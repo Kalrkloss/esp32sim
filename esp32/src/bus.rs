@@ -57,6 +57,7 @@ pub struct SocBus {
     // Preserve the half reference tick at 160 MHz across batches/clock changes.
     pub(crate) clock_half: u64,
     pub(crate) pins_active: bool,
+    pub ble: esp_soc::ble::vhci::Ble,
 }
 
 impl SocBus {
@@ -82,6 +83,7 @@ impl SocBus {
             page_ver: vec![0; 0x10021],
             clock_half: 0,
             pins_active: false,
+            ble: Default::default(),
         }
     }
     fn load<const N: usize>(&mut self, a: u32) -> Result<[u8; N], Fault> {
@@ -143,7 +145,7 @@ impl SocBus {
             _ => None,
         }
     }
-    fn flash_off(&self, addr: u32) -> Option<usize> {
+    pub(crate) fn flash_off(&self, addr: u32) -> Option<usize> {
         let (table, index) = if (DBUS_LOW..DBUS_HIGH).contains(&addr) {
             (0, ((addr - DBUS_LOW) >> 16) as usize)
         } else if (IBUS_LOW..IBUS_HIGH).contains(&addr) {
