@@ -369,7 +369,8 @@ pub struct Peripherals {
     pub i2s0: Box<esp_periph::I2s>,
     /// SPI command or I2S RX pending, refreshed only when either changes.
     pub work_pending: bool,
-    pub ecc: crate::ecc::Ecc,
+    /// Boxed: Peripherals grows by one pointer, not by the ECC parameter RAM.
+    pub ecc: Box<crate::ecc::Ecc>,
 }
 
 // Every peripheral, where it sits (4 KB block number from 0x60000000), and its interrupt sources.
