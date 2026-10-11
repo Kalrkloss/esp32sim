@@ -1,4 +1,4 @@
-//! Finite GDMA OUT gathers (crypto DMA). Descriptors are read only through the shared
+//! Finite GDMA OUT gathers. Descriptors are read only through the shared
 //! `DescriptorWalk`; this file adds the OUT-side bookkeeping, not a second reader.
 use super::{DescriptorWalk, DmaDescriptorFault, DmaDescriptorWord, GdmaOutCh, GDMA_DESCRIPTOR_STEP_BUDGET};
 use emu_core::Fault;

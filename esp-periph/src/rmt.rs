@@ -177,6 +177,8 @@ impl RmtDma {
     /// The descriptor after the last staged SUC_EOF node of a ring still being fed, or 0.
     pub fn dma_resume(&self) -> u32 { self.0.dma_fifo.as_ref().map_or(0, |fifo| fifo.resume) }
     pub fn set_dma_resume(&mut self, next: u32) { self.0.dma_fifo.get_or_insert_with(Default::default).resume = next; }
+    /// Forget a GDMA continuation without allocating or discarding staged symbols.
+    pub fn clear_dma_resume(&mut self) { if let Some(fifo) = self.0.dma_fifo.as_mut() { fifo.resume = 0; } }
     #[cold]
     #[inline(never)]
     pub fn clear_dma_fifo(&mut self) { self.0.dma_fifo = None; }

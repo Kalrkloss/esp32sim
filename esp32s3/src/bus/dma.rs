@@ -36,12 +36,21 @@ impl SocBus {
     /// channel stage the transaction.
     #[cold]
     #[inline(never)]
-    pub(super) fn rmt_dma_write(&mut self, a: u32) {
+    pub(super) fn rmt_dma_write(&mut self, a: u32, v: u32) {
         let stage = match a >> 12 {
             0x60016 => a & 0xfff == 0x2c,
             0x6003f => {
                 let channel = ((a & 0xfff) / crate::periph::GDMA_CH_STRIDE) as usize;
-                self.periph.gdma.out.get(channel).is_some_and(|c| c.running && c.peri_sel == 9)
+                let Some(c) = self.periph.gdma.out.get(channel) else { return; };
+                let off = (a & 0xfff) % crate::periph::GDMA_CH_STRIDE;
+                // IDF v5.5.4 soc/esp32s3/register/soc/gdma_reg.h:
+                // OUT_RST (OUT_CONF0 bit 0), OUTLINK_START bit 21, RESTART bit 22.
+                // Reset self-clears in GDMA, so inspect the written value. A fresh
+                // START owns its new link; only continuation keeps the saved node.
+                if c.peri_sel == 9 && ((off == 0x60 && v & 1 != 0) || (off == 0x80 && v & (1 << 21) != 0)) {
+                    self.periph.rmt.clear_dma_resume();
+                }
+                c.running && c.peri_sel == 9
             }
             _ => false,
         };

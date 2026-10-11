@@ -1531,6 +1531,40 @@ fn rmt_dma_follows_the_idf_ping_pong_ring() {
 }
 
 #[test]
+fn rmt_dma_fresh_start_discards_ring_resume_with_or_without_reset() {
+    const OUT_CONF0: u32 = 0x6003_f060;
+    const OUT_LINK: u32 = 0x6003_f080;
+    let (n0, n1, b0, b1) = (FIRST_DESC, FIRST_DESC + 16, FIRST_DESC + 64, FIRST_DESC + 68);
+    let control = (1 << 31) | (1 << 30) | (4 << 12) | 4;
+    for reset in [true, false] {
+        let mut bus = dma_bus();
+        for (node, buf, next, symbol) in [(n0, b0, n1, 0x8000 | 35 | (15 << 16)), (n1, b1, n0, 0x8000 | 10 | (40 << 16))] {
+            bus.write32(node, control).unwrap();
+            bus.write32(node + 4, buf).unwrap();
+            bus.write32(node + 8, next).unwrap();
+            bus.write32(buf, symbol).unwrap();
+        }
+        let c = &mut bus.periph.gdma.out[0];
+        c.running = false; c.peri_sel = 9; c.conf0 = 1 << 2; c.conf1 = 1 << 12;
+        bus.write32(0x6001_602c, 1 << 25).unwrap();
+        bus.write32(OUT_LINK, (n0 & 0xf_ffff) | (1 << 21)).unwrap();
+        assert_eq!(bus.periph.gdma.out[0].eof_desc, n0);
+        assert_eq!(bus.periph.rmt.dma_resume(), n1);
+        // Hand the first node back to DMA and relink it without disabling RMT DMA.
+        bus.write32(n0, control).unwrap();
+        if reset {
+            bus.write32(OUT_CONF0, (1 << 2) | 1).unwrap();
+            assert_eq!(bus.periph.rmt.dma_resume(), 0, "OUT_RST clears continuation even before START");
+        }
+        bus.write32(OUT_LINK, (n0 & 0xf_ffff) | (1 << 21)).unwrap();
+        assert_eq!(bus.periph.gdma.out[0].eof_desc, n0, "START uses its new link, not the stale resume node");
+        assert_eq!(bus.periph.rmt.dma_resume(), n1);
+        assert_eq!(bus.periph.rmt.dma_fifo_len(), 2);
+        assert!(bus.periph.rmt.dma_fifo().iter().all(|&symbol| symbol == 0x8000 | 35 | (15 << 16)));
+    }
+}
+
+#[test]
 fn rmt_dma_ring_waits_for_a_cpu_owned_node_and_resumes_after_restart() {
     const OUT_LINK: u32 = 0x6003_f080;
     let (n0, n1, buf) = (FIRST_DESC, FIRST_DESC + 16, FIRST_DESC + 64);

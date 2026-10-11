@@ -456,7 +456,7 @@ impl SocBus {
         self.periph_write_inner(addr, v);
         // RMT TX3 DMA is staged at MMIO boundaries once DMA_ACCESS_EN is set; one bit
         // test keeps every other write on main's path.
-        if self.periph.rmt.ch[3].conf0 & (1 << 25) != 0 { self.rmt_dma_write(addr & !3); }
+        if self.periph.rmt.ch[3].conf0 & (1 << 25) != 0 { self.rmt_dma_write(addr & !3, v); }
         self.refresh_tick_budget();   // the write may have armed something
     }
     fn periph_write_inner(&mut self, addr: u32, v: u32) {
