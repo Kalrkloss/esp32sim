@@ -11,11 +11,11 @@ and the old opcode mapping. Main's pin-address device matching is preserved.
 Both slot counts expand one macro body into separate non-generic impls, so
 S3/C3/C6 still compile one copy of each I2C method; a generic impl would be
 instantiated in every calling crate and inlined differently there.
-S3's checked descriptor reader and bounded descriptor visits move into
-esp-periph as `dma_descriptor_reader!`, which expands them on each chip bus as
-monomorphic code; the S3 expansion is the code S3 ran before. Classic expands
-it over memory-only descriptor access and adds a finite chain walk with cycle
-rejection. The S3 SPI, camera and crypto walks remain in place. DMA errors do
+Classic uses #201's `esp_periph::gdma::DescriptorWalk::read_with` with a
+memory-only word reader and finite chain walks with cycle rejection. The shared
+walker owns descriptor decoding, word-specific faults and visit budgets. No
+second `dma_descriptor_reader!` macro or `esp_periph::dma` module remains.
+S3's SPI, camera and crypto walks retain main's implementation. DMA errors do
 not publish classic TX completion or send malformed transfers to the board.
 
 No existing chip gains fields or per-tick work. Classic peripheral clocks and

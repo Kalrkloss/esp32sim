@@ -7,9 +7,9 @@
     "killed": true
   },
   {
-    "file": "esp-periph/src/dma.rs",
-    "mutation": "if self.remaining == 0 -> if self.remaining == usize::MAX",
-    "test": "descriptor_reader_decodes_words_bounds_visits_and_names_faulting_word",
+    "file": "esp-periph/src/gdma/receive.rs",
+    "mutation": "self.remaining -= 1;\n        let mut word = |offset, kind| -> self.remaining = 2;\n        let mut word = |offset, kind|",
+    "test": "walk_reads_any_word_source_and_stops_at_budget",
     "crate": "esp-periph",
     "killed": true
   },
