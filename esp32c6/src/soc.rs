@@ -59,7 +59,7 @@ impl esp_soc::SocBus for SocBus {
         let board = self.board.next_deadline().map(|at| at.saturating_sub(self.cycles).max(1));
         let deadline = timer.into_iter().chain(board).min();
         // work_pending is false on idle rounds; it covers both SPI and RX.
-        if self.periph.work_pending && self.periph.i2s0.rx_running() { Some(deadline.unwrap_or(u64::MAX).min(256)) } else { deadline }
+        if self.periph.work_pending && self.periph.optional.i2s0.rx_running() { Some(deadline.unwrap_or(u64::MAX).min(256)) } else { deadline }
     }
     fn irq_dirty(&mut self) -> &mut bool { &mut self.irq_dirty }
     fn refresh_irq(&mut self) -> bool { self.periph.refresh_lines(); true }
@@ -109,7 +109,7 @@ impl esp_soc::SocBus for SocBus {
         let mut old = std::mem::replace(&mut self.periph, periph::Peripherals::new(mac));
         let p = &mut self.periph;
         p.efuse = old.efuse;
-        p.i2s0.keep_rx_input(&mut old.i2s0);
+        p.optional.i2s0.keep_rx_input(&mut old.optional.i2s0);
         p.adc.analog = old.adc.analog;
         p.adc.analog.set_stream_clock_offset(self.cycles); // the new peripheral clock starts at zero
         p.misc.log_unknown = old.misc.log_unknown;
@@ -195,11 +195,11 @@ impl esp_soc::SocBus for SocBus {
 
     fn board(&mut self) -> &mut dyn BoardModel { &mut *self.board }
     fn board_ref(&self) -> &dyn BoardModel { &*self.board }
-    fn i2s_input(&mut self, port: usize) -> Option<&mut esp_periph::i2s::PcmInput> { if port == 0 { Some(self.periph.i2s0.rx_input()) } else { None } }
-    fn pcm_sources(&self) -> Option<&esp_periph::i2s::PcmSources> { self.periph.i2s0.pcm_bank_ref() }
+    fn i2s_input(&mut self, port: usize) -> Option<&mut esp_periph::i2s::PcmInput> { if port == 0 { Some(self.periph.optional.i2s0.rx_input()) } else { None } }
+    fn pcm_sources(&self) -> Option<&esp_periph::i2s::PcmSources> { self.periph.optional.i2s0.pcm_bank_ref() }
     fn attach_pcm_sources(&mut self) -> Option<&mut esp_periph::i2s::PcmSources> {
         self.flush_ticks();
-        Some(esp_soc::soc::attach_pcm_sources(self.periph.i2s0.pcm_bank(), self.cycles, periph::CPU_HZ))
+        Some(esp_soc::soc::attach_pcm_sources(self.periph.optional.i2s0.pcm_bank(), self.cycles, periph::CPU_HZ))
     }
     fn audio(&self) -> (&[i16], u32) { (&[], 44100) }
     fn irq_sources_of(&self, _core: usize, line: u32) -> Vec<usize> { (0..src::COUNT).filter(|&s| self.periph.intmtx.map[s] == line).collect() }
