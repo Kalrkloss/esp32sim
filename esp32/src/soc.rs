@@ -84,6 +84,8 @@ impl esp_soc::SocBus for SocBus {
         let cause = self.periph.rtc.0.reset_cause;
         let old = std::mem::replace(&mut self.periph, Peripherals::new(mac));
         self.periph.gpio.restore_inputs(&old.gpio);
+        self.periph.spi0.0.jedec = old.spi0.0.jedec;
+        self.periph.spi1.0.jedec = old.spi1.0.jedec;
         self.periph.efuse = old.efuse;
         self.periph.misc.log_unknown = old.misc.log_unknown;
         self.periph.gpio.gpio.strap = old.gpio.gpio.strap;
