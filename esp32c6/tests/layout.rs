@@ -9,7 +9,7 @@ fn optional_devices_preserve_the_existing_i2s_indirection() {
 // Other targets still exercise the architecture-independent offset assertion above.
 #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
 #[test]
-fn ecc_does_not_grow_the_native_hot_bus() {
+fn cold_devices_do_not_grow_the_native_hot_bus() {
     use esp32c6::{bus::SocBus, periph::Peripherals};
     assert_eq!(std::mem::size_of::<Peripherals>(), 8624);
     assert_eq!(std::mem::size_of::<SocBus>(), 10176);

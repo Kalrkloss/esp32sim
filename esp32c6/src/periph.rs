@@ -331,12 +331,13 @@ pub fn efuse_c6(mac: [u8; 6], rev_major: u32, rev_minor: u32, pkg: u32, blk_majo
     e
 }
 
-/// Cold devices share one allocation so unused ECC does not grow the hot bus.
+/// Cold devices share one allocation so unused ECC/PARLIO do not grow the hot bus.
 /// I2S stays at offset zero: its existing data path keeps the same indirection.
 #[repr(C)]
 pub struct OptionalPeripherals {
     pub i2s0: esp_periph::I2s,
     pub ecc: crate::ecc::Ecc,
+    pub parlio: crate::parlio::Parlio,
 }
 
 pub struct Peripherals {
@@ -383,7 +384,6 @@ pub struct Peripherals {
     pub optional: Box<OptionalPeripherals>,
     /// SPI command or I2S RX pending, refreshed only when either changes.
     pub work_pending: bool,
-    pub parlio: crate::parlio::Parlio,
 }
 
 // Every peripheral, where it sits (4 KB block number from 0x60000000), and its interrupt sources.
@@ -395,7 +395,7 @@ device_set! { Peripherals; inline always; clock: (clock) CPU_HZ, [(ClockDomain::
     0x02 "SPI0" (spi0) => [];
     0x03 "SPI1" (spi1) => [];
     0x06 "RMT" (rmt) => [src::RMT];
-    0x15 "PARL_IO" optional (parlio) => [src::PARLIO];
+    0x15 "PARL_IO" optional (optional.parlio) => [src::PARLIO];
     0x07 "LEDC" optional (ledc) => [src::LEDC];
     0x08 "TIMG0" (timg[0]) => [src::TG0_T0];
     0x09 "TIMG1" (timg[1]) => [src::TG1_T0];
@@ -459,11 +459,11 @@ impl Peripherals {
             spi0: SpiMemC6({ let mut s = SpiMem::new(false); s.has_psram = false; s }),
             spi1: SpiMemC6({ let mut s = SpiMem::new(true); s.has_psram = false; s }),   // no PSRAM on the C6
             sha: Sha::new(), aes: Aes::new(), rsa: Rsa::new(),
-            rmt: RmtC6::new(CPU_HZ), parlio: crate::parlio::Parlio::new(), gdma: GdmaC6::new(), spi2: GpSpi::new(), radio: Ieee802154::new(), modem_bb: ModemBb::new(), wifi_mac: WifiMac::new(),
+            rmt: RmtC6::new(CPU_HZ), gdma: GdmaC6::new(), spi2: GpSpi::new(), radio: Ieee802154::new(), modem_bb: ModemBb::new(), wifi_mac: WifiMac::new(),
             intmtx: IntMatrix::new(), intc: Intc::new(), cache: Cache::new(), lpsys: LpSys::new(), pcr: Pcr::new(), ana_mst: AnaMst::new(), assist_debug: AssistDebug::new(),
             rng: Rng::new(), cpu_sub: RegRam::new(),
             misc: Misc::new(), spi_exec: false, clock: Self::new_clock(),
-            optional: Box::new(OptionalPeripherals { i2s0: esp_periph::I2s::new(CPU_HZ), ecc: Default::default() }), work_pending: false,
+            optional: Box::new(OptionalPeripherals { i2s0: esp_periph::I2s::new(CPU_HZ), ecc: Default::default(), parlio: crate::parlio::Parlio::new() }), work_pending: false,
             last_status: [0; 4],
         }
     }
@@ -579,8 +579,8 @@ impl Peripherals {
 mod parlio_layout_tests {
     use super::*;
     #[test]
-    fn parlio_storage_follows_clock_and_cached_status() {
-        assert!(std::mem::offset_of!(Peripherals, parlio) >= std::mem::offset_of!(Peripherals, clock) + size_of::<ClockTree<4>>());
-        assert!(std::mem::offset_of!(Peripherals, parlio) >= std::mem::offset_of!(Peripherals, last_status) + size_of::<[u32; 4]>());
+    fn parlio_storage_shares_the_cold_i2s_allocation() {
+        assert_eq!(std::mem::offset_of!(OptionalPeripherals, i2s0), 0);
+        assert!(std::mem::offset_of!(OptionalPeripherals, parlio) >= size_of::<esp_periph::I2s>());
     }
 }

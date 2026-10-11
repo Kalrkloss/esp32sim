@@ -459,14 +459,14 @@ impl SocBus {
     /// Stage finite PARLIO DMA transfers at MMIO boundaries, including clock-off prefill.
     fn stage_parlio_dma(&mut self) {
         if let Some(ch) = self.periph.gdma.gdma.out_channel_for(9) {
-            let limit = 65535usize.saturating_sub(self.periph.parlio.tx().fifo.len());
+            let limit = 65535usize.saturating_sub(self.periph.optional.parlio.tx().fifo.len());
             let mut data = Vec::new();
             match self.gather_dma_out(ch, limit + 1, &mut data) {
-                true if data.len() <= limit => self.periph.parlio.tx().fifo.extend(data),
+                true if data.len() <= limit => self.periph.optional.parlio.tx().fifo.extend(data),
                 _ => {
                     let c = &mut self.periph.gdma.gdma.out[ch];
                     c.running = false; c.int_raw = (c.int_raw & !8) | 4;
-                    self.periph.parlio.tx().fifo.clear();
+                    self.periph.optional.parlio.tx().fifo.clear();
                 }
             }
             self.irq_dirty = true;
@@ -474,7 +474,7 @@ impl SocBus {
         // PCR PARL_CLK_TX_CONF (clock and TX reset) is applied here, never at the PCR write,
         // so IDF start-up clock writes do not allocate an unused transmitter.
         let clock = self.periph.pcr.read(0xac);
-        let Some(tx) = self.periph.parlio.tx.as_mut() else { return };
+        let Some(tx) = self.periph.optional.parlio.tx.as_mut() else { return };
         tx.set_clock(clock);
         tx.complete();
         if let Some(frame) = tx.done.take() {
@@ -627,7 +627,7 @@ mod parlio_dma_tests {
         use esp_periph::Device;
         let mut bus = SocBus::new(1024, [0; 6]);
         assert_eq!(size_of::<crate::parlio::Parlio>(), size_of::<usize>());
-        assert!(std::mem::offset_of!(Peripherals, parlio) > std::mem::offset_of!(Peripherals, systimer));
+        assert_eq!(size_of::<Box<crate::periph::OptionalPeripherals>>(), size_of::<usize>());
         // IDF start-up may configure the PARLIO TX clock long before PARLIO is used.
         bus.write32(0x6009_60ac, (1 << 18) | (1 << 16) | 74).unwrap();
         bus.write32(0x6009_60ac, (1 << 18) | (1 << 19)).unwrap();
@@ -635,15 +635,15 @@ mod parlio_dma_tests {
             bus.write32(0x6009_1008, 1).unwrap();
             bus.tick(64);
             bus.periph.refresh_lines();
-            assert!(bus.periph.parlio.tx.is_none());
-            assert_eq!(bus.periph.parlio.clock(), None);
+            assert!(bus.periph.optional.parlio.tx.is_none());
+            assert_eq!(bus.periph.optional.parlio.clock(), None);
             assert!(bus.periph.misc.active_optional.is_empty());
             assert_eq!(bus.periph.source_status()[1] & (1 << 31), 0);
         }
         bus.periph.write32(0x6001_5008, (1 << 19) | (1 << 2));
-        assert!(bus.periph.parlio.tx.is_some());
-        assert!(bus.periph.parlio.tx().running());
-        assert_eq!(bus.periph.parlio.clock(), None);
+        assert!(bus.periph.optional.parlio.tx.is_some());
+        assert!(bus.periph.optional.parlio.tx().running());
+        assert_eq!(bus.periph.optional.parlio.clock(), None);
         bus.periph.tick(64);
         assert!(bus.periph.misc.active_optional.is_empty());
     }
@@ -659,10 +659,10 @@ mod parlio_dma_tests {
         let c = &mut bus.periph.gdma.gdma.out[0];
         c.running = true; c.desc = desc; c.peri_sel = 9;
         bus.write32(0x6008_004c, u32::MAX).unwrap();
-        assert!(bus.periph.parlio.tx.is_none());
+        assert!(bus.periph.optional.parlio.tx.is_none());
         assert!(bus.periph.gdma.gdma.out[0].running);
         bus.write32(0x6008_003c, u32::MAX).unwrap();
-        assert_eq!(bus.periph.parlio.tx().fifo.len(), 1);
+        assert_eq!(bus.periph.optional.parlio.tx().fifo.len(), 1);
         assert!(!bus.periph.gdma.gdma.out[0].running);
     }
 
@@ -683,7 +683,7 @@ mod parlio_dma_tests {
         let c = &mut bus.periph.gdma.gdma.out[0];
         c.running = true; c.desc = desc; c.peri_sel = 9; c.conf1 = 1 << 12;
         bus.write32(0x6008_003c, u32::MAX).unwrap();
-        assert_eq!(bus.periph.parlio.tx().fifo.len(), 24);
+        assert_eq!(bus.periph.optional.parlio.tx().fifo.len(), 24);
         assert!(frames.lock().unwrap().is_empty());
         bus.write32(0x6001_5008, (24 << 2) | (1 << 19) | (3 << 27)).unwrap();
         assert_eq!(*frames.lock().unwrap(), [(4, vec![false; 24])]);
@@ -766,11 +766,11 @@ mod parlio_dma_tests {
     #[test]
     fn pcr_tx_reset_clears_an_allocated_transmitter() {
         let mut bus = SocBus::new(1024, [0; 6]);
-        bus.periph.parlio.tx().fifo.extend([1, 2, 3]);
+        bus.periph.optional.parlio.tx().fifo.extend([1, 2, 3]);
         bus.write32(0x6009_60ac, 1 << 18).unwrap();
-        assert_eq!(bus.periph.parlio.tx().fifo.len(), 3);
+        assert_eq!(bus.periph.optional.parlio.tx().fifo.len(), 3);
         bus.write32(0x6009_60ac, (1 << 18) | (1 << 19)).unwrap();
-        assert!(bus.periph.parlio.tx().fifo.is_empty());
+        assert!(bus.periph.optional.parlio.tx().fifo.is_empty());
     }
 
     #[test]
@@ -824,9 +824,9 @@ mod parlio_dma_tests {
             bus.write32(desc + 8, if case == 3 { desc } else { 0 }).unwrap();
             let c = &mut bus.periph.gdma.gdma.out[0];
             c.running = true; c.desc = if case == 4 { desc + 1 } else { desc }; c.peri_sel = 9; c.conf1 = 1 << 12;
-            if case == 5 { bus.periph.parlio.tx().fifo.resize(65535, 1); }
+            if case == 5 { bus.periph.optional.parlio.tx().fifo.resize(65535, 1); }
             bus.stage_parlio_dma();
-            assert!(bus.periph.parlio.tx().fifo.is_empty());
+            assert!(bus.periph.optional.parlio.tx().fifo.is_empty());
             assert_eq!(bus.periph.gdma.gdma.out[0].int_raw & 4, 4, "case {case}");
             assert!(!bus.periph.gdma.gdma.out[0].running);
         }
