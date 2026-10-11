@@ -26,8 +26,7 @@ pub struct Rmt {
     pub tx_count: u64,
     /// S3 TX3 DMA symbols staged at MMIO boundaries; allocated on first use. It takes the
     /// slot of the former `i64` clock ratio (now a `u8` after `running`), so `Rmt` keeps its layout.
-    #[allow(clippy::box_collection, reason = "the unused queue handle stays pointer-sized")]
-    dma_fifo: Option<Box<VecDeque<u32>>>,
+    dma_fifo: Option<Box<DmaQueue>>,
     running: u8,
     cpu_per_apb: u8,
 }
@@ -132,7 +131,7 @@ impl Rmt {
             }
             if !DMA && c.rd != 0 && c.rd.is_multiple_of(mem_words) && c.conf0 & (1 << 3) != 0 { c.bits.clear(); }
             let sym = if DMA {
-                let Some(symbol) = self.dma_fifo.as_deref_mut().and_then(VecDeque::pop_front) else { c.acc_cycles = 0; break; };
+                let Some(symbol) = self.dma_fifo.as_deref_mut().and_then(|fifo| fifo.symbols.pop_front()) else { c.acc_cycles = 0; break; };
                 symbol
             } else { self.mem[base + (c.rd % mem_words)] };
             let (d0, l0, d1, l1) = ((sym & 0x7fff) as i64, sym & 0x8000 != 0, ((sym >> 16) & 0x7fff) as i64, sym & 0x8000_0000 != 0);
@@ -154,6 +153,10 @@ impl Rmt {
     }
 }
 
+/// Staged TX3 DMA symbols and, while a descriptor ring is being fed, where staging resumes.
+#[derive(Default)]
+pub struct DmaQueue { symbols: VecDeque<u32>, resume: u32 }
+
 /// S3 TX3 DMA view of the shared transmitter; compact C3/C6 transmitters never select DMA.
 /// IDF v5.5.4 components/soc/esp32s3/register/soc/rmt_struct.h:117-120 puts
 /// DMA_ACCESS_EN at bit 25 (v4.4.8 calls bits 25..31 reserved).
@@ -169,8 +172,11 @@ impl std::ops::DerefMut for RmtDma {
 }
 impl RmtDma {
     pub fn new(cpu_hz: u64) -> Self { Self(Rmt::new(cpu_hz)) }
-    pub fn dma_fifo(&mut self) -> &mut VecDeque<u32> { self.0.dma_fifo.get_or_insert_with(Default::default) }
-    pub fn dma_fifo_len(&self) -> usize { self.0.dma_fifo.as_ref().map_or(0, |fifo| fifo.len()) }
+    pub fn dma_fifo(&mut self) -> &mut VecDeque<u32> { &mut self.0.dma_fifo.get_or_insert_with(Default::default).symbols }
+    pub fn dma_fifo_len(&self) -> usize { self.0.dma_fifo.as_ref().map_or(0, |fifo| fifo.symbols.len()) }
+    /// The descriptor after the last staged SUC_EOF node of a ring still being fed, or 0.
+    pub fn dma_resume(&self) -> u32 { self.0.dma_fifo.as_ref().map_or(0, |fifo| fifo.resume) }
+    pub fn set_dma_resume(&mut self, next: u32) { self.0.dma_fifo.get_or_insert_with(Default::default).resume = next; }
     #[cold]
     #[inline(never)]
     pub fn clear_dma_fifo(&mut self) { self.0.dma_fifo = None; }

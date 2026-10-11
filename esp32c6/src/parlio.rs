@@ -16,7 +16,6 @@ pub struct Parlio {
 impl Parlio {
     pub fn new() -> Self { Self::default() }
     pub fn tx(&mut self) -> &mut Tx { self.tx.get_or_insert_with(Default::default) }
-    pub fn set_clock(&mut self, value: u32) { self.tx().set_clock(value); }
 }
 impl Device for Parlio {
     fn read(&mut self, off: u32) -> u32 { self.tx().read(off) }

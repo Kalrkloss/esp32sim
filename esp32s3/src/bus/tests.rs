@@ -1457,7 +1457,7 @@ fn rmt_dma_stages_symbols_and_returns_descriptors_without_a_tick_pump() {
 
 #[test]
 fn rmt_dma_rejects_malformed_chains_and_bounds_cycles() {
-    for case in 0..8 {
+    for case in 0..9 {
         let mut bus = dma_bus();
         let data = FIRST_DESC + 64;
         bus.periph.gdma.out[0].peri_sel = 9;
@@ -1469,10 +1469,91 @@ fn rmt_dma_rejects_malformed_chains_and_bounds_cycles() {
         bus.write32(FIRST_DESC + 8, if case == 5 { FIRST_DESC } else { 0 }).unwrap();
         if case == 6 { bus.periph.gdma.out[0].desc = 0x6001_602c; }
         if case == 7 { bus.periph.rmt.dma_fifo().resize(24 * 4096 + 1, 1); }
+        if case == 8 {
+            // OUT_CONF0/CONF1/INT_RAW read as an owned EOF descriptor with a RAM buffer.
+            let c = &mut bus.periph.gdma.out[0];
+            c.desc = 0x6003_f060; c.conf0 = (3 << 30) | (4 << 12) | 4; c.conf1 = 0x3fc9_1140;
+        }
         bus.write32(0x6001_602c, 1 << 25).unwrap();
         assert!(!bus.periph.gdma.out[0].running, "case {case}");
         assert_eq!(bus.periph.gdma.out[0].int_raw & 4, 4, "case {case}");
         assert_eq!(bus.periph.rmt.int_raw & (1 << 28), 1 << 28);
         assert_eq!(bus.periph.rmt.dma_fifo_len(), 0);
     }
+}
+
+/// IDF v5.5.5 esp_driver_rmt/src/rmt_tx.c DMA mode: two ring nodes, SUC_EOF on both,
+/// owner check and automatic write-back (rmt_tx.c:42-46, 79-95), refilled from the OUT_EOF
+/// callback and continued with gdma_append (1105-1132); the last node's link is cut
+/// (rmt_tx_mark_eof, 602-649). Two ping-pong halves of two symbols carry a four-half frame.
+#[test]
+fn rmt_dma_follows_the_idf_ping_pong_ring() {
+    const OUT_LINK: u32 = 0x6003_f080;
+    const OUT_INT_CLR: u32 = 0x6003_f074;
+    let (n0, n1) = (FIRST_DESC, FIRST_DESC + 16);
+    let (b0, b1) = (FIRST_DESC + 64, FIRST_DESC + 72);
+    let one = 0x8000 | 35 | (15 << 16);
+    let zero = 0x8000 | 10 | (40 << 16);
+    let mut bus = dma_bus();
+    let fill = |bus: &mut SocBus, node: u32, buf: u32, symbols: [u32; 2], next: u32| {
+        bus.write32(buf, symbols[0]).unwrap();
+        bus.write32(buf + 4, symbols[1]).unwrap();
+        bus.write32(node, (1 << 31) | (1 << 30) | (8 << 12) | 8).unwrap();
+        bus.write32(node + 4, buf).unwrap();
+        bus.write32(node + 8, next).unwrap();
+    };
+    let c = &mut bus.periph.gdma.out[0];
+    c.running = false; c.peri_sel = 9; c.conf0 = 1 << 2; c.conf1 = 1 << 12; c.int_ena = 1 << 1;
+    bus.write32(0x6001_602c, 1 << 25).unwrap();        // rmt_ll_tx_enable_dma
+    fill(&mut bus, n0, b0, [one, zero], n1);
+    fill(&mut bus, n1, b1, [one, one], n0);
+    bus.write32(OUT_LINK, (n0 & 0xf_ffff) | (1 << 21)).unwrap();   // gdma_start
+    assert_eq!((bus.periph.rmt.dma_fifo_len(), bus.periph.gdma.out[0].eof_desc), (2, n0));
+    bus.write32(0x6001_602c, (1 << 25) | 1).unwrap();             // tx_start
+    assert_eq!(bus.periph.rmt.dma_fifo_len(), 4, "the second node is ready too");
+    let mut halves = [([zero, zero], n1), ([one, 0], 0)].into_iter();
+    let mut refill = n0;
+    while bus.periph.gdma.out[0].running {
+        bus.write32(OUT_INT_CLR, 1 << 1).unwrap();                 // GDMA ISR clears, then the callback
+        let Some((symbols, next)) = halves.next() else { break };
+        assert_eq!(bus.read32(refill).unwrap() >> 31, 0, "consumed node returned to the CPU");
+        let buf = if refill == n0 { b0 } else { b1 };
+        fill(&mut bus, refill, buf, symbols, next);
+        bus.write32(OUT_LINK, (n0 & 0xf_ffff) | (1 << 22)).unwrap(); // gdma_append: RESTART
+        refill = if refill == n0 { n1 } else { n0 };
+    }
+    bus.write32(OUT_INT_CLR, 1 << 1).unwrap();
+    assert!(!bus.periph.gdma.out[0].running);
+    assert_eq!(bus.periph.gdma.out[0].int_raw & (1 << 2), 0, "no descriptor error");
+    assert_eq!(bus.periph.rmt.dma_fifo_len(), 8);
+    bus.periph.rmt.tick(10_000);
+    assert_eq!(bus.periph.rmt.done, vec![(3, vec![true, false, true, true, false, false, true])]);
+}
+
+#[test]
+fn rmt_dma_ring_waits_for_a_cpu_owned_node_and_resumes_after_restart() {
+    const OUT_LINK: u32 = 0x6003_f080;
+    let (n0, n1, buf) = (FIRST_DESC, FIRST_DESC + 16, FIRST_DESC + 64);
+    let mut bus = dma_bus();
+    for (node, control, next) in [(n0, (1 << 31) | (1 << 30) | (4 << 12) | 4, n1), (n1, (1 << 30) | (4 << 12) | 4, n0)] {
+        bus.write32(node, control).unwrap();
+        bus.write32(node + 4, buf).unwrap();
+        bus.write32(node + 8, next).unwrap();
+    }
+    bus.write32(buf, 0x8000 | 35 | (15 << 16)).unwrap();
+    let c = &mut bus.periph.gdma.out[0];
+    c.running = false; c.peri_sel = 9; c.conf0 = 1 << 2; c.conf1 = 1 << 12;
+    bus.write32(0x6001_602c, 1 << 25).unwrap();
+    bus.write32(OUT_LINK, (n0 & 0xf_ffff) | (1 << 21)).unwrap();
+    assert_eq!(bus.periph.rmt.dma_fifo_len(), 1);
+    // Node 1 still belongs to the CPU: the channel waits without a descriptor error.
+    bus.write32(OUT_LINK, (n0 & 0xf_ffff) | (1 << 22)).unwrap();
+    assert!(bus.periph.gdma.out[0].running);
+    assert_eq!((bus.periph.gdma.out[0].int_raw & (1 << 2), bus.periph.rmt.dma_fifo_len()), (0, 1));
+    bus.write32(n1, (1 << 31) | (1 << 30) | (4 << 12) | 4).unwrap();
+    bus.write32(n1 + 8, 0).unwrap();
+    bus.write32(OUT_LINK, (n0 & 0xf_ffff) | (1 << 22)).unwrap();
+    assert_eq!(bus.periph.rmt.dma_fifo_len(), 2);
+    assert_eq!(bus.periph.gdma.out[0].eof_desc, n1);
+    assert!(!bus.periph.gdma.out[0].running);
 }

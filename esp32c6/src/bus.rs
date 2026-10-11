@@ -305,46 +305,31 @@ impl SocBus {
         self.irq_dirty = true;
     }
 
-    /// Finite SRAM-backed OUT transfers shared by SPI2, AES and PARLIO.
+    /// Finite SRAM-backed OUT transfers for SPI2, AES and PARLIO through the shared gather:
+    /// one transaction per start, so the channel stops after it with OUT_TOTAL_EOF, or with
+    /// OUT_DSCR_ERR on a descriptor fault. `out` keeps what was gathered before a fault.
     /// GDMA fields: IDF v5.5.4 soc/esp32c6/register/soc/gdma_reg.h:1665-1716.
-    fn gather_dma_out(&mut self, ch: usize, limit: usize) -> Result<Vec<u8>, ()> {
-        let result = (|| {
-            let mut data = Vec::new();
-            for _ in 0..4096 {
-                let c = self.periph.gdma.gdma.out[ch];
-                if c.desc & 3 != 0 || self.sram_bytes(c.desc, 12).is_none() { return Err(()); }
-                let d = read_desc(&|a| self.sram32(a), c.desc);
-                if d.length > d.size || (c.conf1 & (1 << 12) != 0 && !d.owner_dma) { return Err(()); }
-                let n = (d.length as usize).min(limit - data.len());
-                data.extend_from_slice(self.sram_bytes(d.buf, n).ok_or(())?);
-                if c.conf0 & 4 != 0 {
-                    let word = self.sram32(c.desc) & !(1 << 31);
-                    if !self.sram_store(c.desc, &word.to_le_bytes()) { return Err(()); }
-                }
-                let c = &mut self.periph.gdma.gdma.out[ch];
-                c.int_raw |= 1;
-                if d.eof { c.int_raw |= 2; c.eof_desc = d.addr; }
-                c.desc = d.next; c.buf_pos = 0;
-                if d.next == 0 || d.eof || data.len() == limit {
-                    c.running = false; c.int_raw |= 8;
-                    return Ok(data);
-                }
-            }
-            Err(())
-        })();
-        if result.is_err() {
-            let c = &mut self.periph.gdma.gdma.out[ch];
-            c.running = false; c.int_raw |= 4;
+    fn gather_dma_out(&mut self, ch: usize, limit: usize, out: &mut Vec<u8>) -> bool {
+        let mut memory = esp_periph::gdma::SramOut { base: SRAM_LOW, bytes: &mut self.sram, channel: &mut self.periph.gdma.gdma.out[ch] };
+        let result = esp_periph::gdma::gather_out(&mut memory, limit, out);
+        let c = &mut self.periph.gdma.gdma.out[ch];
+        c.running = false; c.buf_pos = 0;
+        match result {
+            Ok(next) => { c.desc = next; c.int_raw |= 1 << 3; }
+            Err(_) => c.int_raw |= 1 << 2,
         }
         self.irq_dirty = true;
-        result
+        result.is_ok()
     }
 
     fn spi2_dma_tx(&mut self) {
         let Some(bits) = self.periph.spi2.dma_tx_pending else { return };
         let want = (bits as usize).div_ceil(8);
         let Some(ch) = self.periph.gdma.gdma.out_channel_for(0) else { return };   // not started yet: the round's end retries
-        let Ok(data) = self.gather_dma_out(ch, want) else { return };
+        // A malformed chain still completes the transfer with the bytes gathered before the
+        // fault, as before the shared gather; GDMA additionally reports OUT_DSCR_ERR.
+        let mut data = Vec::with_capacity(want);
+        self.gather_dma_out(ch, want, &mut data);
         self.periph.spi2.complete_dma_tx(&data);
     }
 
@@ -352,13 +337,15 @@ impl SocBus {
     /// this chip: the OUT chain is the input, the cipher is the shared model's, the result goes
     /// into the IN chain, each descriptor written back with its length, SUC_EOF on the last and
     /// the owner handed to the CPU. All of it happens in the round that set the trigger.
-    /// Malformed OUT chains report GDMA descriptor errors without transforming partial input.
+    /// A chain that leaves SRAM or is otherwise malformed ends the input where it is: the driver
+    /// sees the AES done with what was delivered (as before), and GDMA reports OUT_DSCR_ERR.
     /// A short IN chain receives the result that fits.
     fn aes_dma_step(&mut self) {
         self.periph.aes.dma_pending = false;
         let (out_ch, in_ch) = { let g = &self.periph.gdma.gdma; (g.out_channel_for(6), g.in_channel_for(6)) };
         if let (Some(out_ch), Some(in_ch)) = (out_ch, in_ch) {
-            let Ok(input) = self.gather_dma_out(out_ch, 4096 * 4095) else { return };
+            let mut input = Vec::new();
+            self.gather_dma_out(out_ch, usize::MAX, &mut input);
 
             let output = self.periph.aes.transform_blocks(&input);
             let (mut desc, mut pos, mut last) = (self.periph.gdma.gdma.inp[in_ch].desc, 0usize, 0);
@@ -473,8 +460,9 @@ impl SocBus {
     fn stage_parlio_dma(&mut self) {
         if let Some(ch) = self.periph.gdma.gdma.out_channel_for(9) {
             let limit = 65535usize.saturating_sub(self.periph.parlio.tx().fifo.len());
-            match self.gather_dma_out(ch, limit + 1) {
-                Ok(data) if data.len() <= limit => self.periph.parlio.tx().fifo.extend(data),
+            let mut data = Vec::new();
+            match self.gather_dma_out(ch, limit + 1, &mut data) {
+                true if data.len() <= limit => self.periph.parlio.tx().fifo.extend(data),
                 _ => {
                     let c = &mut self.periph.gdma.gdma.out[ch];
                     c.running = false; c.int_raw = (c.int_raw & !8) | 4;
@@ -483,7 +471,11 @@ impl SocBus {
             }
             self.irq_dirty = true;
         }
+        // PCR PARL_CLK_TX_CONF (clock and TX reset) is applied here, never at the PCR write,
+        // so IDF start-up clock writes do not allocate an unused transmitter.
+        let clock = self.periph.pcr.read(0xac);
         let Some(tx) = self.periph.parlio.tx.as_mut() else { return };
+        tx.set_clock(clock);
         tx.complete();
         if let Some(frame) = tx.done.take() {
             // IDF v5.5.4 components/soc/esp32c6/include/soc/gpio_sig_map.h:84: DATA0=47.
@@ -636,6 +628,9 @@ mod parlio_dma_tests {
         let mut bus = SocBus::new(1024, [0; 6]);
         assert_eq!(size_of::<crate::parlio::Parlio>(), size_of::<usize>());
         assert!(std::mem::offset_of!(Peripherals, parlio) > std::mem::offset_of!(Peripherals, systimer));
+        // IDF start-up may configure the PARLIO TX clock long before PARLIO is used.
+        bus.write32(0x6009_60ac, (1 << 18) | (1 << 16) | 74).unwrap();
+        bus.write32(0x6009_60ac, (1 << 18) | (1 << 19)).unwrap();
         for _ in 0..8 {
             bus.write32(0x6009_1008, 1).unwrap();
             bus.tick(64);
@@ -733,6 +728,49 @@ mod parlio_dma_tests {
                 assert_eq!((c.int_raw & 15, c.eof_desc), (11, desc));
             }
         }
+    }
+
+    #[test]
+    fn malformed_out_chain_still_completes_spi_and_aes_with_gathered_bytes() {
+        for trigger in [0, 6] {
+            let mut bus = SocBus::new(1024, [0; 6]);
+            let desc = SRAM_LOW + 32;
+            let input = SRAM_LOW + 128;
+            // 16 good bytes, then a descriptor whose buffer leaves SRAM.
+            for (addr, word) in [(desc, (1 << 31) | (16 << 12) | 16), (desc + 4, input), (desc + 8, desc + 16),
+                (desc + 16, (1 << 31) | (1 << 30) | (16 << 12) | 16), (desc + 20, 0x5000_0000), (desc + 24, 0),
+                (desc + 32, (1 << 31) | 32), (desc + 36, SRAM_LOW + 192), (desc + 40, 0)] {
+                assert!(bus.sram_store(addr, &word.to_le_bytes()));
+            }
+            assert!(bus.sram_store(input, &[7; 16]));
+            let c = &mut bus.periph.gdma.gdma.out[0];
+            c.running = true; c.desc = desc; c.peri_sel = trigger; c.conf0 = 4; c.conf1 = 1 << 12;
+            if trigger == 0 {
+                for (reg, value) in [(0x30, 1 << 28), (0x10, 1 << 27), (0x1c, 255), (0, 1 << 24)] {
+                    bus.periph.spi2.write(reg, value);
+                }
+                bus.spi2_dma_tx();
+                assert_eq!(bus.periph.spi2.take_transfer().unwrap().tx[..16], [7; 16]);
+            } else {
+                let c = &mut bus.periph.gdma.gdma.inp[0];
+                c.running = true; c.desc = desc + 32; c.peri_sel = 6;
+                bus.aes_dma_step();
+                assert_eq!(bus.periph.aes.state, 2);
+            }
+            let c = &bus.periph.gdma.gdma.out[0];
+            assert!(!c.running);
+            assert_eq!(c.int_raw & 12, 4, "OUT_DSCR_ERR, no OUT_TOTAL_EOF");
+        }
+    }
+
+    #[test]
+    fn pcr_tx_reset_clears_an_allocated_transmitter() {
+        let mut bus = SocBus::new(1024, [0; 6]);
+        bus.periph.parlio.tx().fifo.extend([1, 2, 3]);
+        bus.write32(0x6009_60ac, 1 << 18).unwrap();
+        assert_eq!(bus.periph.parlio.tx().fifo.len(), 3);
+        bus.write32(0x6009_60ac, (1 << 18) | (1 << 19)).unwrap();
+        assert!(bus.periph.parlio.tx().fifo.is_empty());
     }
 
     #[test]

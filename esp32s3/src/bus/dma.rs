@@ -47,15 +47,30 @@ impl SocBus {
         };
         if stage { self.stage_rmt_dma(); }
     }
+    /// Stage TX3 symbols through the shared OUT gather, one SUC_EOF node at a time.
+    /// IDF v5.5.5 components/esp_driver_rmt/src/rmt_tx.c:79-95,693-701 and 1105-1132 feed long
+    /// frames through a two-node ring (SUC_EOF on both nodes) refilled from the OUT_EOF callback
+    /// and continued with gdma_append (OUT_LINK RESTART). Staging is instantaneous, so it reaches
+    /// a node the callback has not refilled yet, where real hardware is still held back by the
+    /// RMT FIFO: such a CPU-owned node waits for the next append instead of faulting, and
+    /// RESTART resumes after the last staged node.
     fn stage_rmt_dma(&mut self) {
         let Some(ch) = self.periph.gdma.out_channel_for(9) else { return; };
+        let resume = self.periph.rmt.dma_resume();
+        if resume != 0 { self.periph.gdma.out[ch].desc = resume; }
         let limit = RMT_DMA_SYMBOL_LIMIT.saturating_sub(self.periph.rmt.dma_fifo_len()) * 4;
-        match self.gather_dma_out(ch, limit + 1) {
-            Ok(bytes) if bytes.len() <= limit => {
+        // Ask for one byte more than fits: `RmtDmaOut` accepts whole symbols only, so a chain
+        // longer than the queue's room fails as a misaligned length instead of being cut.
+        let mut bytes = Vec::new();
+        match esp_periph::gdma::gather_out(&mut RmtDmaOut { bus: self, channel: ch }, limit + 1, &mut bytes) {
+            Ok(next) => {
                 self.periph.rmt.dma_fifo().extend(bytes.as_chunks::<4>().0.iter().map(|&word| u32::from_le_bytes(word)));
-                self.periph.gdma.out[ch].running = false;
-                self.periph.gdma.out[ch].int_raw |= 8;
+                self.periph.rmt.set_dma_resume(next);
+                let c = &mut self.periph.gdma.out[ch];
+                c.desc = next;
+                if next == 0 { c.running = false; c.int_raw |= 1 << 3; }   // OUT_TOTAL_EOF
             }
+            Err(DmaDescriptorFault::NotOwned { descriptor }) if resume != 0 && descriptor == resume && bytes.is_empty() => {}
             _ => {
                 self.fail_dma_out(ch);
                 self.periph.rmt.int_raw |= 1 << 28;
@@ -641,42 +656,6 @@ impl SocBus {
         }
     }
 
-    /// Gather a finite OUT transaction. Descriptor visits bound both runtime and allocation
-    /// (4096 * 4095 bytes maximum); a visited set rejects cycles independently of owner checking.
-    fn gather_dma_out(&mut self, ch: usize, limit: usize) -> Result<Vec<u8>, DmaDescriptorFault> {
-        let mut input = Vec::new();
-        let mut desc = self.periph.gdma.out[ch].desc;
-        let mut visited = HashSet::new();
-        let mut walk = DescriptorWalk::new(GDMA_DESCRIPTOR_STEP_BUDGET);
-        while desc != 0 && input.len() < limit {
-            if !visited.insert(desc) { return Err(DmaDescriptorFault::Cycle { descriptor: desc }); }
-            if desc & 3 != 0 || !desc.checked_add(12).is_some_and(|end| self.lookup(desc).is_some_and(|entry| end <= entry.hi)) {
-                return Err(DmaDescriptorFault::Read { descriptor: desc, word: DmaDescriptorWord::Control, fault: Fault::Prohibited });
-            }
-            let (control, d) = walk.read(self, desc)?;
-            if d.length > d.size || (self.periph.gdma.out[ch].peri_sel == 9 && (d.length & 3 != 0 || d.buf & 3 != 0)) {
-                return Err(DmaDescriptorFault::BufferRead { descriptor: desc, address: d.buf, fault: Fault::Prohibited });
-            }
-            if self.periph.gdma.out[ch].conf1 & (1 << 12) != 0 && !d.owner_dma { return Err(DmaDescriptorFault::NotOwned { descriptor: desc }); }
-            let take = (d.length as usize).min(limit - input.len());
-            self.append_mapped_bytes(d.buf, take, &mut input).map_err(|(address, fault)|
-                DmaDescriptorFault::BufferRead { descriptor: desc, address, fault })?;
-            // OUT_AUTO_WRBACK, IDF v5.5.4 soc/esp32s3/register/soc/gdma_reg.h:585-591.
-            if self.periph.gdma.out[ch].conf0 & 4 != 0 {
-                self.write32_unpriced(desc, control & !(1 << 31)).map_err(|fault|
-                    DmaDescriptorFault::Writeback { descriptor: desc, fault })?;
-            }
-            self.periph.gdma.out[ch].int_raw |= 1 << 0;
-            if d.eof {
-                self.periph.gdma.out[ch].int_raw |= 1 << 1;
-                self.periph.gdma.out[ch].eof_desc = desc;
-                break;
-            }
-            desc = d.next;
-        }
-        Ok(input)
-    }
-
     fn scatter_dma_in(&mut self, ch: usize, data: &[u8], eof_bytes: Option<u32>, finish: bool) -> Result<(), ()> {
         let mut channel = self.periph.gdma.inp[ch];
         let mut irq_changed = false;
@@ -735,5 +714,21 @@ impl esp_periph::gdma::OutMemory for CryptoDmaOut<'_> {
     fn out_channel(&mut self) -> &mut esp_periph::GdmaOutCh { &mut self.bus.periph.gdma.out[self.channel] }
     fn word(&mut self, address: u32) -> Result<u32, Fault> { self.bus.read32_unpriced(address) }
     fn append(&mut self, address: u32, count: usize, out: &mut Vec<u8>) -> Result<(), (u32, Fault)> { self.bus.append_mapped_bytes(address, count, out) }
+    fn writeback(&mut self, address: u32, value: u32) -> Result<(), Fault> { self.bus.write32_unpriced(address, value) }
+}
+
+/// RMT DMA memory: symbol buffers are word arrays in RAM. Descriptors in MMIO and misaligned
+/// buffers or lengths are rejected; everything else is the crypto adapter's bus access.
+struct RmtDmaOut<'a> { bus: &'a mut SocBus, channel: usize }
+impl esp_periph::gdma::OutMemory for RmtDmaOut<'_> {
+    fn out_channel(&mut self) -> &mut esp_periph::GdmaOutCh { &mut self.bus.periph.gdma.out[self.channel] }
+    fn word(&mut self, address: u32) -> Result<u32, Fault> {
+        if SocBus::is_periph(address) { return Err(Fault::Prohibited); }
+        self.bus.read32_unpriced(address)
+    }
+    fn append(&mut self, address: u32, count: usize, out: &mut Vec<u8>) -> Result<(), (u32, Fault)> {
+        if address & 3 != 0 || count & 3 != 0 { return Err((address, Fault::Misaligned)); }
+        self.bus.append_mapped_bytes(address, count, out)
+    }
     fn writeback(&mut self, address: u32, value: u32) -> Result<(), Fault> { self.bus.write32_unpriced(address, value) }
 }

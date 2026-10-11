@@ -518,7 +518,6 @@ impl Peripherals {
             self.spi_exec |= fx.contains(WriteEffect::SPI_EXEC);
             self.refresh_work();
         }
-        if addr == PERIPH_BASE + 0x960ac { self.parlio.set_clock(v); }
         if addr == PERIPH_BASE + 0x96034 || addr == PERIPH_BASE + 0x96038 {
             let conf = self.pcr.read(0x34); let clock = self.pcr.read(0x38);
             self.ledc.external_clock_hz = if conf & 3 != 1 || clock & (1 << 22) == 0 { 0 } else { match (clock >> 20) & 3 { 1 => 80_000_000, 2 => 17_500_000, 3 => 40_000_000, _ => 0 } };
