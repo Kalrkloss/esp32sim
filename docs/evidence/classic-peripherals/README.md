@@ -1,6 +1,7 @@
 # EX224: classic ESP32 peripheral adapters
 
-Base: branch `esp32-classic-2-core` (#206). Adds I2C0/1, sixteen LEDC
+Base: branch `esp32-classic-2-core-ff` (#206),
+`schematik-engineering/esp32sim@7e05c86401acef840643021e771b44b2a5a3fa99`, on upstream main `ff64902a`. Adds I2C0/1, sixteen LEDC
 channels, SPI2/3 and eight RMT channels. Board callbacks are gated while no board is attached;
 LED output uses the existing BoardModel/Ws2812Chain path. I2S RX belongs
 to EX229. No MCPWM implementation is added for classic in this part.
