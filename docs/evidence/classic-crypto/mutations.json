@@ -138,5 +138,19 @@
     "test": "reset_clears_crypto_state_and_reserved_modes_do_not_execute",
     "crate": "esp32",
     "killed": true
+  },
+  {
+    "file": "esp32/src/crypto.rs",
+    "mutation": "Self::endian_words(&mut self.text, self.endian >> 4); -> Self::endian_words(&mut self.text, self.endian >> 2);",
+    "test": "aes_endian_register_layouts_match_trm_tables",
+    "crate": "esp32",
+    "killed": true
+  },
+  {
+    "file": "esp32/src/crypto.rs",
+    "mutation": "if endian & 1 == 0 { (byte swap) -> if endian & 1 != 0 {",
+    "test": "aes_endian_register_layouts_match_trm_tables",
+    "crate": "esp32",
+    "killed": true
   }
 ]
