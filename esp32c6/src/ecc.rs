@@ -149,6 +149,9 @@ impl Default for Ecc {
     }
 }
 impl Ecc {
+    /// PCR ECC_CONF ECC_RST_EN (pcr_reg.h:1333-1336), pulsed by ecc_ll_reset_register
+    /// (hal/esp32c6/include/hal/ecc_ll.h:40-44), returns the accelerator to its reset state.
+    pub fn reset(&mut self) { *self = Self::default(); }
     fn calculate(&mut self) {
         let mode = (self.conf >> 5) & 7;
         if !matches!(mode, 0 | 2 | 3) || self.conf & 4 == 0 {
@@ -159,7 +162,10 @@ impl Ecc {
         let x = &self.mem[8..8 + n];
         let y = &self.mem[16..16 + n];
         let valid = curve.valid(x, y);
-        self.conf = (self.conf & !(1 | 256)) | if valid { 256 } else { 0 };
+        self.conf &= !1;
+        // VERIFICATION_RESULT (RO/SS, ecc_mult_reg.h:111-113) is the verification outcome;
+        // plain point multiplication (mode 0) verifies nothing and leaves it (inferred).
+        if mode != 0 { self.conf = (self.conf & !256) | if valid { 256 } else { 0 }; }
         if mode != 2 && (mode == 0 || valid) {
             let mut point = Point::infinity();
             for bit in (0..n * 32).rev() {
@@ -193,7 +199,7 @@ impl Device for Ecc {
             0x14 => self.ena = value & 1,
             0x1c => {
                 if value & 2 != 0 {
-                    *self = Self::default();
+                    self.reset();
                 } else {
                     self.conf = (value & !256) | (self.conf & 256);
                     if value & 1 != 0 {
@@ -308,6 +314,25 @@ mod tests {
         assert_eq!(ecc.mem, before);
         ecc.write(0x1c, 0);
         assert_eq!(ecc.read(0x1c) & 256, 256);
+    }
+
+    #[test]
+    fn point_multiplication_leaves_the_verification_result() {
+        let mut ecc = Ecc::default();
+        write_number(&mut ecc, 0x120, G256X);
+        write_number(&mut ecc, 0x140, G256Y);
+        ecc.write(0x1c, 0x45);
+        assert_eq!(ecc.read(0x1c) & 257, 256);
+        // Mode 0 on an off-curve point still multiplies but reports no verification.
+        ecc.write(0x140, ecc.mem[16] ^ 1);
+        ecc.write(0x1c, 5);
+        assert_eq!(ecc.read(0x1c) & 257, 256);
+        ecc.write(0x1c, 0x45);
+        assert_eq!(ecc.read(0x1c) & 257, 0);
+        write_number(&mut ecc, 0x120, G256X);
+        write_number(&mut ecc, 0x140, G256Y);
+        ecc.write(0x1c, 5);
+        assert_eq!(ecc.read(0x1c) & 257, 0);
     }
 
     #[test]

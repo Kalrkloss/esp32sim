@@ -12,6 +12,8 @@ impl WriteEffect {
     pub const INTMAP: WriteEffect = WriteEffect(2);
     /// an I2S receiver's RX_CONF was written: SoCs that cache pending work re-read `rx_running`
     pub const RX_CONF: WriteEffect = WriteEffect(4);
+    /// a clock/reset controller pulsed a peripheral's reset bit: the SoC rebuilds that peripheral
+    pub const PERIPH_RESET: WriteEffect = WriteEffect(8);
     pub fn contains(self, o: WriteEffect) -> bool { self.0 & o.0 != 0 }
 }
 impl std::ops::BitOr for WriteEffect { type Output = WriteEffect; fn bitor(self, o: WriteEffect) -> WriteEffect { WriteEffect(self.0 | o.0) } }
