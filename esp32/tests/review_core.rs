@@ -1,4 +1,17 @@
 use esp_soc::SocBus as _;
+use emu_core::bus::Bus as _;
+
+#[test]
+fn reset_disables_classic_rwdt_without_clobbering_stage3() {
+    let mut bus = esp32::bus::SocBus::new(4 << 20, [0; 6]);
+    bus.write32(0x3ff4_80a4, 0x50d8_3aa1).unwrap();
+    bus.write32(0x3ff4_8098, 0x1234).unwrap();
+    bus.write32(0x3ff4_808c, (1 << 31) | (3 << 28)).unwrap();
+    bus.request_reset(12);
+    bus.reboot([0; 6]);
+    assert_eq!(bus.read32(0x3ff4_808c).unwrap(), 0);
+    assert_eq!(bus.read32(0x3ff4_8098).unwrap(), 0x1234);
+}
 
 #[test]
 fn reset_keeps_both_flash_jedec_ids() {

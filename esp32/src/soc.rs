@@ -92,7 +92,8 @@ impl esp_soc::SocBus for SocBus {
         self.periph.rtc.0.ram = old.rtc.0.ram;
         self.periph.rtc.0.slow_ticks = old.rtc.0.slow_ticks;
         self.periph.rtc.0.ram.write(0x38, cause | cause << 6);
-        self.periph.rtc.0.ram.write(0x98, 0);
+        // ESP-IDF v5.5.4 esp32/rtc_cntl_reg.h:1615: WDTCONFIG0, not S3's +0x98.
+        self.periph.rtc.0.ram.write(0x8c, 0);
         self.periph.rtc.0.reset_cause = cause;
         cause
     }
