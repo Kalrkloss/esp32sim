@@ -1,8 +1,7 @@
 # EX219: LED routing and DMA output
 
-Base: upstream main `a175e357` (#203 merged; tree identical to `15655505`),
-including merged #201 and #202. Branch: `led-rmt-parlio-fixes`.
-The portable layout follow-up changes tests and evidence, not production code.
+Base: upstream main `2b992d2d` (#201/#202/#203/#196 merged).
+Branch: `led-rmt-parlio-fixes`; no unmerged parent dependency.
 Related EX205 provides CPU-fed
 compact RMT and board pin transport. This change adds mirrored peripheral routes, S3 TX3 DMA
 symbols, and C6 parallel output. It reuses the WS2812 timing constants that EX218 (#204) added
@@ -32,7 +31,10 @@ of half the DMA buffer each, both with SUC_EOF, owner check and automatic write-
 (`42-46`, `79-95`, `693-701`). The OUT_EOF callback re-encodes the consumed half, hands
 it back to DMA and calls `gdma_append`, which sets OUT_LINK RESTART (`1105-1132`). The
 last node's link is cut when the frame ends (`rmt_tx_mark_eof`, `602-649`). RESTART
-resumes after the last staged node rather than at the link address. Staging is
+resumes after the last staged node rather than at the link address. OUT_RST
+and a fresh OUT_LINK START clear that continuation; START uses its newly written
+link even while RMT DMA_ACCESS_EN stays set. Reset does not discard symbols already
+staged in the RMT FIFO. Staging is
 instantaneous, so it can reach a ring node that the callback has not refilled yet,
 where real hardware is still held back by the RMT FIFO. Such a CPU-owned node at the
 resume point waits for the next append instead of raising a descriptor error. A test
@@ -87,80 +89,52 @@ description.
 
 ## Idle path
 
-The retained release AArch64 disassembly on Rust 1.99.0 compares the cold-layout
-source on `led-rmt-parlio-fixes` against historical main `ff64902a` and the
-#203 tree at `15655505`, now merged as main `a175e357` with an identical tree.
-The portable-test follow-up changes no production source, so the parent comparison
-applies to the current base. Builds use `cargo +1.99.0 build --release
---bins` and `llvm-objdump -d --demangle --no-show-raw-insn`; `asmcmp.py` normalizes
-instruction/branch addresses, alignment nops, adrp page offsets and equivalent
-call-target aliases (comparator preserved as [asmcmp.py](asmcmp.py)). [asm.json](asm.json) records all selected symbols and links
-complete normalized instruction diffs (large diffs are split into ordered parts).
-Whole-binary difference inventories are [main](asm-main-all.txt) and
-[parent](asm-parent-all.txt), with base-only/head-only symbols in
-[main symbols](asm-main-symbols.json) and [parent symbols](asm-parent-symbols.json).
-Each baseline has 30 differing common functions overall; the selected hot-function
-set has 10 versus main and 9 versus the parent. This is a code-generation check,
-not a timing measurement of the rebased head.
+Current comparison: upstream main `2b992d2d` versus the reset/START-fixed
+`led-rmt-parlio-fixes` source, Rust 1.99.0, AArch64 release binaries.
+Commands: `cargo +1.99.0 build --release --bins` and
+`llvm-objdump -d --demangle --no-show-raw-insn`; [asmcmp.py](asmcmp.py)
+normalizes instruction/branch addresses, alignment nops, adrp page offsets
+and equivalent call-target aliases, retaining register/field immediates.
+[Current structured results](rebase-2b.json) record every selected function and
+layout record. Historical comparisons against `ff64902a` and `15655505` remain
+in [asm.json](asm.json) and [layout.json](layout.json), under their original revisions.
 
-`size_of!` and `offset_of!` dumps in [layout.json](layout.json) cover all named
-fields of each chip's `Peripherals` and `SocBus`. Reproduce each revision with
-`CARGO_TARGET_DIR=<build-dir> python3 layout_probe.py <checkout>` using the
-[preserved probe](layout_probe.py), with no concurrent builds in that checkout.
-Every size and field offset
-matches main and the parent (185 size/offset records; 258 selected-function
-comparisons across both baselines and all three binaries). The only field-name
-difference against main is C6's
-`i2s0` → `optional`, both at offset 8536. Sizes in bytes:
+Across all three binaries, 68 selected emitted function comparisons give
+59 identical and 9 differing bodies. All compared emitted Machine run/step
+bodies match. Inlined functions have no independent body and are checked via
+their emitted callers. The differing bodies below are not claimed identical
+or used as a performance estimate; counts are normalized static instructions.
 
-| Chip | Peripherals | SocBus |
-| --- | ---: | ---: |
-| C3 | 5136 | 6128 |
-| C6 | 8624 | 10176 |
-| S3 | 9360 | 12408 |
+| Chip / function | Main | Head | Difference |
+| --- | ---: | ---: | --- |
+| S3 `write32` | 307 | 315 | DMA_ACCESS_EN gate and cold staging call now pass the written value for self-clearing reset/START handling. |
+| S3 `periph_write_inner` | 1663 | 1663 | RMT dispatch calls RmtDma::write rather than Rmt::write. |
+| S3 `tick_impl` | 3743 | 3683 | RmtDma tick and completed-frame fanout; register allocation/block placement. |
+| S3 `write32_access::<false>` | 194 | 199 | DMA gate/staging hook with the written value. |
+| C3 `tick_with_pins` | 521 | 448 | Completed-frame test and cold route fanout replace first-match delivery. |
+| C6 `tick` | 2036 | 1980 | Cold RMT frame fanout; register allocation/block placement. |
+| C6 `periph_write` | 1747 | 1822 | PARLIO dispatch/address-gated staging and shared cold allocation. |
+| C6 `tick_optional` | 227 | 229 | PARLIO dispatch arm/cold-field offsets; PARLIO never joins the active list. |
+| C6 `read32` | 677 | 683 | PARLIO read dispatch and cold-field references. |
 
-C6 PARLIO shares the existing boxed `OptionalPeripherals` allocation with I2S and
-ECC; I2S remains at offset zero. The nullable PARLIO TX box remains unallocated
-until first relevant MMIO access or selected DMA transfer. PCR clock writes before
-PARLIO is used allocate nothing, and `clock()` stays `None`, so PARLIO never enters
-the optional-device active list. Portable regression tests retain the I2S
-offset-zero contract and assert that the actual `Peripherals.optional` field
-occupies one pointer, not inline cold-device storage. The nullable Box also
-occupies one pointer. No architecture/OS gate or absolute hot-bus size/offset
-is pinned, so unrelated field additions do not invalidate the test.
+Every one of 185 Peripherals/SocBus size/offset records matches main across
+S3/C3/C6. Reproduce with `CARGO_TARGET_DIR=<build-dir> python3 layout_probe.py
+<checkout>` using the [preserved probe](layout_probe.py), with no concurrent
+builds or source mutations in that checkout.
 
-All emitted C3/C6 `Machine::run`, `run_unmodeled`, `step_core`, S3 `run_modeled`,
-`run_unmodeled` and `step_core` bodies are instruction-identical to both baselines.
-The emitted C3/C6 deadlines and pending-work functions, all peripheral-read bus
-wrappers, C3/S3 bus ticks and C3 peripheral read dispatch are also identical.
-Inlined accessors (including `devices`, `Peripherals::write32`, S3's deadline and
-S3's run dispatch) have no independent emitted symbol: their callers are checked,
-not counted as separately identical functions. Both native read/write wrappers
-and the S3 access wrappers are included in the comparison.
+C6 PARLIO shares the existing boxed `OptionalPeripherals` allocation with I2S
+and ECC; I2S stays at offset zero. The nullable PARLIO TX box remains unallocated
+until relevant MMIO/DMA use. PCR writes before use allocate nothing, and
+`clock()` stays `None`, so PARLIO never enters the optional-device active list.
+Portable tests assert I2S offset zero and the actual cold field's pointer-sized
+storage—not fixed bus sizes/offsets. They run without architecture/OS gating.
 
-Every differing selected function is listed below. Counts are normalized
-instructions, not executed instructions or a performance estimate.
-
-| Function | main | #203 parent | head | Difference |
-| --- | ---: | ---: | ---: | --- |
-| C3 `periph_write` | 1660 | 1676 | 1676 | Parent's SHA DMA write hook; identical to parent. |
-| C3 `tick_with_pins` | 521 | 521 | 448 | Completed-frame test and cold route fanout replace first-match delivery; register allocation and block order change. |
-| C6 bus `tick` | 2036 | 2036 | 1980 | RMT frame fanout is cold; register allocation/block order change, not structure offsets. |
-| C6 `periph_write` | 1660 | 1747 | 1822 | Parent ECC/SHA hooks plus PARLIO dispatch and address-gated staging; optional storage indirection. |
-| C6 `tick_optional` | 194 | 227 | 229 | Parent ECC arm plus PARLIO dispatch arm and cold-field offsets; PARLIO never joins the active list. |
-| C6 `Peripherals::read32` | 679 | 677 | 683 | ECC/PARLIO read dispatch and cold allocation references. |
-| S3 bus `write32` | 307 | 307 | 314 | RMT DMA_ACCESS_EN gate and conditional cold staging call. |
-| S3 `periph_write_inner` | 1663 | 1663 | 1663 | RMT dispatch calls `RmtDma::write` instead of `Rmt::write`. |
-| S3 `tick_impl` | 3667 | 3743 | 3683 | `RmtDma::tick`, completed-frame fanout test/cold call, associated register allocation and block placement changes. |
-| S3 `write32_access::<false>` | 194 | 194 | 201 | Same RMT DMA gate/staging hook as bus write32. |
-
-The S3 queue is a nullable boxed `VecDeque` in the former `i64` RMT clock-ratio
-space; the ratio is now `u8` in tail padding, preserving `Rmt` and enclosing layouts.
-Queue allocation is lazy; reset, DMA disable and staging failure release it.
-Plain C3/C6 RMT tick remains the non-DMA specialization; running channels widen the
-clock ratio. DMA staging is never a per-tick pump. No claim is made that changed
-bus functions are instruction-identical or that their timing is unchanged on the
-new base. The historical measured stack and its uncertainty are below.
+The S3 queue is a nullable boxed `DmaQueue { symbols, resume }` in the former
+`i64` clock-ratio slot; the ratio is `u8` in tail padding. Queue allocation is
+lazy. RMT AFIFO reset, DMA disable and staging failure release it. GDMA OUT_RST
+and START clear only `resume`, without allocating or discarding staged symbols.
+Plain C3/C6 RMT tick remains the non-DMA specialization. DMA staging is never
+a per-tick pump. This is static evidence, not a CPU timing measurement of this head.
 
 ## Register sources
 
@@ -172,6 +146,7 @@ Public ESP-IDF v5.5.4 sources, with paths relative to `components/`:
 | S3 AFIFO reset bit 23, DMA failure bit 28 | `soc/esp32s3/register/soc/rmt_reg.h:575-581`, `1650-1656` |
 | S3 GDMA trigger 9 | `soc/esp32s3/include/soc/gdma_channel.h:21` |
 | S3 GDMA auto-writeback, owner check, output interrupts | `soc/esp32s3/register/soc/gdma_reg.h:585-618`, `649-678` |
+| S3 GDMA OUT_RST, OUTLINK_RESTART and OUTLINK_START | `soc/esp32s3/register/soc/gdma_reg.h:598-603`, `932-943` |
 | C6 PARLIO TX config, width, readiness and interrupts | `soc/esp32c6/register/soc/parl_io_reg.h:161-355` |
 | C6 PARLIO PCR clock source, divider, gate, reset | `soc/esp32c6/register/soc/pcr_reg.h:1061-1098`; `hal/esp32c6/include/hal/parlio_ll.h:413-430` |
 | C6 bit packing order | `hal/include/hal/parlio_types.h:28-50` |
@@ -194,7 +169,8 @@ No hardware verification is claimed.
 
 ## Verification
 
-`checks.json` records the final required command results on Rust 1.99.0. Both
+`checks.json` records the final required command results on Rust 1.99.0:
+800 CI-policy tests pass; 774 plain tests pass with 44 ignored. Both
 workspace invocations use an empty HOME. The ignored-inclusive invocation sets
 only ESP32SIM_ROM_DIR among emulator variables, to the checkout's `web/wasm/fw`;
 the plain invocation has no emulator variables. CARGO_HOME and RUSTUP_HOME retain
@@ -219,8 +195,10 @@ unit tests pin the write-back gate, descriptor alignment and LENGTH <= SIZE. The
 are register-level workloads, not a claim of running a particular FastLED or NeoPixel
 firmware release.
 
-`mutations.json` records 45 exact mutations and the tests that kill them, including
-the MMIO staging hooks and channel gates, the S3 DMA_ACCESS_EN write gate and CH3
+`mutations.json` records 47 exact functional mutations (45 existing and two
+for OUT_RST/START continuation clearing), using the default test profile;
+the workspace qualification and separate layout mutation use release builds.
+They cover the MMIO staging hooks and channel gates, the S3 DMA_ACCESS_EN write gate and CH3
 CONF0 address gate, multi-route fanout, DMA mode, reset, the shared gather's
 ownership, length, alignment, write-back and EOF rules, the RMT word-alignment and
 MMIO-descriptor rules, the ring wait, RESTART resume and continuation past SUC_EOF,
@@ -240,7 +218,9 @@ mutation and restored-source tests; the restored source passes both tests.
 
 DMA staging and descriptor completion occur at MMIO boundaries. Finite chains and
 IDF's two-node ping-pong ring are supported. Staging is instantaneous: FIFO
-backpressure is stood in for by waiting at a CPU-owned ring node, and concurrent
+backpressure is stood in for by waiting at a CPU-owned ring node. This wait
+requires CHECK_OWNER, which IDF enables with `owner_check`; with it off, a
+resume node is re-gathered and stale symbols can be duplicated. Concurrent
 guest buffer modification is not modeled. S3 rejects a chain whose staged symbols
 would exceed the queue bound. PARLIO completes transactionally rather
 than after elapsed wire time. It models TX data output, not RX, external input
