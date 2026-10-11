@@ -12,6 +12,13 @@ SHA-384/512 sharing a counter as well as state. DPORT owns command gating;
 reset replaces each device with its initial state, including diagnostic counts.
 DPORT clocks, coupled resets, RSA power-down and source 51 route completion.
 
+## Rebased validation
+
+Rust 1.99.0 on the ff64902a-based source: both Clippy targets pass with warnings
+denied; 788 CI-mode workspace tests and 766 plain tests
+(36 ignored) pass with empty HOME. All eight production WASM scenarios
+and evidence privacy pass. Classic and existing goldens remain byte-identical.
+
 ## Sources and limits
 
 ESP-IDF v5.5.4 `components/soc/esp32/include/soc/hwcrypto_reg.h:12-64`
