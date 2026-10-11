@@ -307,6 +307,24 @@ fn crypto_tls_c3() { crypto_tls("c3", BIN_C3, "esp32c3_rev3"); }
 
 #[test] #[ignore = "needs the ESP32-C6 mask ROM ELF fetched by CI"]
 fn crypto_tls_c6() { crypto_tls("c6", BIN_C6, "esp32c6_rev0"); }
+/// The stock countdown includes 10 through 0: eleven one-second delays per reset.
+#[test]
+#[ignore = "needs the ESP32 ECO3 mask ROM ELF"]
+fn classic_reset_clock_and_flash_size() {
+    let rom = rom("esp32_rev300");
+    let r = run(BIN, &["--chip", "esp32", "--rom", rom.to_str().unwrap(), "--board", "esp32dev", "--boot", "rom", "--no-dump", "--console", "uart0", "--flash-mb", "16",
+        "--bootloader", &format!("{FW}/classic-hello-bootloader.bin"), "--ptable", &format!("{FW}/classic-hello-ptable.bin"), "--app", &format!("{FW}/classic-hello_world.bin"), "--max-seconds", "25"]);
+    let resets: Vec<f64> = r.stderr.lines().filter_map(|l| l.strip_prefix("[emu] chip reset at t="))
+        .map(|s| s.split_once('s').unwrap().0.parse().unwrap()).collect();
+    assert_eq!(resets.len(), 2, "{}", r.stderr);
+    for interval in [resets[0], resets[1] - resets[0]] { assert!((11.0..11.1).contains(&interval), "{resets:?}"); }
+    assert_eq!(r.stdout.matches("Detected size(16384k)").count(), 3, "{}", r.stdout);
+    assert!(!r.stdout.contains("Detected size(8192k)"));
+    assert_eq!(r.stdout.matches("Restarting now.").count(), 2);
+    assert!(r.stderr.contains("[emu] stop: Halted"), "{}", r.stderr);
+    assert!(!r.stdout.contains("ESP_ERR_FLASH_SIZE_NOT_MATCH"), "{}", r.stdout);
+}
+
 /// Classic ECO3 ROM, stock IDF bootloader and hello_world application.
 #[test]
 #[ignore = "needs the ESP32 ECO3 mask ROM ELF"]

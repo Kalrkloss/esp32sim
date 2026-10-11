@@ -592,7 +592,7 @@ impl<S: Soc> Machine<S> {
             if idle[..S::CORES].iter().all(|&x| x) && !slow_path {
                 // Stop at every known source of new work, including core-local timers. Device
                 // deadlines alone do not include CCOMPARE or host-script actions.
-                let limit = S::IDLE_CHUNK.min(max_insns - n).min(self.max_cycles - self.bus.cycles());
+                let limit = S::IDLE_CHUNK.min(max_insns - n).min(self.bus.cpu_cycles_for_bus(self.max_cycles - self.bus.cycles()));
                 let chunk = self.idle_budget(limit, &on);
                 for (i, &enabled) in on.iter().enumerate().take(S::CORES) { if enabled { self.cores[i].idle_advance(chunk as u32); } }
                 n += chunk;
@@ -673,7 +673,7 @@ impl<S: Soc> Machine<S> {
             let quantum = if APPROXIMATE {
                 // An instruction can overrun the deadline by at most CPI-1 cycles.
                 self.idle_budget(u64::from(max_quantum) * u64::from(cpi), &on)
-                    .min(self.max_cycles - self.bus.cycles()).div_ceil(u64::from(cpi)).max(1)
+                    .min(self.bus.cpu_cycles_for_bus(self.max_cycles - self.bus.cycles())).div_ceil(u64::from(cpi)).max(1)
             } else {
                 // A sleeping peer's local timer bounds the entire round. Advancing only that
                 // peer by a shorter interval would leave its CCOUNT behind shared device time.
@@ -683,7 +683,7 @@ impl<S: Soc> Machine<S> {
                 let quantum = self.cores.iter().enumerate().filter(|(i, _)| on[*i] && idle[*i])
                     .filter_map(|(_, core)| core.cycles_until_wake())
                     .fold(self.quantum, |limit, wake| limit.min(wake.max(1)));
-                if self.max_cycles != u64::MAX { quantum.min(self.max_cycles - self.bus.cycles()) } else { quantum }
+                if self.max_cycles != u64::MAX { quantum.min(self.bus.cpu_cycles_for_bus(self.max_cycles - self.bus.cycles())) } else { quantum }
             };
             let elapsed = quantum * u64::from(cpi);
             let mut stalls = [0u64; 4];
@@ -903,7 +903,7 @@ impl<S: Soc> Machine<S> {
             if enabled { if let Some(delta) = core.cycles_until_wake() { budget = budget.min(delta.max(1)); } }
         }
         if let Some((at, _)) = self.script.events.get(self.script.pos) {
-            budget = budget.min(at.saturating_sub(self.bus.cycles()).max(1));
+            budget = budget.min(self.bus.cpu_cycles_for_bus(at.saturating_sub(self.bus.cycles())).max(1));
         }
         budget
     }

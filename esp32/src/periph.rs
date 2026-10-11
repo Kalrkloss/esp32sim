@@ -11,7 +11,8 @@ use esp_periph::{
     Uart, UartLayout, WriteEffect,
 };
 
-// Fixed configured CPU clock; IDF v5.5.4 components/esp_system/Kconfig, ESP_DEFAULT_CPU_FREQ_MHZ.
+// Stable bus-time reference. The selected CPU clock is converted to this domain;
+// CCOUNT still counts CPU clocks, and APB/RTC devices keep their own clock rates.
 pub const CPU_HZ: u64 = 240_000_000;
 pub const PERIPH_BASE: u32 = 0x3ff0_0000;
 pub const PERIPH_END: u32 = 0x3ff8_0000;
@@ -580,6 +581,15 @@ impl Peripherals {
     pub fn tick(&mut self, cycles: u64) {
         Dispatch::tick(self, cycles);
 
+    }
+    /// Half reference ticks per CPU clock. IDF v5.5.4 clk_tree_ll.h:543-626,
+    /// dport_reg.h:154-174 and rtc_cntl_reg.h:863-881: XTAL=40 MHz;
+    /// PLL CPUPERIOD_SEL 0/1/2 selects 80/160/240 MHz. Unsupported clock
+    /// sources/reserved PLL selections use XTAL; APLL/RC/dividers are not modeled.
+    pub(crate) fn cpu_scale_half(&self) -> u64 {
+        if (self.rtc.0.ram.read(0x70) >> 27) & 3 == 1 {
+            match self.dport.ram.read(0x3c) & 3 { 0 => 6, 1 => 3, 2 => 2, _ => 12 }
+        } else { 12 }
     }
     pub fn source_status(&self, core: usize) -> [u32; 3] {
         let all = Dispatch::source_status(self);

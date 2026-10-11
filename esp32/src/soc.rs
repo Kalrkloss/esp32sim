@@ -56,10 +56,13 @@ impl esp_soc::SocBus for SocBus {
     fn cycles(&self) -> u64 {
         self.cycles
     }
+    fn cpu_cycles_for_bus(&self, cycles: u64) -> u64 {
+        cycles.saturating_mul(2).saturating_sub(self.clock_half).div_ceil(self.periph.cpu_scale_half())
+    }
     fn next_deadline(&self) -> Option<u64> {
         match self.periph.cycles_until_timer() {
             u32::MAX => None,
-            n => Some(n.max(1) as u64),
+            n => Some(self.cpu_cycles_for_bus(u64::from(n)).max(1)),
         }
     }
     fn irq_dirty(&mut self) -> &mut bool {

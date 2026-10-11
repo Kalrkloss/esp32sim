@@ -56,6 +56,8 @@ pub struct SocBus {
     pub gpio_events: Option<Vec<(u64, u8, bool)>>,
     pub debug: esp_soc::DebugFlags,
     page_ver: Vec<u32>,
+    // Preserve the half reference tick at 160 MHz across batches/clock changes.
+    pub(crate) clock_half: u64,
 }
 
 impl SocBus {
@@ -80,6 +82,7 @@ impl SocBus {
             gpio_events: None,
             debug: Default::default(),
             page_ver: vec![0; 0x10021],
+            clock_half: 0,
         }
     }
     fn load<const N: usize>(&mut self, a: u32) -> Result<[u8; N], Fault> {
@@ -322,8 +325,11 @@ impl Bus for SocBus {
         self.irq_dirty
     }
     fn tick(&mut self, cycles: u32) -> u32 {
-        self.cycles += cycles as u64;
-        self.periph.tick(cycles as u64);
+        let half = u64::from(cycles) * self.periph.cpu_scale_half() + self.clock_half;
+        self.clock_half = half & 1;
+        let elapsed = half >> 1;
+        self.cycles += elapsed;
+        self.periph.tick(elapsed);
         1
     }
 }
