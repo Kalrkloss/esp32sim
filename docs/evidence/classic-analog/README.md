@@ -1,6 +1,7 @@
 # EX227: classic ADC, DAC and touch pads
 
-Base: branch `esp32-classic-5-wifi` (#209). Builds on EX226. Reuses main's
+Base: branch `esp32-classic-5-wifi-ff` (#209),
+`schematik-engineering/esp32sim@97d0087db0acd7414adb160c98aa909a6b472519`, on upstream main `ff64902a`. Builds on EX226. Reuses main's
 AnalogInputs, raw-count validation, sample observations and waveform timing.
 Classic supplies two SAR register layouts, eighteen ADC pads, two DACs,
 ten touch pads and RTC mux isolation. The shared script accepts
