@@ -63,5 +63,10 @@
     "version": "ESP-IDF v5.5.5",
     "path": "components/soc/esp32c6/register/soc/pcr_reg.h",
     "sha256": "8972e97ee3629b97db85b4b41b11e2223d4429ec0b2f154a4a5bafa42f8eed21"
+  },
+  {
+    "version": "ESP-IDF v5.5.5",
+    "path": "components/esp_driver_i2s/i2s_common.c",
+    "sha256": "4dd53bd7b95caf1c6b5840c0256eb9080445b3bf5bcdd496eb20e6430ebe76b5"
   }
 ]

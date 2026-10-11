@@ -198,5 +198,35 @@
     "mutation": "C6 RX work term",
     "test": "pcm_to_guest_dma_on_all_chips",
     "killed": true
+  },
+  {
+    "mutation": "24-bit packs 3 bytes",
+    "test": "pcm_clock_slots_width_silence_and_reset",
+    "killed": true
+  },
+  {
+    "mutation": "RX_24_FILL_EN pads to 4",
+    "test": "pcm_clock_slots_width_silence_and_reset",
+    "killed": true
+  },
+  {
+    "mutation": "container width",
+    "test": "pcm_clock_slots_width_silence_and_reset",
+    "killed": true
+  },
+  {
+    "mutation": "RX_EOF_NUM reset 0x40",
+    "test": "rx_eof_num_resets_to_hardware_default",
+    "killed": true
+  },
+  {
+    "mutation": "walk budget",
+    "test": "walk_reads_any_word_source_and_stops_at_budget",
+    "killed": true
+  },
+  {
+    "mutation": "walk next word",
+    "test": "walk_reads_any_word_source_and_stops_at_budget",
+    "killed": true
   }
 ]

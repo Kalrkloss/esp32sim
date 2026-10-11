@@ -1,13 +1,14 @@
 # EX214: I2S receive input
 
-Base: upstream `017af524`. This branch ports controller-bound stereo PCM input onto
-main's camera/crypto GDMA receive path. It retains the existing C3 GDMA adapter;
+Base: upstream main `fe3a9c08`. This branch ports controller-bound stereo PCM input
+onto main's camera/crypto GDMA receive path. It retains the existing C3 GDMA adapter;
 there is exactly one register-layout translation. EX212 owns the existing scatter
 semantics. EX214 adds another producer and moves that walker into `esp-periph` so
 all three chips use it.
 
 S3 controllers 0 and 1 and C3/C6 controller 0 accept 16-bit host frames. Standard
-RX packs mono/stereo 16-bit words or left-aligned 24/32-bit samples. S3 controller
+RX packs mono/stereo 16-bit words or left-aligned 24/32-bit samples. 24-bit samples
+take 3 bytes, or 4 when the firmware sets RX_24_FILL_EN; 32-bit samples take 4. S3 controller
 0 accepts converted PDM16. Queued input and generated tones survive chip reset.
 Stopped receivers and unbound DMA channels do not consume the per-port queue.
 Unsupported slave, raw-PDM, extended TDM, companding and reordered formats do not
@@ -26,6 +27,16 @@ Compared with the public headers shipped in Arduino-ESP32 3.3.11, ESP-IDF v5.5.5
 - `components/soc/esp32c6/register/soc/i2s_reg.h`: mode fields at 149–290,
   widths/divider at 424–478 and slots at 930–945. Its clocks instead live in
   `components/soc/esp32c6/register/soc/pcr_reg.h`, lines 719–784.
+- RX_24_FILL_EN, RX_CONF bit 16, reset 0, "1: store 24 channel bits to 32 bits.
+  0: store 24 channel bits to 24 bits": esp32s3 `i2s_reg.h` lines 160–165, esp32c3
+  lines 145–150, esp32c6 lines 238–244. ESP-IDF v5.5.5 never writes it; its
+  `components/esp_driver_i2s/i2s_common.c` line 451 (`i2s_get_buf_size`) sizes
+  `(bits + 7) / 8` bytes per sample on S3/C3/C6, so 24-bit RX defaults to 3 bytes.
+  Where the 24 bits sit inside a padded 32-bit word is not documented; the model
+  left-aligns them (inferred), the same placement the TX pump reads.
+- RX_EOF_NUM resets to 0x40: esp32s3 `i2s_reg.h` line 1059, esp32c3 line 1005,
+  esp32c6 line 1226. The model uses the value as a byte count, as IDF's
+  `i2s_ll_rx_set_eof_num` and `i2s_common.c` line 557 do.
 - `components/hal/esp32s3/include/hal/i2s_ll.h`: RX clock selectors at 257,
   fractional divider programming at 387. C6 selectors are in its `i2s_ll.h`,
   lines 270–285. XTAL/PLL240/PLL160 selectors are 0/1/2; external is unsupported.
@@ -55,14 +66,33 @@ python3 docs/evidence/i2s-rx-input/mutations.py
 
 `mutations.json` is the mutation-to-killing-test table. The script requires a
 clean source snapshot and restores each file before starting the next mutation.
-All 40 mutations fail an assertion, rather than merely failing compilation.
+All 46 mutations fail an assertion, rather than merely failing compilation.
 Existing golden files remain byte-identical; none were regenerated.
+
+## Shared GDMA descriptor reader
+
+`esp-periph/src/gdma/receive.rs` holds the one GDMA descriptor reader for all chips
+and DMA users. Other DMA code reuses it instead of adding a second reader or budget:
+
+- `GDMA_DESCRIPTOR_STEP_BUDGET` (4096) is defined only here and re-exported from
+  `esp_periph::gdma`.
+- `DescriptorWalk::new(budget)` bounds one pump call. Every `read(bus, addr)` (through
+  a `Bus`, unpriced) or `read_with(addr, word)` (any word source, for DMA memory held
+  outside a `Bus`) costs one step. Once the budget is spent, reads return
+  `StepBudgetExceeded` without touching memory. Both return the raw DW0 for write-back
+  and the decoded `DmaDesc`.
+- `GdmaInCh::scatter`/`receive` keep #190's semantics. When data remains and the
+  inlink is 0, they set IN_DSCR_EMPTY (bit 4). They honour CHECK_OWNER (IN_CONF1 bit
+  12). They close at byte-count EOF or `finish` (IN_SUC_EOF with the length written
+  back), clear `running` at the end of the chain and report IN_DSCR_ERR on faults
+  (`fail_receive`). `close` is the shared write-back.
+- OUT gathers (S3 TX, SPI2 and crypto) use the same `DescriptorWalk`.
 
 ## CPU comparison
 
-Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 954f2a68 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
+Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 954f2a68 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none. Pocket Tank and I2S TX workloads were not timed. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
-Measured on `c4ffbf4dc0460a24e2a3c220240a4fd4821f6868` against main `954f2a68`; the branch was since rebased onto `fe3a9c08` with no change to its own diff. User CPU seconds.
+Measured on `schematik-engineering/esp32sim@c4ffbf4dc0460a24e2a3c220240a4fd4821f6868` (branch `i2s-rx-input`) against main `954f2a68`. The branch was then rebased onto `fe3a9c08` without changing its own diff. User CPU seconds.
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -115,7 +145,7 @@ Status: PASS. Flags: —.
 | 6 | 7 | B→M | 2.440081 | 2.410282 | 1.69/1.71/1.71 | 1.69/1.69/1.69 | accepted |
 | 7 | 8 | M→B | 2.429529 | 2.443767 | 1.71/1.71/1.71 | 1.71/1.65/1.71 | accepted |
 
-Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above. Raw output files are preserved.
+Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above. Only the tables above are retained.
 
 Idle structure, for firmware that never enables I2S RX:
 
