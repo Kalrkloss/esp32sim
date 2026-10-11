@@ -47,10 +47,10 @@ remain unchanged. JIT implementation files are unchanged.
 
 ## Results
 
-Rust 1.99.0: native and WASM Clippy pass with warnings denied. Empty-HOME
-CI-mode workspace: 709 passed, zero failed. Plain workspace with no firmware
-variables: 687 passed, 36 ignored, zero failed. All eight production WASM
-scenarios pass. Evidence privacy check passes. Existing goldens are unchanged.
+Rust 1.99.0 on the ff64902a-based source: both Clippy targets pass with warnings
+denied; 740 CI-mode workspace tests and 718 plain tests
+(36 ignored) pass with empty HOME. All eight production WASM scenarios
+and evidence privacy pass. Classic and existing goldens remain byte-identical.
 The fixture reports silicon revision v2.0 despite using the ECO3 ROM; the
 model does not supply the additional revision-3 date bit. Its boot output
 also retains inferred clock-calibration warnings. These are recorded limits,
