@@ -1,6 +1,7 @@
 # EX226: classic Wi-Fi on StationLink
 
-Base: branch `esp32-classic-4-crypto` (#208). Builds on EX225 and the shared
+Base: branch `esp32-classic-4-crypto-ff` (#208),
+`schematik-engineering/esp32sim@1260a8cbc765c4a18c607c03e96927da832936bc`, on upstream main `ff64902a`. Builds on EX225 and the shared
 StationLink from #193. The classic adapter retains MAC/PHY registers, TSF,
 DPORT gates, DMA and RX metadata. AP/network queues, pacing, Ethernet relay,
 statistics and reboot handling use StationLink. A DPORT MAC reset clears the
@@ -52,7 +53,35 @@ All eight WASM scenarios pass. Goldens remain byte-identical.
 
 ## CPU comparison
 
-Not measured separately. The stack tip, PR #212 (schematik-engineering/esp32sim@bcd4df7e, branch `esp32-classic-host`, which contains this change), was measured against main `2f9443a9` with the method in the classic-host receipt (user CPU, one warmup and seven alternating load-gated pairs, identical instruction counts and console hashes):
+### Classic hello: measured pre-rebase revisions
+
+Branch `esp32-classic-5-wifi` at
+`schematik-engineering/esp32sim@ca069cf2b6a50647bdcc414c9ac53c01e50f08e3`
+against parent #208, branch `esp32-classic-4-crypto` at
+`schematik-engineering/esp32sim@cb5d1fa6440cedb46e769ab372cb1a2130296b4b`.
+These measurements identify the old revisions, not the ff64902a rebase.
+Rust 1.99.0 release binaries; child user CPU seconds including startup; one warmup
+and seven alternating pairs, load below 5 before each attempt and peak below 7.
+Console SHA-256 and instruction counts matched across attempts.
+
+| Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Classic hello | 2.5060 (2.3622–2.7359) | 2.4150 (2.3839–2.7382) | -3.63% | 2/7 | 34160592 | 5.28 |
+
+| Pair | Attempt | Order | Main s | PR s | Main load before/after/peak | PR load before/after/peak | Result |
+| --- | ---: | --- | ---: | ---: | --- | --- | --- |
+| warmup | 1 | B→M | 2.562813 | 2.446447 | 4.91/4.91/4.91 | 4.82/4.91/4.91 | accepted |
+| 1 | 2 | M→B | 2.689331 | 2.738203 | 4.91/4.92/4.92 | 4.92/4.92/4.92 | accepted |
+| 2 | 3 | B→M | 2.735878 | 2.531034 | 5.00/5.00/5.00 | 4.92/5.00/5.00 | accepted |
+| 3 | 4 | M→B | 2.408043 | 2.394516 | 4.96/5.28/5.28 | 5.28/5.28/5.28 | accepted |
+| 4 | 5 | B→M | 2.428351 | 2.415029 | 4.93/4.93/4.93 | 4.92/4.93/4.93 | accepted |
+| 5 | 6 | M→B | 2.362180 | 2.383858 | 4.93/5.02/5.02 | 5.02/5.02/5.02 | accepted |
+| 6 | 7 | B→M | 2.506022 | 2.449845 | 4.65/4.65/4.65 | 4.80/4.65/4.80 | accepted |
+| 7 | 8 | M→B | 2.552290 | 2.384733 | 4.65/4.60/4.65 | 4.60/4.60/4.60 | accepted |
+
+Raw outputs are not committed; the accepted pair samples are above.
+
+The non-classic workloads were not measured separately. The stack tip, PR #212 (schematik-engineering/esp32sim@bcd4df7e, branch `esp32-classic-host`, which contains this change), was measured against main `2f9443a9` with the method in the classic-host receipt (user CPU, one warmup and seven alternating load-gated pairs, identical instruction counts and console hashes):
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
