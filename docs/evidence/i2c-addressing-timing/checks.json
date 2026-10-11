@@ -1,14 +1,14 @@
 {
-  "base": "ff64902ab01f91f7e57e00d213412a11cc1999fc",
+  "base": "a175e357b480541f4c07b9671b7b1168de9c1a4e",
   "toolchain": "1.99.0",
   "checks": [
     {
-      "check": "fetch-assets",
-      "command": "tools/fetch-demo-assets.sh --no-linux",
+      "check": "assets",
+      "command": "bash tools/fetch-demo-assets.sh --no-linux",
       "exit": 0
     },
     {
-      "check": "clippy-native",
+      "check": "clippy",
       "command": "cargo +1.99.0 clippy --workspace --all-targets -- -D warnings",
       "exit": 0
     },
@@ -18,39 +18,30 @@
       "exit": 0
     },
     {
-      "check": "workspace-rom",
+      "check": "workspace",
       "command": "cargo +1.99.0 test --release --workspace -- --include-ignored --skip external_",
       "exit": 0,
-      "passed": 736,
+      "passed": 768,
       "failed": 0,
       "ignored": 0,
-      "environment": {
-        "HOME": "empty directory",
-        "firmware_inputs": "ESP32SIM_ROM_DIR=web/wasm/fw",
-        "build_environment": "PATH, RUSTUP_HOME, CARGO_HOME, CARGO_TARGET_DIR, RUSTUP_TOOLCHAIN, TMPDIR"
-      }
+      "HOME": "empty",
+      "emulator_environment": [
+        "ESP32SIM_ROM_DIR=web/wasm/fw"
+      ]
     },
     {
-      "check": "workspace-plain",
+      "check": "plain",
       "command": "cargo +1.99.0 test --release --workspace",
       "exit": 0,
-      "passed": 715,
+      "passed": 745,
       "failed": 0,
-      "ignored": 35,
-      "environment": {
-        "HOME": "empty directory",
-        "firmware_inputs": "none",
-        "build_environment": "PATH, RUSTUP_HOME, CARGO_HOME, CARGO_TARGET_DIR, RUSTUP_TOOLCHAIN, TMPDIR"
-      }
+      "ignored": 37,
+      "HOME": "empty",
+      "emulator_environment": []
     },
     {
-      "check": "wasm-build",
-      "command": "RUSTUP_TOOLCHAIN=1.99.0 tools/wasm-build.sh",
-      "exit": 0
-    },
-    {
-      "check": "wasm-demos",
-      "command": "node tools/wasm-test.mjs hello c3-hello c6-hello c6-energy-scan c6-contiki c6-contiki-net c6-rpl-net panel",
+      "check": "wasm",
+      "command": "RUSTUP_TOOLCHAIN=1.99.0 bash tools/wasm-build.sh && node tools/wasm-test.mjs hello c3-hello c6-hello c6-energy-scan c6-contiki c6-contiki-net c6-rpl-net panel",
       "exit": 0
     },
     {
@@ -59,12 +50,12 @@
       "exit": 0
     },
     {
-      "check": "build",
+      "check": "bins",
       "command": "cargo +1.99.0 build --release --bins",
       "exit": 0
     },
     {
-      "check": "mutate",
+      "check": "mutations",
       "command": "python3 docs/evidence/i2c-addressing-timing/mutate.py",
       "exit": 0
     },
@@ -88,8 +79,8 @@
     "total": 44,
     "killed": 44
   },
-  "cpu_comparison": "Historical tables only: fork b1c67907 and control 7b404a99. Rebase checked by disassembly; no new CPU benchmark.",
+  "cpu_comparison": "Historical tables only; no new CPU benchmark.",
   "jit_differential": "Not required: no JIT code changed",
-  "production_wasm_sha256": "acecac33250b9b4eb56558390bc60106b7c437ded45dd902925001e09a528fb0",
-  "rebase_results": "rebase-validation.json"
+  "production_wasm_sha256": "6ee18f09831800f5ce05466844a2fe7ca76cbdaff8507866571478204c95b6a1",
+  "rebase_results": "rebase-a175.json"
 }
