@@ -92,6 +92,7 @@ impl PcmSources {
     pub(crate) fn select(&self, gpio: &Gpio, signals: RxSignals, pdm: bool) -> Option<usize> {
         let RxSignals {
             data,
+            clock,
             input_select_bit,
             output_mask,
         } = signals;
@@ -107,9 +108,9 @@ impl PcmSources {
             gpio.func_in_sel[data] & ((1 << (input_select_bit + 1)) - 1)
                 == u32::from(din) | (1 << input_select_bit)
                 && gpio.func_out_sel[bclk as usize] & output_mask
-                    == data as u32 + if pdm { 2 } else { 1 }
+                    == clock[usize::from(pdm)] as u32
                 && ws.is_none_or(|ws| {
-                    gpio.func_out_sel[ws as usize] & output_mask == data as u32 + 2
+                    gpio.func_out_sel[ws as usize] & output_mask == clock[1] as u32
                 })
         })
     }
@@ -124,6 +125,8 @@ impl PcmSources {
 #[derive(Clone, Copy)]
 pub struct RxSignals {
     pub data: usize,
+    /// Output signal indices [BCLK, WS]; PDM uses the WS signal.
+    pub clock: [usize; 2],
     pub input_select_bit: u32,
     pub output_mask: u32,
 }
@@ -159,7 +162,7 @@ mod tests {
         gpio.func_in_sel[25] = 6 | (1 << 7);
         gpio.func_out_sel[4] = 26;
         gpio.func_out_sel[5] = 27;
-        let signals = RxSignals { data: 25, input_select_bit: 7, output_mask: 0x3ff };
+        let signals = RxSignals { data: 25, clock: [26, 27], input_select_bit: 7, output_mask: 0x3ff };
         for id in [0, 15] {
             sources.inputs[id] = Some(PcmSource::new(8000, PcmPins::I2s { bclk: 4, ws: 5, data: 6 }).unwrap());
         }
@@ -241,6 +244,7 @@ mod tests {
             gpio.func_out_sel[5] = 27;
             let signals = RxSignals {
                 data: 25,
+                clock: [26, 27],
                 input_select_bit: 7,
                 output_mask: 0x3ff,
             };
@@ -284,6 +288,7 @@ mod tests {
         ] {
             let signals = RxSignals {
                 data,
+                clock: [data + 1, data + 2],
                 input_select_bit: bit,
                 output_mask: mask,
             };
