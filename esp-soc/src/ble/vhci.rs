@@ -79,15 +79,9 @@ pub struct Ble {
     pub original_flash: Option<(usize, Vec<u8>)>,
 }
 
-pub fn restore_flash(saved: &mut Option<(usize, Vec<u8>)>, flash: &mut [u8]) {
-    if let Some((off, original)) = saved.take() {
-        flash[off..off + original.len()].copy_from_slice(&original);
-    }
-}
-
 impl Ble {
     pub fn restore_flash(&mut self, flash: &mut [u8]) {
-        restore_flash(&mut self.original_flash, flash);
+        super::restore_patched_flash(&mut self.original_flash, flash);
     }
 
     pub fn enable(&mut self, symbols: &HashMap<String, u32>, init_size: u32, abi: &Abi) -> Result<(), String> {
