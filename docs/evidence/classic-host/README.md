@@ -1,7 +1,7 @@
 # EX229: classic host input and I2S receive
 
 Base: branch `esp32-classic-ble-ff` (#211),
-`schematik-engineering/esp32sim@9b3f1fff7fdaae7a070d7fe1b87c494cc0f99a97`, on upstream main `ff64902a`.
+`schematik-engineering/esp32sim@0d134fabc9009ebf26b6a6e20cc47992bf077399`, on upstream main `ff64902a`.
 #201 and #202 are included in main. The shared `DescriptorWalk` integration
 is owned by #207; this part adds only classic RX and its regression tests.
 No prerequisite merge commit is included.
