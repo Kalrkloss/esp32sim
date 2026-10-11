@@ -180,5 +180,12 @@
     "test": "controls_preserve_hosts_defaults_and_read_write_direction",
     "crate": "esp-periph",
     "killed": true
+  },
+  {
+    "file": "esp32/src/wifi.rs",
+    "mutation": "let link = std::mem::take(&mut self.link); -> let link = std::mem::take(&mut self.link).surviving_reboot();",
+    "test": "dport_gates_transmit_routes_interrupt_and_resets_mac",
+    "crate": "esp32",
+    "killed": true
   }
 ]

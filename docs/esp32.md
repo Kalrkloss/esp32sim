@@ -48,5 +48,6 @@ the existing board/display/WS2812 interfaces. `esp32dev-loopback` supplies a loo
 are not implemented; transaction-level SPI has no bit-level timing.
 
 Classic Wi-Fi uses the shared `StationLink` access point, network and Ethernet
-relay. An inline DPORT clock gate guards service. MAC/PHY register behavior is inferred;
+relay. An inline DPORT clock gate guards service. A DPORT MAC reset keeps the
+host link and its counts. MAC/PHY register behavior is inferred;
 calibration completion is modeled without RF arithmetic or hardware timing.

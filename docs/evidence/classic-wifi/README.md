@@ -1,15 +1,26 @@
 # EX226: classic Wi-Fi on StationLink
 
-Base: `esp32-classic-4-crypto`, `5c05d939`. Builds on EX225 and the shared
+Base: branch `esp32-classic-4-crypto` (#208). Builds on EX225 and the shared
 StationLink from #193. The classic adapter retains MAC/PHY registers, TSF,
 DPORT gates, DMA and RX metadata. AP/network queues, pacing, Ethernet relay,
-statistics and reboot handling use StationLink. Descriptor decoding reuses
+statistics and reboot handling use StationLink. A DPORT MAC reset clears the
+MAC registers only and keeps the link, its relay queues and frame counts, as
+on S3/C3/C6; a guest reboot applies `StationLink::surviving_reboot`.
+
+The classic eFuse MAC words carry the ROM CRC8 of the factory MAC, so IDF's
+MAC CRC check passes (`classic_factory_mac_includes_rom_crc8`).
+
+`next_deadline` covers timers and board deadlines but not Wi-Fi due times, the
+same as S3/C3/C6: while the CPU idles, a due frame waits for the next timer
+deadline (about 1 ms with the FreeRTOS tick). A shared StationLink due-time API
+for all four chips is left for a separate change. Descriptor decoding reuses
 the checked reader from EX224. No fourth station implementation is added.
 
 ## Sources and limits
 
 ESP-IDF v5.5.4 `components/soc/esp32/register/soc/dport_reg.h:1031-1043`
-defines the clock reset value and Wi-Fi enable mask. MAC offsets, PHY
+defines the clock reset value and Wi-Fi enable mask; lines 1064 and 1069 define
+`DPORT_CORE_RST_EN_REG` bit 2, `DPORT_WIFIMAC_RST`. MAC offsets, PHY
 completion and RX metadata are inferred from the Arduino-ESP32 3.3.8 libraries;
 no public register-header or hardware validation is claimed for these fields.
 PHY calibration completes without RF arithmetic. No RF timing claim, PSRAM
@@ -26,22 +37,22 @@ fields or per-tick work. New classic fields are appended.
 
 ## Verification
 
-Use the full [EX223 command set](../classic-core/README.md) on Rust 1.99.0.
+Use the full [EX230 command set](../classic-core/README.md) on Rust 1.99.0.
 The inherited ROM/firmware hashes are in that receipt. No golden changes.
 JIT implementation is unchanged.
 
-[Mutation table](mutations.json) records 26 killed single replacements and the tests
+[Mutation table](mutations.json) records 27 killed single replacements and the tests
 that fail. Run each with `cargo +1.99.0 test -p CRATE --lib TEST`, restoring
 the original source between mutations. Tests cover register aliases, TSF,
 clock/reset, DMA rejection, RX metadata, shared station pacing and reboot.
 
-Results on Rust 1.99.0: both required Clippy checks pass; 763 CI-mode
-workspace tests and 741 plain tests (36 ignored) pass with empty HOME.
+Results on Rust 1.99.0: both required Clippy checks pass; 767 CI-mode
+workspace tests and 745 plain tests (36 ignored) pass with empty HOME.
 All eight WASM scenarios pass. Goldens remain byte-identical.
 
 ## CPU comparison
 
-Not measured separately. The stack tip, PR #212 (`bcd4df7e`, which contains this change), was measured against main `2f9443a9` with the method in the classic-host receipt (user CPU, one warmup and seven alternating load-gated pairs, identical instruction counts and console hashes):
+Not measured separately. The stack tip, PR #212 (schematik-engineering/esp32sim@bcd4df7e, branch `esp32-classic-host`, which contains this change), was measured against main `2f9443a9` with the method in the classic-host receipt (user CPU, one warmup and seven alternating load-gated pairs, identical instruction counts and console hashes):
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -50,13 +61,15 @@ Not measured separately. The stack tip, PR #212 (`bcd4df7e`, which contains this
 | S3 hello | 24.6510 (23.7365–32.0593) | 24.3939 (23.8923–27.6721) | -1.04% | 4/7 | 1789819657 | 4.96 |
 | C3 hello | 2.3837 (2.3635–2.5350) | 2.4178 (2.3742–2.5332) | +1.43% | 5/7 | 4800000000 | 3.53 |
 
-Static check (no timing): release `esp32sim` binaries from main `2f9443a9` and
-this branch were disassembled with `llvm-objdump -d` and compared function by
+That measurement predates the Oct 11 review commits and the rebase onto main `eec7b2c9`. Those commits add no S3/C3/C6 execution-path instructions; the static check below was repeated on the rebased stack tip (#211).
+
+Static check (no timing): release `esp32sim` binaries from main `eec7b2c9` and
+the rebased stack tip were disassembled with `llvm-objdump -d` and compared function by
 function after normalising addresses, alignment `nop`s, adrp page offsets and
 linker-chosen symbol aliases. The S3/C3/C6 execution path is instruction-identical
 to main: `Machine::run`, `step_core`, each `SocBus` `tick` and `next_deadline`, S3 `tick_impl`,
 `refresh_tick_budget` and GDMA engines, the MMIO dispatchers, `TimerGroup::tick`, and the UART,
-TIMG, SHA, LEDC and RMT tick and register paths, and RTC_CNTL. Remaining differences: shared `Gpio::write` (`ubfx` for `lsr`, inherited from EX223); `I2c::write`, whose bounds-check panic calls share one source location in the macro
+TIMG, SHA, LEDC and RMT tick and register paths, and RTC_CNTL. Remaining differences: shared `Gpio::write` (`ubfx` for `lsr`, inherited from EX230); `I2c::write`, whose bounds-check panic calls share one source location in the macro
 expansion, so three merge and the END arm moves; `Ledc::output`, the host PWM query, and the `Peripherals::new` constructors; drop glue for `StationLink` and `Tcp`; the analog I2C masters keep main's code
 because `Regi2c` is inlined into each chip.
 
