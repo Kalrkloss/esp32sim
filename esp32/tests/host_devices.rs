@@ -67,6 +67,32 @@ fn uart_matrix_receive_does_not_require_gpio_output_mux() {
 }
 
 #[test]
+fn uart1_uart2_native_pads_use_iomux_function_4() {
+    let mut b = bus(); let probe = Arc::new(Mutex::new(Probe::default())); b.board = Box::new(Board(probe.clone())); b.attach_board_devices();
+    // Reset pads are at function 0 (SD_DATA3 on GPIO10, GPIO17_0 on GPIO17): no UART1/UART2 route.
+    b.write32(0x3ff4_9058, 1 << 9).unwrap(); // GPIO10 function 0, input enabled
+    b.write32(0x3ff4_904c, 1 << 9).unwrap(); // GPIO16 function 0, input enabled
+    for port in 1..3 {
+        assert_eq!(b.periph.uart_route(port).tx_pins, 0, "UART{port}");
+        assert_eq!(b.periph.uart_route(port).rx_pin, None, "UART{port}");
+    }
+    // Arduino Serial2.begin() default pins: uart_set_pin selects U2TXD/U2RXD (function 4).
+    b.write32(0x3ff4_9050, 4 << 12).unwrap();
+    b.write32(0x3ff4_904c, (4 << 12) | (1 << 9)).unwrap();
+    // UART1 native pads: U1TXD on SD_DATA3/GPIO10, U1RXD on SD_DATA2/GPIO9 (function 4).
+    b.write32(0x3ff4_9058, 4 << 12).unwrap();
+    b.write32(0x3ff4_9054, (4 << 12) | (1 << 9)).unwrap();
+    assert_eq!(b.periph.uart_route(2).tx_pins, 1 << 17);
+    assert_eq!(b.periph.uart_route(2).rx_pin, Some(16));
+    assert_eq!(b.periph.uart_route(1).tx_pins, 1 << 10);
+    assert_eq!(b.periph.uart_route(1).rx_pin, Some(9));
+    b.write32(0x3ff6_e000, 0x55).unwrap();
+    let p = probe.lock().unwrap();
+    let (route, byte) = p.uart.last().copied().unwrap();
+    assert_eq!((route.port, route.tx_pins, byte), (2, 1 << 17, 0x55));
+}
+
+#[test]
 fn physical_spi_excludes_released_and_high_selects() {
     struct SpiBoard(Arc<Mutex<Vec<esp_soc::board::SpiPins>>>);
     impl BoardModel for SpiBoard {

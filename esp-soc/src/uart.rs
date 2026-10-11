@@ -42,8 +42,10 @@ pub struct UartPins {
     native: &'static [(u8, u8, u32)],
 }
 impl UartPins {
-    // IDF v5.5.4 gpio_sig_map.h:46,52,360 and io_mux_reg.h UART function selectors.
-    pub const ESP32: Self = Self { chip: ChipPins::ESP32, signals: &[14, 17, 198], native: &[(1, 3, 0), (10, 9, 0), (17, 16, 0)] };
+    // IDF v5.5.4 gpio_sig_map.h:46,52,360; components/soc/esp32/register/soc/io_mux_reg.h:122,136
+    // (FUNC_U0TXD/U0RXD 0), 181,189 (FUNC_SD_DATA2_U1RXD/SD_DATA3_U1TXD 4) and 242,250
+    // (FUNC_GPIO16_U2RXD/GPIO17_U2TXD 4), used by uart_pins.h U*_MUX_FUNC.
+    pub const ESP32: Self = Self { chip: ChipPins::ESP32, signals: &[14, 17, 198], native: &[(1, 3, 0), (10, 9, 4), (17, 16, 4)] };
     pub const S3: Self = Self { chip: ChipPins::S3, signals: &[12, 15, 18], native: &[(43, 44, 0), (17, 18, 2)] };
     pub const C3: Self = Self { chip: ChipPins::C3, signals: &[6, 9], native: &[(21, 20, 0)] };
     pub const C6: Self = Self { chip: ChipPins::C6, signals: &[6, 9], native: &[(16, 17, 0)] };
