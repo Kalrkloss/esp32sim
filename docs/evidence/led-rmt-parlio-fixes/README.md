@@ -1,9 +1,9 @@
 # EX219: LED routing and DMA output
 
-Base: #203's branch `c3-c6-sha-dma-wifi-cal` at `schematik-engineering/esp32sim@15655505`,
-on upstream main `ff64902a` (includes merged #201 and #202). Verified code head:
-`schematik-engineering/esp32sim@78d45a464202ec639c2c869b71aca386e64569cb` on
-`led-rmt-parlio-fixes`; the following commit updates evidence only. Related EX205 provides CPU-fed
+Base: upstream main `a175e357` (#203 merged; tree identical to `15655505`),
+including merged #201 and #202. Branch: `led-rmt-parlio-fixes`.
+The portable layout follow-up changes tests and evidence, not production code.
+Related EX205 provides CPU-fed
 compact RMT and board pin transport. This change adds mirrored peripheral routes, S3 TX3 DMA
 symbols, and C6 parallel output. It reuses the WS2812 timing constants that EX218 (#204) added
 to `esp-soc/src/devices/ws2812.rs`; the GPIO waveform decoder itself is untouched. GDMA OUT
@@ -87,9 +87,11 @@ description.
 
 ## Idle path
 
-Release AArch64 disassembly on Rust 1.99.0 compares the cold-layout source on
-`led-rmt-parlio-fixes` against main `ff64902a` and parent
-`schematik-engineering/esp32sim@15655505`. Builds use `cargo +1.99.0 build --release
+The retained release AArch64 disassembly on Rust 1.99.0 compares the cold-layout
+source on `led-rmt-parlio-fixes` against historical main `ff64902a` and the
+#203 tree at `15655505`, now merged as main `a175e357` with an identical tree.
+The portable-test follow-up changes no production source, so the parent comparison
+applies to the current base. Builds use `cargo +1.99.0 build --release
 --bins` and `llvm-objdump -d --demangle --no-show-raw-insn`; `asmcmp.py` normalizes
 instruction/branch addresses, alignment nops, adrp page offsets and equivalent
 call-target aliases (comparator preserved as [asmcmp.py](asmcmp.py)). [asm.json](asm.json) records all selected symbols and links
@@ -121,8 +123,11 @@ C6 PARLIO shares the existing boxed `OptionalPeripherals` allocation with I2S an
 ECC; I2S remains at offset zero. The nullable PARLIO TX box remains unallocated
 until first relevant MMIO access or selected DMA transfer. PCR clock writes before
 PARLIO is used allocate nothing, and `clock()` stays `None`, so PARLIO never enters
-the optional-device active list. Native regression tests pin C6 hot-bus sizes and
-offsets and the architecture-independent I2S offset-zero contract.
+the optional-device active list. Portable regression tests retain the I2S
+offset-zero contract and assert that the actual `Peripherals.optional` field
+occupies one pointer, not inline cold-device storage. The nullable Box also
+occupies one pointer. No architecture/OS gate or absolute hot-bus size/offset
+is pinned, so unrelated field additions do not invalidate the test.
 
 All emitted C3/C6 `Machine::run`, `run_unmodeled`, `step_core`, S3 `run_modeled`,
 `run_unmodeled` and `step_core` bodies are instruction-identical to both baselines.
@@ -226,8 +231,10 @@ retained RMT queue storage after disable, inline PARLIO TX storage and an active
 PARLIO clock. Each changed source is restored before the next mutation. Every
 mutation fails an assertion in a previously passing focused test. Separately,
 [layout-mutation.json](layout-mutation.json) records the cold-allocation guard:
-restoring the top-level PARLIO field fails `cold_devices_do_not_grow_the_native_hot_bus`;
-the restored coallocated source passes both layout tests.
+inlining `OptionalPeripherals` fails `cold_devices_do_not_grow_the_native_hot_bus`
+on its actual-field size assertion, rather than a compilation failure.
+`python3 docs/evidence/led-rmt-parlio-fixes/layout_mutate.py` runs baseline,
+mutation and restored-source tests; the restored source passes both tests.
 
 ## Limits
 
@@ -245,6 +252,13 @@ inferred decoder policy. A transaction boundary also terminates a parallel frame
 These tolerances and completion rules are not silicon timing claims.
 
 ## CPU comparison
+
+The maintainer separately closed #203's C6 idle-path check on merged main:
+`ff64902a` → `a175e357`, seven alternating load-gated pairs, median user CPU
+3.50 → 3.51 s (+0.3%), after slower 3/7, identical instructions and console
+SHA-256. This resolves the parent's earlier +1.37% (7/7) flag; it is not a
+remeasurement of #205. The historical #205 measurements below retain their
+actual measured parent revisions.
 
 Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Baseline `schematik-engineering/esp32sim@3d9eee3c` built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
