@@ -475,8 +475,14 @@ impl BleLc {
             3 => {
                 if c.pending.is_none() {
                     let logical = half(sram, cs + 28) as u32;
-                    let tx = self.mapped(logical, 14, sram).ok_or("unmapped connection TX")?;
-                    let packet = if half(sram, tx) & 0x8000 == 0 {
+                    // An ACK can leave CS+28 at link 0, the null link. Logical 0 is the
+                    // event table, never a TX descriptor: send an empty PDU, as for a
+                    // descriptor the guest still owns. Inferred; null-link handling was
+                    // not traced in the ROM.
+                    let tx = if logical == 0 { None } else {
+                        Some(self.mapped(logical, 14, sram).ok_or("unmapped connection TX")?)
+                    };
+                    let packet = if let Some(tx) = tx.filter(|&tx| half(sram, tx) & 0x8000 == 0) {
                         let header = half(sram, tx + 2);
                         let len = (header >> 8) as usize;
                         let data = self.mapped(half(sram, tx + 4) as u32, len, sram).ok_or("unmapped connection payload")?;
@@ -1042,6 +1048,36 @@ mod tests {
             assert_eq!(d.connection_event(&mut event, cs, &mut ram).is_ok(), valid);
             if valid { assert_eq!(event.due, anchor * HALF_US_CYCLES); }
         }
+    }
+
+    #[test]
+    fn csa2_rejected() {
+        for (control, result) in [(5 << 8, Ok(true)), ((1 << 14) | (5 << 8), Err("CSA#2 not supported"))] {
+            let (mut d, mut ram) = advertising_fixture();
+            let base = crate::bus::DRAM_IN_SRAM;
+            let cs = base + 0x400;
+            put_half(&mut ram, cs + 22, control);
+            put_half(&mut ram, cs + 26, 20);
+            ram[cs + 34..cs + 39].copy_from_slice(&[255,255,255,255,31]);
+            d.state.as_mut().unwrap().connection = Some(Connection { anchor: 1000 * HALF_US_CYCLES, ..Connection::default() });
+            let mut event = Event { entry: base, due: 1000 * HALF_US_CYCLES,
+                advertising: None, phase: ScanPhase::Advertising, connection_phase: 0 };
+            assert_eq!(d.connection_event(&mut event, cs, &mut ram), result);
+        }
+    }
+
+    #[test]
+    fn null_tx_link_sends_an_empty_pdu() {
+        let (mut d, mut ram) = advertising_fixture();
+        let base = crate::bus::DRAM_IN_SRAM;
+        put_half(&mut ram, base + 0x41c, 0); // CS+28 null link; logical 0 is the event table.
+        d.state.as_mut().unwrap().connection = Some(Connection::default());
+        let mut event = Event { entry: base, due: 0, advertising: None,
+            phase: ScanPhase::Advertising, connection_phase: 3 };
+        d.connection_event(&mut event, base + 0x400, &mut ram).unwrap();
+        assert!(d.take_observation().unwrap().ends_with("type=DATA pdu=0100"));
+        assert!(d.state.as_ref().unwrap().connection.as_ref().unwrap().pending.as_ref().unwrap().descriptor.is_none());
+        assert_eq!(half(&ram, base), 2);
     }
 
     #[test]

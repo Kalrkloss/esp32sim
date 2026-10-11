@@ -41,6 +41,8 @@ cases = [
     (lc, 'let pdu = std::mem::take(&mut c.incoming);', 'let pdu = c.outgoing.front().cloned().unwrap_or_else(|| vec![1,0]);', 'central_receive_uses_the_transmitted_packet_and_header'),
     (lc, '?.silent = true,', '?.silent = false,', 'full_ble_script_connect_read_and_stop'),
     (peer, 'b.len() <= 20', 'true', 'hex_bytes_and_read_by_type_preserve_wire_values'),
+    (lc, 'if control & (1 << 14) != 0 { return Err("CSA#2 not supported") }', '', 'csa2_rejected'),
+    (lc, 'let tx = if logical == 0 { None } else {', 'let tx = if false { None } else {', 'null_tx_link_sends_an_empty_pdu'),
     (peer, 'end as u8, (end >> 8) as u8, 3, 0x28', '0xff, 0xff, 3, 0x28', 'hex_bytes_and_read_by_type_preserve_wire_values'),
 
 ]

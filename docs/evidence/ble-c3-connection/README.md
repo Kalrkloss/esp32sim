@@ -1,6 +1,6 @@
 # EX213: C3 scan and connection events
 
-Base: upstream/main `017af524`, including merged PR #195. This extends EX211's
+Base: upstream/main `eec7b2c9`, including merged PR #195. This extends EX211's
 controller-driven advertising with SCAN_REQ/SCAN_RSP, format-3 connection events,
 CSA#1, SN/NESN, guest supervision timeout and a virtual central that replies to
 LL_VERSION_IND and reads a characteristic by UUID. It reuses the merged enable,
@@ -21,7 +21,10 @@ ELF's `.data_btdm`, allowing the guest to restart advertising without losing UUI
 One unencrypted 1M CSA#1 connection is supported, with the central selecting a
 30 ms interval, 2 s supervision timeout, hop 5 and all 37 data channels. ATT uses
 MTU 23. No pairing, encryption, CSA#2, PHY update or L2CAP fragmentation claim.
-Unsupported guest procedures report an error. Air times, receive windows and
+Unsupported guest procedures report an error; a guest that selects CSA#2
+(CS+22 bit 14) is rejected instead of hopping with CSA#1. When an ACK leaves the
+CS TX link (CS+28) at 0, the null link, the next peripheral packet is an empty
+PDU; logical 0 is never read as a descriptor. That null-link rule is inferred. Air times, receive windows and
 IRQ/ownership transition timing are model choices or inferred from the C3 rev3
 ROM and IDF 5.5.5 controller, not measured RF behavior.
 
@@ -103,11 +106,11 @@ committed synthetic checks or CI firmware workload.
 [checks.json](checks.json) records commands and results on Rust 1.99.0, with
 [source hashes](source-hashes.json) identifying the checked implementation.
 Both native and wasm Clippy pass with warnings denied. The workspace passes
-with an empty HOME and only ROM input configured: 666 passed under CI policy.
-Plain workspace tests pass with no ESP32SIM inputs: 642 passed, 42 ignored.
+with an empty HOME and only ROM input configured: 715 passed, 0 ignored under CI policy.
+Plain workspace tests pass with no ESP32SIM inputs: 691 passed, 42 ignored.
 The eight required production WASM demos, advertising ABI and connection ABI
 pass; [wasm.json](wasm.json) pins the module hash and reconnect results.
-32 deliberate mutations fail their named tests. Privacy and source diff whitespace checks pass. The exact console goldens
+34 deliberate mutations fail their named tests. Privacy and source diff whitespace checks pass. The exact console goldens
 retain guest CRLF and trailing spaces; those intentionally trigger Git whitespace
 checks and are excluded from the source-only check. JIT implementation code is unchanged, so no JIT differential run was needed.
 
@@ -132,7 +135,7 @@ server tests remain ignored and named `external_*`; their inputs are not CI fixt
 
 Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 954f2a68 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
-Measured on `771b56f91a208353f8f768e06a32b441406611b9` against main `954f2a68`; the branch was later rebased onto `954f2a68` with no code change. User CPU seconds.
+Measured on `schematik-engineering/esp32sim@771b56f9` (fork branch `schematik-integration-v2`) against main `954f2a68`; the same code was later rebased onto `eec7b2c9`. Not re-measured after the October 11 review follow-up, which changes only the full-mode connection TX path (phase 3 of a connection event); that path runs only with `--ble full` and a connected central. User CPU seconds.
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -171,11 +174,10 @@ Status: PASS. Flags: —.
 | 6 | 9 | B→M | 26.688934 | 27.378237 | 5.32/5.53/5.78 | 4.94/5.32/5.74 | accepted |
 | 7 | 10 | M→B | 26.962300 | 26.327239 | 4.60/4.76/5.08 | 4.76/5.34/5.66 | accepted |
 
-Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above. Raw output files are preserved.
+Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above. Raw output files are not committed.
 
 All added radio state is inside the existing optional
 boxed BLE state. UUID discovery is full-controller-only, so the existing HCI
 Peer/Session fields and sizes are unchanged; no fields were added to the bus/peripheral hot structures. The
 disabled tick path, optional-device registration and instruction dispatch are
 unchanged. Observation formatting stays behind the merged lazy observer gate.
-

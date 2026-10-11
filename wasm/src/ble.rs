@@ -50,7 +50,8 @@ pub unsafe extern "C" fn esp32sim_ble_scan(e: *mut Emu, enabled: u32) -> u32 {
 }
 
 
-/// Send connect or read-uuid SERVICE CHARACTERISTIC to C3 full mode.
+/// Send `connect`, `read-uuid SERVICE CHARACTERISTIC`, `disconnect` or
+/// `central-stop` to C3 full mode.
 /// Returns 0 on success, 1 for invalid commands, other chips or disabled full mode.
 /// # Safety
 /// `e` must be live and exclusive; `ptr` must be readable for `len` bytes.

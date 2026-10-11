@@ -1,6 +1,6 @@
 {
   "checks": "pass",
-  "module_sha256": "ac726bb9275b5aed6196f8c349c20f9fbc876ee808acf8c58ee479fc893038eb",
+  "module_sha256": "2dfa79829c9c143cec24835d7acd6999963004056e4a3ec89bc694fb438192a2",
   "modeled_seconds": 8,
   "connections": 2,
   "reads": 2,

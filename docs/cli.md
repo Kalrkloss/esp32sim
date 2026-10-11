@@ -193,6 +193,8 @@ holds the latest 1024 observations and reports dropped entries when polled.
 Use script commands `ble connect`, `ble read-uuid SERVICE CHARACTERISTIC`,
 `ble central-stop`, and `ble disconnect`. The last sends LL_TERMINATE_IND;
 `central-stop` silences the central so the guest supervision timer can expire.
+A `read-uuid` sent between `central-stop` and that timeout is queued on the
+silent link and lost; send it after the next `connect`.
 For example, pass this file with `--ble full --script connection.txt`:
 
 ```text

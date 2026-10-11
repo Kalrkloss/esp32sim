@@ -1,5 +1,5 @@
 {
-  "base": "017af524",
+  "base": "eec7b2c9",
   "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
   "host": {
     "os": "Darwin",
@@ -22,7 +22,7 @@
       "check": "workspace-ci",
       "command": "cargo +1.99.0 test --release --workspace -- --include-ignored --skip external_",
       "exit_code": 0,
-      "passed": 666,
+      "passed": 715,
       "failed": 0,
       "ignored": 0
     },
@@ -30,7 +30,7 @@
       "check": "workspace-plain",
       "command": "cargo +1.99.0 test --release --workspace",
       "exit_code": 0,
-      "passed": 642,
+      "passed": 691,
       "failed": 0,
       "ignored": 42
     },
@@ -67,7 +67,7 @@
     {
       "check": "mutations",
       "command": "python3 docs/evidence/ble-c3-connection/mutate.py",
-      "killed": 32,
+      "killed": 34,
       "survived": 0
     },
     {

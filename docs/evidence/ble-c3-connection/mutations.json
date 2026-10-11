@@ -186,6 +186,18 @@
     "killed": true
   },
   {
+    "file": "esp32c3/src/ble_lc.rs",
+    "mutation": "if control & (1 << 14) != 0 { return Err(\"CSA#2 not supported\") } -> ",
+    "test": "csa2_rejected",
+    "killed": true
+  },
+  {
+    "file": "esp32c3/src/ble_lc.rs",
+    "mutation": "let tx = if logical == 0 { None } else { -> let tx = if false { None } else {",
+    "test": "null_tx_link_sends_an_empty_pdu",
+    "killed": true
+  },
+  {
     "file": "esp-soc/src/ble/peer.rs",
     "mutation": "end as u8, (end >> 8) as u8, 3, 0x28 -> 0xff, 0xff, 3, 0x28",
     "test": "hex_bytes_and_read_by_type_preserve_wire_values",
