@@ -1,21 +1,10 @@
 # EX229: classic host input and I2S receive
 
-Base: branch `esp32-classic-ble` (#211), on upstream main `eec7b2c9`. Merge
-`schematik-engineering/esp32sim@b327516e` brings in
-[#201](https://github.com/mikroverk/esp32sim/pull/201) and
-[#202](https://github.com/mikroverk/esp32sim/pull/202) at
-`schematik-engineering/esp32sim@38124b81` (branch `audio-sources-adc-stream`, on
-`i2s-rx-input` `schematik-engineering/esp32sim@baf9845b`). All three branches sit on
-`eec7b2c9`. This PR must wait for #201, #202 and #211.
-
-Commits above #211:
-
-| Commit | Content |
-| --- | --- |
-| `schematik-engineering/esp32sim@b327516e` | Merge, conflict resolutions only: `docs/cli.md` and `docs/experiments.md` keep both sides; `analog.rs` takes #202's `convert` with the classic stack's `pub`; `esp-periph/src/lib.rs` keeps both module lists; `esp32s3/src/bus/dma.rs` takes #201's side. |
-| `schematik-engineering/esp32sim@88831031` | Removes the classic stack's second descriptor reader (`esp_periph::dma` and `dma_descriptor_reader!`). Classic's memory-only word reader goes through #201's `DescriptorWalk::read_with`. |
-| `schematik-engineering/esp32sim@aeb19f27` | Classic I2S0/1 RX, ported to #202's read-only `pcm_sources()` / `attach_pcm_sources()` and #201's RX_24_FILL_EN. |
-| `schematik-engineering/esp32sim@2b58a9be` | Owner check from LC_CONF, DRAM-only DMA, FIFO-reset and slot mapping, IN_DONE/IN_DSCR_EMPTY. |
+Base: branch `esp32-classic-ble-ff` (#211),
+`schematik-engineering/esp32sim@9b3f1fff7fdaae7a070d7fe1b87c494cc0f99a97`, on upstream main `ff64902a`.
+#201 and #202 are included in main. The shared `DescriptorWalk` integration
+is owned by #207; this part adds only classic RX and its regression tests.
+No prerequisite merge commit is included.
 
 Classic UART APB/AHB routing, matrix input, GPIO feedback/release, physical SPI,
 raw ADC observations and Ethernet relay already come from EX230 and EX224-EX228.
@@ -157,7 +146,7 @@ Not re-measured on this head. An earlier head of branch `esp32-classic-host`,
 `schematik-engineering/esp32sim@bcd4df7e`, was measured against main `2f9443a9`.
 It predates the rebase onto `eec7b2c9`, the updated #201/#202 and the Oct 11
 review commits. Classic code is unused in these workloads. The static check above
-covers the current head.
+covers its explicitly named pre-rebase revisions, not this head.
 
 Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 2f9443a9 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
