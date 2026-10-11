@@ -28,10 +28,12 @@ impl DescriptorWalk {
     pub fn new(budget: usize) -> Self { Self { remaining: budget, budget } }
     /// Read a descriptor through the guest bus (DMA accesses are unpriced).
     pub fn read(&mut self, bus: &mut impl Bus, addr: u32) -> Result<(u32, DmaDesc), DmaDescriptorFault> {
-        self.read_with(addr, |a| bus.read32_unpriced(a))
+        if self.remaining == 0 { return Err(DmaDescriptorFault::StepBudgetExceeded { budget: self.budget }); }
+        self.remaining -= 1;
+        try_dma_desc(bus, addr)
     }
     /// Read a descriptor from any word source, for callers that hold DMA memory outside a `Bus`.
-    /// Returns DW0 unmodified (for write-back) and the decoded descriptor.
+    /// Same budget, decoding and faults as `read`; returns DW0 unmodified for write-back.
     pub fn read_with(&mut self, addr: u32, mut word: impl FnMut(u32) -> Result<u32, Fault>) -> Result<(u32, DmaDesc), DmaDescriptorFault> {
         if self.remaining == 0 { return Err(DmaDescriptorFault::StepBudgetExceeded { budget: self.budget }); }
         self.remaining -= 1;
@@ -41,6 +43,15 @@ impl DescriptorWalk {
         let (buf, next) = (word(4, DmaDescriptorWord::Buffer)?, word(8, DmaDescriptorWord::Next)?);
         Ok((dw0, DmaDesc::decode(addr, dw0, buf, next)))
     }
+}
+
+/// Read a descriptor through the same decoder as the infallible host-memory API.
+fn try_dma_desc(bus: &mut impl Bus, addr: u32) -> Result<(u32, DmaDesc), DmaDescriptorFault> {
+    let mut word = |offset, word| bus.read32_unpriced(addr.wrapping_add(offset))
+        .map_err(|fault| DmaDescriptorFault::Read { descriptor: addr, word, fault });
+    let dw0 = word(0, DmaDescriptorWord::Control)?;
+    let (buf, next) = (word(4, DmaDescriptorWord::Buffer)?, word(8, DmaDescriptorWord::Next)?);
+    Ok((dw0, DmaDesc::decode(addr, dw0, buf, next)))
 }
 
 impl GdmaInCh {
