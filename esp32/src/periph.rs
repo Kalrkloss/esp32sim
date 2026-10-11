@@ -539,7 +539,9 @@ impl ClassicEfuse {
         r.write(0x08, (crc as u32) << 16 | (mac[0] as u32) << 8 | mac[1] as u32);
         r.write(0x0c, 1 << 15); // ECO1+
         r.write(0x14, 1 << 20); // Revision 2; the loaded ECO3 ROM is selected independently.
-        r.write(0x10, 0x10 << 8); // Nominal 1100 mV Vref, sign-magnitude negative zero.
+        // IDF v5.5.4 register/soc/efuse_reg.h:169,177-183: EFUSE_BLK0_RDATA4_REG EFUSE_RD_ADC_VREF
+        // [12:8]. 0x10 is nominal 1100 mV Vref, sign-magnitude negative zero.
+        r.write(0x10, 0x10 << 8);
         Self { ram: r, cmd: 0 }
     }
 }
@@ -602,6 +604,8 @@ device_set! { Peripherals; clock: (clock) CPU_HZ, [(ClockDomain::RtcSlow, 1600)]
     0x73 "WIFI_MAC" (wifi) => [SRC_WIFI_MAC];
     0x74 "WIFI_MAC" alias (wifi) delta 0x1000 => [];
     0x75 "WIFI_MAC" alias (wifi) delta 0x2000 => [];
+    0x48 "RTC_IO" alias (adc.rtc_io) delta -0x400 @ 0x400..=0x4ff => [];
+    0x48 "SENS" alias (adc) delta -0x800 @ 0x800..=0x8ff => [];
     0x48 "RTCCNTL" (rtc) => [SRC_RTC_CORE];
     0x49 "IO_MUX" alias (gpio) delta 0x1000 => [];
     0x50 "UART1" (uart[1]) => [SRC_UART1];
@@ -706,12 +710,13 @@ impl Peripherals {
             _ => "?",
         }
     }
+    /// SENS and RTC_IO sit in the RTC domain: like RTC_CNTL's register RAM they keep their
+    /// values, including touch-timer and DAC power state, across a guest reboot.
+    pub(crate) fn restore_rtc_analog(&mut self, adc: ClassicAdc) {
+        self.adc = adc;
+        self.gpio.rtc_pads = self.adc.rtc_pad_mask();
+    }
     pub fn read32(&mut self, addr: u32) -> u32 {
-        match addr {
-            0x3ff4_8400..=0x3ff4_84ff => return self.adc.rtc_io.read(addr - 0x3ff4_8400),
-            0x3ff4_8800..=0x3ff4_88ff => return self.adc.read_sens(addr - 0x3ff4_8800),
-            _ => {}
-        }
         if (0x3ff0_00ec..=0x3ff0_0100).contains(&addr) {
             let (core, word) = if addr < 0x3ff0_00f8 {
                 (0, ((addr - 0x3ff0_00ec) / 4) as usize)
@@ -733,12 +738,13 @@ impl Peripherals {
         match addr {
             0x3ff4_8400..=0x3ff4_84ff => {
                 let old = self.gpio.driven_levels();
-                self.adc.rtc_io.write(addr - 0x3ff4_8400, v);
+                mmio::write32(self, addr, v);
                 self.gpio.rtc_pads = self.adc.rtc_pad_mask();
                 self.gpio.note_driven(old);
                 return;
             }
-            0x3ff4_8800..=0x3ff4_88ff => { self.adc.write_sens(addr - 0x3ff4_8800, v); return; }
+            // IDF v5.5.4 register/soc/rtc_cntl_reg.h:246,277-279: RTC_CNTL_STATE0_REG bit 23 is
+            // RTC_CNTL_TOUCH_SLP_TIMER_EN.
             0x3ff4_8018 => self.adc.touch_timer = v & (1 << 23) != 0,
             _ => {}
         }
@@ -899,6 +905,24 @@ mod tests {
         assert_eq!(p.gpio.driven(25), Some(true));
         assert!(p.adc.dac_outputs().is_empty());
         assert_eq!((p.read32(0x3ff5_a010) >> 8) & 31, 0x10);
+    }
+
+    #[test]
+    fn sens_and_rtc_io_accesses_reach_mmio_probes() {
+        let mut p = Peripherals::new([0; 6]);
+        p.misc.mmio_log = Some(Vec::new());
+        p.write32(0x3ff4_8834, 3 << 12);
+        let sens = p.read32(0x3ff4_8834);
+        p.write32(0x3ff4_8484, 1 << 10);
+        let rtc_io = p.read32(0x3ff4_8484);
+        assert_eq!((sens, rtc_io), (3 << 12, 1 << 10));
+        assert_eq!(p.misc.mmio_log.take().unwrap(), [
+            (0, 0x3ff4_8834, 3 << 12, true), (0, 0x3ff4_8834, 3 << 12, false),
+            (0, 0x3ff4_8484, 1 << 10, true), (0, 0x3ff4_8484, 1 << 10, false),
+        ]);
+        // The block-0x48 entries go to the analog model, not RTC_CNTL's register RAM.
+        assert_eq!(p.rtc.0.ram.read(0x834), 0);
+        assert!(p.adc.dac_outputs().is_empty());
     }
 
     fn configure_i2c0_pins(p: &mut Peripherals) {

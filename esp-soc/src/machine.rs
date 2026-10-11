@@ -1139,7 +1139,7 @@ impl<S: Soc> Machine<S> {
                 "touch" => { let mut p = rest.split_whitespace(); let x: u16 = p.next().and_then(|v| v.parse().ok()).unwrap_or(0); let y: u16 = p.next().and_then(|v| v.parse().ok()).unwrap_or(0); let d = p.next().unwrap_or("1") == "1"; ev.push((c, ScriptAction::Touch(x, y, d))); }
                 "touchpad" => {
                     let mut p = rest.split_whitespace(); let pn = pin(p.next().unwrap_or(""))?;
-                    if pn >= 64 { return Err(format!("line {}: GPIO must be below 64", ln + 1)); }
+                    if !self.bus.has_touch_pad(pn) { return Err(format!("line {}: GPIO {} has no capacitive touch pad on this chip", ln + 1, pn)); }
                     let touched = match p.next() { Some("0") => false, Some("1") => true, _ => return Err(format!("line {}: touchpad needs 0 or 1", ln + 1)) };
                     if p.next().is_some_and(|v| !v.starts_with('#')) { return Err(format!("line {}: touchpad takes a GPIO and one value", ln + 1)); }
                     ev.push((c, ScriptAction::TouchPad(pn, touched)));

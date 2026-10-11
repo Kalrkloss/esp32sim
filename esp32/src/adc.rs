@@ -3,13 +3,14 @@
 //! register/soc/rtc_io_reg.h defines DAC power/mux bits;
 //! include/soc/adc_channel.h and rtc_io_periph.c define pin mappings.
 //! Conversion transfer functions and touch counts are inferred, not silicon calibration.
-use esp_periph::{AnalogInputs, RegRam};
+use esp_periph::{AnalogInputs, Device, RegRam, WriteEffect};
 
 const ADC1_PINS: [u8; 8] = [36, 37, 38, 39, 32, 33, 34, 35];
 const ADC2_PINS: [u8; 10] = [4, 0, 2, 15, 13, 12, 14, 27, 25, 26];
 pub fn valid_pin(pin: u8) -> bool { ADC1_PINS.contains(&pin) || ADC2_PINS.contains(&pin) }
 
 const TOUCH_PINS: [u8; 10] = [4, 0, 2, 15, 13, 12, 14, 27, 33, 32];
+pub fn touch_pin(pin: u8) -> bool { TOUCH_PINS.contains(&pin) }
 // GPIO, RTC_IO register, RTC mux bit (ESP-IDF rtc_io_desc).
 const PADS: [(u8, u32, u32); 18] = [
     (36, 0x7c, 27),
@@ -31,6 +32,16 @@ const PADS: [(u8, u32, u32); 18] = [
     (14, 0xac, 19),
     (27, 0xb0, 19),
 ];
+/// SENS registers, mounted through the chip's `device_set!` table so MMIO probes and
+/// `log_all` tracing see them.
+impl Device for ClassicAdc {
+    fn read(&mut self, off: u32) -> u32 { self.read_sens(off) }
+    fn write(&mut self, off: u32, v: u32) -> WriteEffect {
+        self.write_sens(off, v);
+        WriteEffect::NONE
+    }
+}
+
 #[cfg(test)]
 const START: u32 = 1 << 17;
 const DONE: u32 = 1 << 16;
@@ -79,11 +90,6 @@ impl ClassicAdc {
         };
         self.touched[channel] = touched;
         true
-    }
-
-    pub fn restore_inputs(&mut self, old: Self) {
-        self.analog = old.analog;
-        self.touched = old.touched;
     }
 
     pub fn rtc_pad_mask(&self) -> u64 {

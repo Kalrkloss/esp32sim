@@ -100,11 +100,11 @@ impl esp_soc::SocBus for SocBus {
     fn reboot(&mut self, mac: [u8; 6]) -> u32 {
         let cause = self.periph.rtc.0.reset_cause;
         let old = std::mem::replace(&mut self.periph, Peripherals::new(mac));
+        self.periph.restore_rtc_analog(old.adc);
         self.periph.gpio.restore_inputs(&old.gpio);
         self.periph.spi0.0.jedec = old.spi0.0.jedec;
         self.periph.spi1.0.jedec = old.spi1.0.jedec;
         self.periph.efuse = old.efuse;
-        self.periph.adc.restore_inputs(old.adc);
         self.periph.wifi.link = old.wifi.link.surviving_reboot();
         self.periph.wifi.log = old.wifi.log;
         self.periph.misc.log_unknown = old.misc.log_unknown;
@@ -174,6 +174,7 @@ impl esp_soc::SocBus for SocBus {
     fn adc_observation(&self, pin: u8) -> Option<esp_periph::AdcObservation> { crate::adc::valid_pin(pin).then(|| self.periph.adc.analog.observation(pin)) }
     fn analog_set(&mut self, pin: u8, src: esp_periph::AnalogSource) { self.periph.adc.analog.set(pin, src); }
     fn set_touch_input(&mut self, pin: u8, touched: bool) { self.periph.adc.set_touch_input(pin, touched); }
+    fn has_touch_pad(&self, pin: u8) -> bool { crate::adc::touch_pin(pin) }
     fn pwm_output(&self, pin: u8) -> Option<(f64, u32)> {
         self.periph.pwm_output(pin as u32)
     }

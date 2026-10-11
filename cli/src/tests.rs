@@ -149,9 +149,12 @@ fn analog_scripts_validate_inputs_and_keep_panel_touch_separate() {
     assert!(matches!(m.script.events[1], (48_000_000, ScriptAction::TouchPad(4, true))));
     assert!(matches!(m.script.events[2], (72_000_000, ScriptAction::Analog(34, esp_periph::AnalogSource::Const(1.650)))));
     assert!(matches!(m.script.events[3], (96_000_000, ScriptAction::Touch(450, 30, true))));
-    for command in ["adc 34", "adc 34 nope", "adc 256 1", "adc -1 1", "touchpad 4", "touchpad 4 2", "touchpad 4 1 extra", "touchpad 64 0"] {
+    for command in ["adc 34", "adc 34 nope", "adc 256 1", "adc -1 1", "touchpad 4", "touchpad 4 2", "touchpad 4 1 extra", "touchpad 64 0", "touchpad 5 1", "touchpad 34 1"] {
         assert!(m.load_script(&format!("0 {command}")).is_err(), "accepted {command}");
     }
+    assert!(esp32s3::machine([0; 6]).load_script("0 touchpad 4 1").is_err());
+    assert!(esp32c3::machine([0; 6], 4 << 20).load_script("0 touchpad 4 1").is_err());
+    assert!(esp32c6::machine([0; 6], 4 << 20).load_script("0 touchpad 4 1").is_err());
     m.load_script("0 adc 34 0\n0 adc 35 3.3\n0 adc 36 1.6504").unwrap();
     assert!(matches!(m.script.events[0].1, ScriptAction::Analog(34, esp_periph::AnalogSource::Const(0.0))));
     assert!(matches!(m.script.events[1].1, ScriptAction::Analog(35, esp_periph::AnalogSource::Const(3.3))));

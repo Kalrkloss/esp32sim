@@ -714,14 +714,23 @@ mod tests {
     }
 
     #[test]
-    fn reboot_preserves_host_analog_input_but_resets_dac_registers() {
+    fn reboot_keeps_rtc_domain_analog_registers_and_host_inputs() {
+        use esp_soc::SocBus as _;
         let mut b = SocBus::new(4 << 20, [0; 6]);
-        esp_soc::SocBus::analog_set(&mut b, 34, esp_periph::AnalogSource::Const(1.650));
-        esp_soc::SocBus::set_touch_input(&mut b, 4, true);
+        b.analog_set(34, esp_periph::AnalogSource::Const(1.650));
+        b.set_touch_input(4, true);
         b.write32(0x3ff4_8484, (128 << 19) | (1 << 18) | (1 << 17) | (1 << 10)).unwrap();
-        assert!(esp_soc::SocBus::report(&b).contains("[dac] GPIO25: 1656 mV"));
-        esp_soc::SocBus::reboot(&mut b, [0; 6]);
-        assert!(b.periph.adc.dac_outputs().is_empty());
+        b.write32(0x3ff4_8494, 1 << 19).unwrap(); // GPIO4 RTC mux
+        b.write32(0x3ff4_8018, 1 << 23).unwrap(); // RTC_CNTL_TOUCH_SLP_TIMER_EN
+        assert!(b.report().contains("[dac] GPIO25: 1656 mV"));
+        b.reboot([0; 6]);
+        // SENS/RTC_IO and the STATE0 copy survive like RTC_CNTL's register RAM.
+        assert_eq!(b.periph.adc.dac_outputs(), [(25, 1656)]);
+        assert!(b.periph.adc.touch_timer);
+        assert_ne!(b.read32(0x3ff4_8018).unwrap() & (1 << 23), 0);
+        b.write32(0x3ff4_9048, (2 << 12) | (1 << 9)).unwrap();
+        b.gpio_set_input(4, true);
+        assert_eq!(b.read32(0x3ff4_403c).unwrap() & (1 << 4), 0, "GPIO4 stays on the RTC mux");
 
         b.write32(0x3ff4_8480, 1 << 29).unwrap();
         b.write32(0x3ff4_8800, 1 << 28).unwrap();
