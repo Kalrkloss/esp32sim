@@ -1,6 +1,7 @@
 # EX225: classic ESP32 crypto adapters
 
-Base: branch `esp32-classic-3-peripherals` (#207). Builds on EX230/EX224.
+Base: branch `esp32-classic-3-peripherals-ff` (#207),
+`schematik-engineering/esp32sim@8457808ee973a3975139707a1a542f28214dbcc1`, on upstream main `ff64902a`. Builds on EX230/EX224.
 Adds classic AES and RSA registers and expands the boot SHA-256 adapter to
 SHA-1/256/384/512, sharing AES, SHA and big-integer arithmetic with other chips.
 The classic RSA Montgomery operation uses the programmed M-prime value;
