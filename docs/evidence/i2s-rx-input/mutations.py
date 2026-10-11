@@ -6,6 +6,8 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[3]
 RX = 'esp-periph/src/i2s/rx.rs'
+# EX215 aliases PcmInput to PcmSource; controller storage lives here.
+PCM = 'esp-periph/src/i2s/sources.rs'
 UNIT = ['cargo', '+1.99.0', 'test', '-p', 'esp-periph', '--lib']
 BUS = ['cargo', '+1.99.0', 'test', '-p', 'esp32sim', '--test', 'i2s_rx']
 CASES = [
@@ -19,8 +21,8 @@ CASES = [
     ('two slots', RX, '(tdm >> 16) & 15 == 1', 'true', UNIT, 'unsupported_modes_preserve_queued_input'),
     ('frame accumulator', RX, 'rx.acc %= cpu_hz;', 'rx.acc = 0;', UNIT, 'reset_discards_fractional_receiver_time'),
     ('reset accumulator', 'esp-periph/src/i2s.rs', 'if v & 3 != 0 { self.reset_rx_phase(); }', '', UNIT, 'reset_discards_fractional_receiver_time'),
-    ('input bound', RX, '65536 - self.frames.len()', '65537 - self.frames.len()', UNIT, 'bounded_input_and_tone'),
-    ('tone clear', RX, 'self.tone = None;', 'let _ = &self.tone;', UNIT, 'bounded_input_and_tone'),
+    ('input bound', PCM, '65536 - self.queue.frames.len()', '65537 - self.queue.frames.len()', UNIT, 'bounded_input_and_tone'),
+    ('tone clear', PCM, 'self.tone = None;', 'let _ = &self.tone;', UNIT, 'bounded_input_and_tone'),
     ('C3 pump', 'esp32c3/src/bus.rs', 'self.i2s_rx_step(u64::from(cycles));', '', BUS, 'pcm_to_guest_dma_on_all_chips'),
     ('C6 clock', 'esp32c6/src/bus.rs', 'self.periph.i2s0.rx_pcr_clock(self.periph.pcr.read(0x78), self.periph.pcr.read(0x7c));', '', BUS, 'pcm_to_guest_dma_on_all_chips'),
     ('S3 RX port one', 'esp32s3/src/bus/dma.rs', 'if self.periph.i2s1.poll_active() { self.dma_i2s_port(cycles, 1); }', '', BUS, 'absent_controllers_and_s3_second_receiver'),
@@ -30,8 +32,8 @@ CONTRACT = ['cargo', '+1.99.0', 'test', '-p', 'esp-periph', '--test', 'i2s_rx_co
 CASES.extend([
     ('mono packing', RX, 'self.rx_conf & (1 << 5) != 0', 'false', CONTRACT, 'mono_consumes_one_sample_with_both_slots_enabled'),
     ('PDM double decimation', RX, 'self.rx_conf & (1 << 22) != 0', 'false', CONTRACT, 'pdm_double_decimation_halves_pcm_rate'),
-    ('tone replaces queue', RX, 'self.frames.clear();', 'let _ = &self.frames;', CONTRACT, 'tone_replaces_queue_and_push_replaces_tone'),
-    ('push replaces tone', RX, 'self.tone = None;', 'let _ = &self.tone;', CONTRACT, 'tone_replaces_queue_and_push_replaces_tone'),
+    ('tone replaces queue', PCM, 'self.queue.frames.clear();', 'let _ = &self.queue.frames;', CONTRACT, 'tone_replaces_queue_and_push_replaces_tone'),
+    ('push replaces tone', PCM, 'self.tone = None;', 'let _ = &self.tone;', CONTRACT, 'tone_replaces_queue_and_push_replaces_tone'),
 ])
 for chip in ['c3', 'c6']:
     CASES.append((chip + ' RX deadline', 'esp32' + chip + '/src/soc.rs', {'c3': 'if self.periph.i2s_rx {', 'c6': 'if self.periph.work_pending && self.periph.i2s0.rx_running()'}[chip], 'if false {' if chip == 'c3' else 'if false', BUS, 'active_receiver_bounds_scheduler_sleep_with_and_without_pin_work'))
@@ -58,12 +60,6 @@ CASES.extend([
     ('C3 cached RX flag', 'esp32c3/src/periph.rs', 'self.i2s_rx = self.i2s0.rx_running();', '', BUS, 'pcm_to_guest_dma_on_all_chips'),
     ('C6 RX work term', 'esp32c6/src/periph.rs', 'self.work_pending = self.spi_exec || self.i2s0.rx_running();', 'self.work_pending = self.spi_exec;', BUS, 'pcm_to_guest_dma_on_all_chips'),
 ])
-# Controller input shares PcmSource storage in EX215; the EX214 contracts are unchanged.
-CASES = [(name, 'esp-periph/src/i2s/sources.rs' if name in {'input bound', 'tone clear', 'tone replaces queue', 'push replaces tone'} else file,
-          old.replace('self.frames', 'self.queue.frames') if name in {'input bound', 'tone replaces queue'} else old,
-          new.replace('self.frames', 'self.queue.frames') if name in {'input bound', 'tone replaces queue'} else new, command, test)
-         for name, file, old, new, command, test in CASES]
-
 # 24-bit packing, RX_EOF_NUM reset value and the shared descriptor walker.
 WALK = 'esp-periph/src/gdma/receive.rs'
 CASES.extend([
