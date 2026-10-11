@@ -1,6 +1,6 @@
 # EX230: classic ESP32 core
 
-Base: upstream main `eec7b2c9`. The classic chip uses the shared hooks merged in
+Base: upstream main `ff64902a`. The classic chip uses the shared hooks merged in
 #183, including the LX6-only UR 234-236 gate. No shared CPU or bus trait changes. Timer stepping and
 alarm-gap logic are shared through `#[inline(always)]` `Timer` helpers; S3/C3/C6 keep 54-bit
 masks and main's unsaturated deadline product, classic uses 64-bit masks and a saturating
