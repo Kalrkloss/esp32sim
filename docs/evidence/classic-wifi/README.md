@@ -47,9 +47,10 @@ that fail. Run each with `cargo +1.99.0 test -p CRATE --lib TEST`, restoring
 the original source between mutations. Tests cover register aliases, TSF,
 clock/reset, DMA rejection, RX metadata, shared station pacing and reboot.
 
-Results on Rust 1.99.0: both required Clippy checks pass; 767 CI-mode
-workspace tests and 745 plain tests (36 ignored) pass with empty HOME.
-All eight WASM scenarios pass. Goldens remain byte-identical.
+Rust 1.99.0 on the ff64902a-based source: both Clippy targets pass with warnings
+denied; 797 CI-mode workspace tests and 775 plain tests
+(36 ignored) pass with empty HOME. All eight production WASM scenarios
+and evidence privacy pass. Classic and existing goldens remain byte-identical.
 
 ## CPU comparison
 
