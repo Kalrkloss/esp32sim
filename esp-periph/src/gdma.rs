@@ -2,6 +2,8 @@ use crate::device::{Device, WriteEffect};
 use crate::regram::RegRam;
 mod receive;
 pub use receive::{DescriptorWalk, DmaDescriptorFault, DmaDescriptorWord, GDMA_DESCRIPTOR_STEP_BUDGET};
+mod transmit;
+pub use transmit::{gather_out, OutMemory, SramOut};
 
 // ------------------------------------------------------------------ GDMA (out/TX channels only for now) + I2S0 TX
 pub const GDMA_CHANNELS: usize = 5;

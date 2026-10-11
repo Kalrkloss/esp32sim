@@ -600,33 +600,6 @@ impl SocBus {
         }
     }
 
-    /// Gather a finite crypto transaction. Descriptor visits bound both runtime and allocation
-    /// (4096 * 4095 bytes maximum); a visited set rejects cycles independently of owner checking.
-    fn gather_dma_out(&mut self, ch: usize, limit: usize) -> Result<Vec<u8>, DmaDescriptorFault> {
-        let mut input = Vec::new();
-        let mut desc = self.periph.gdma.out[ch].desc;
-        let mut visited = HashSet::new();
-        let mut walk = DescriptorWalk::new(GDMA_DESCRIPTOR_STEP_BUDGET);
-        while desc != 0 && input.len() < limit {
-            if !visited.insert(desc) { return Err(DmaDescriptorFault::Cycle { descriptor: desc }); }
-            let (control, d) = walk.read(self, desc)?;
-            if self.periph.gdma.out[ch].conf1 & (1 << 12) != 0 && !d.owner_dma { return Err(DmaDescriptorFault::NotOwned { descriptor: desc }); }
-            let take = (d.length as usize).min(limit - input.len());
-            self.append_mapped_bytes(d.buf, take, &mut input).map_err(|(address, fault)|
-                DmaDescriptorFault::BufferRead { descriptor: desc, address, fault })?;
-            self.write32_unpriced(desc, control & !(1 << 31)).map_err(|fault|
-                DmaDescriptorFault::Writeback { descriptor: desc, fault })?;
-            self.periph.gdma.out[ch].int_raw |= 1 << 0;
-            if d.eof {
-                self.periph.gdma.out[ch].int_raw |= 1 << 1;
-                self.periph.gdma.out[ch].eof_desc = desc;
-                break;
-            }
-            desc = d.next;
-        }
-        Ok(input)
-    }
-
     fn scatter_dma_in(&mut self, ch: usize, data: &[u8], eof_bytes: Option<u32>, finish: bool) -> Result<(), ()> {
         let mut channel = self.periph.gdma.inp[ch];
         let mut irq_changed = false;
@@ -636,7 +609,8 @@ impl SocBus {
         result.then_some(()).ok_or(())
     }
 
-    /// Feed SHA from its GDMA out channel (peripheral 7).
+    /// Feed SHA from its GDMA out channel (peripheral 7). Main's shape, so the step stays
+    /// inlined in `tick_impl` without growing its frame; only the gather is shared.
     pub(super) fn sha_dma_step(&mut self) {
         self.periph.sha.dma_pending = false;
         let want = (self.periph.sha.block_num as usize).saturating_mul(self.periph.sha.block_bytes());
@@ -645,18 +619,11 @@ impl SocBus {
         if want > GDMA_DESCRIPTOR_STEP_BUDGET * 4095 {
             self.fail_dma_out(ch); self.periph.sha.busy = false; return;
         }
-        let Ok(input) = self.gather_dma_out(ch, want) else {
-            self.fail_dma_out(ch); self.periph.sha.busy = false; return;
-        };
-        if input.len() != want {
+        let mut input = Vec::new();
+        if esp_periph::gdma::gather_out(&mut CryptoDmaOut { bus: self, channel: ch }, want, &mut input).is_err() || input.len() != want {
             self.fail_dma_out(ch); self.periph.sha.busy = false; return;
         }
-        let bs = self.periph.sha.block_bytes();
-        let mut first = self.periph.sha.dma_first;
-        for block in input.chunks(bs) {
-            self.periph.sha.hash_block(block, first);
-            first = false;
-        }
+        self.periph.sha.hash_dma_input(&input);
         self.periph.sha.busy = false;
         self.irq_dirty = true;
     }
@@ -666,9 +633,10 @@ impl SocBus {
         let (Some(out_ch), Some(in_ch)) = (self.periph.gdma.out_channel_for(6), self.periph.gdma.in_channel_for(6)) else {
             self.periph.aes.state = 2; self.periph.aes.int_raw |= 1; self.irq_dirty = true; return;
         };
-        let Ok(input) = self.gather_dma_out(out_ch, usize::MAX) else {
+        let mut input = Vec::new();
+        if esp_periph::gdma::gather_out(&mut CryptoDmaOut { bus: self, channel: out_ch }, usize::MAX, &mut input).is_err() {
             self.fail_dma_out(out_ch); self.periph.aes.state = 0; return;
-        };
+        }
         if self.debug.has("aes") {
             eprintln!("[aes] dma block_mode={} num_blocks={} mode={} bytes={}", self.periph.aes.block_mode, self.periph.aes.num_blocks, self.periph.aes.mode, input.len());
         }
@@ -681,4 +649,14 @@ impl SocBus {
         self.irq_dirty = true;
     }
 
+}
+
+/// The S3 bus as crypto DMA memory: main's unpriced bus accesses, so descriptors and write-backs
+/// that land on registers keep their side effects. Descriptor words feed `DescriptorWalk::read_with`.
+struct CryptoDmaOut<'a> { bus: &'a mut SocBus, channel: usize }
+impl esp_periph::gdma::OutMemory for CryptoDmaOut<'_> {
+    fn out_channel(&mut self) -> &mut esp_periph::GdmaOutCh { &mut self.bus.periph.gdma.out[self.channel] }
+    fn word(&mut self, address: u32) -> Result<u32, Fault> { self.bus.read32_unpriced(address) }
+    fn append(&mut self, address: u32, count: usize, out: &mut Vec<u8>) -> Result<(), (u32, Fault)> { self.bus.append_mapped_bytes(address, count, out) }
+    fn writeback(&mut self, address: u32, value: u32) -> Result<(), Fault> { self.bus.write32_unpriced(address, value) }
 }
