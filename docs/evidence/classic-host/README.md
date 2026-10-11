@@ -118,10 +118,10 @@ Clippy targets with warnings denied, empty-HOME CI-mode
 release workspace tests, production WASM build and the eight required scenarios,
 and evidence privacy.
 
-Results: both Clippy targets pass; 829 CI-mode workspace tests and 807 plain
-tests (36 ignored) pass with empty HOME; all eight WASM scenarios and evidence
-privacy pass. Existing goldens are byte-identical. No JIT implementation files
-changed.
+Rust 1.99.0 on the ff64902a-based source: both Clippy targets pass with warnings
+denied; 829 CI-mode workspace tests and 807 plain tests
+(36 ignored) pass with empty HOME. All eight production WASM scenarios
+and evidence privacy pass. Classic and existing goldens remain byte-identical.
 
 [Mutation table](mutations.json): 32 single replacements, all killed by assertion
 failures. For each row, apply the replacement, run
