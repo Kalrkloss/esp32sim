@@ -130,7 +130,9 @@ impl esp_soc::SocBus for SocBus {
     }
     fn gpio_release_input(&mut self, pin: u8) { self.periph.gpio.release_input(pin); self.irq_dirty = true; }
     fn gpio_state(&self, pin: u8) -> Option<esp_soc::GpioState> {
-        if pin >= 40 || (20..=24).contains(&pin) && pin != 21 && pin != 22 || (28..=31).contains(&pin) { return None; }
+        // IDF v5.5.4 soc_caps.h:182 excludes 24 and 28–31. GPIO20 is only
+        // bonded on PICO-V3-02, not the D0WD model; GPIO23 (VSPI MOSI) is valid.
+        if pin >= 40 || pin == 20 || pin == 24 || (28..=31).contains(&pin) { return None; }
         let gpio = &self.periph.gpio;
         let mux = gpio.mux(pin as usize);
         Some(esp_soc::GpioState::new( gpio.gpio.out & (1 << pin) != 0,

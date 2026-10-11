@@ -2,6 +2,13 @@ use esp_soc::SocBus as _;
 use emu_core::bus::Bus as _;
 
 #[test]
+fn gpio23_is_visible_but_unbonded_or_invalid_pins_are_hidden() {
+    let bus = esp32::bus::SocBus::new(4 << 20, [0; 6]);
+    assert!(bus.gpio_state(23).is_some());
+    for pin in [20, 24, 28, 29, 30, 31, 40, 255] { assert!(bus.gpio_state(pin).is_none()); }
+}
+
+#[test]
 fn reset_disables_classic_rwdt_without_clobbering_stage3() {
     let mut bus = esp32::bus::SocBus::new(4 << 20, [0; 6]);
     bus.write32(0x3ff4_80a4, 0x50d8_3aa1).unwrap();
