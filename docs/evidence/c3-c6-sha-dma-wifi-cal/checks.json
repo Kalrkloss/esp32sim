@@ -13,7 +13,7 @@
     "check": "workspace-ci",
     "command": "cargo +1.99.0 test --release --workspace -- --include-ignored --skip external_",
     "exit": 0,
-    "passed": 669,
+    "passed": 734,
     "failed": 0,
     "ignored": 0,
     "home": "fresh empty directory",
@@ -25,7 +25,7 @@
     "check": "workspace-plain",
     "command": "cargo +1.99.0 test --release --workspace",
     "exit": 0,
-    "passed": 646,
+    "passed": 711,
     "failed": 0,
     "ignored": 37,
     "home": "fresh empty directory",
@@ -48,15 +48,15 @@
     "check": "evidence-privacy",
     "command": "node tools/check-evidence-privacy.mjs",
     "exit": 0,
-    "tracked_files": 1673,
+    "tracked_files": 1701,
     "gzip_files": 20
   },
   {
     "check": "rule-mutations",
     "command": "python3 docs/evidence/c3-c6-sha-dma-wifi-cal/mutate.py",
     "exit": 0,
-    "mutations": 39,
-    "killed": 39
+    "mutations": 43,
+    "killed": 43
   },
   {
     "check": "firmware-mutations",

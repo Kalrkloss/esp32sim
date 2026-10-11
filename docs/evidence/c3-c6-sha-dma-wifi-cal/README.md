@@ -1,12 +1,12 @@
 # EX220: C3/C6 SHA DMA and C6 Wi-Fi calibration/ECC
 
-Base `954f2a683f68e04d994152f7e19da2b35a3e8ccb` on upstream/main.
-The source is the commits on this branch. This change
+Base: #201's branch `i2s-rx-input` at `schematik-engineering/esp32sim@baf9845b`, which is on
+upstream main `eec7b2c9`. The source is the commits on this branch. This change
 extends EX202's station contract to unstubbed C6 PHY startup and TLS accelerator
 use. EX210's shared StationLink from merged #193 remains the only Wi-Fi link.
-S3, C3 and C6 share SHA DMA execution. The S3 crypto OUT reader moves to `esp-periph`; C3/C6 reuse it with SRAM-only
-memory access. The S3 adapter retains its mapped reads, unpriced access and
-live channel state, including MMIO writeback effects. Camera receive DMA and
+S3, C3 and C6 share SHA DMA execution. Their crypto OUT gathers read descriptors only
+through #201's shared walker (see [Shared descriptor reader](#shared-descriptor-reader));
+this branch adds no descriptor reader or step budget of its own. Camera receive DMA and
 the Wi-Fi frame transport are unchanged.
 
 ## Contract and result
@@ -32,8 +32,32 @@ BUSY, stop the channel and assert OUT_DSCR_ERR. Their descriptors and payloads
 must be wholly in SRAM. There is no MMIO fallback that can recursively invoke
 another peripheral transfer.
 
+### Shared descriptor reader
+
+`gather_out` (`esp-periph/src/gdma/transmit.rs`) is the OUT side of #201's shared GDMA
+code. Each descriptor is read with `DescriptorWalk::read_with`, so decoding, the per-call
+`GDMA_DESCRIPTOR_STEP_BUDGET` of 4096 descriptors and the read faults are #201's. The
+gather adds OUT bookkeeping only: a visited set that rejects cycles even without
+CHECK_OWNER, the CHECK_OWNER test (OUT_CONF1 bit 12), the buffer copy, owner write-back,
+OUT_DONE per descriptor, and OUT_EOF plus the EOF descriptor address at SUC_EOF. A fault
+returns the walker's fault type and keeps the bytes gathered so far.
+
+Memory is behind a small trait. The S3 adapter uses main's unpriced bus reads and writes
+and mapped-buffer copy, and reaches the channel through the bus, so a write-back that
+lands on a GDMA register keeps its side effect. S3 SHA and AES therefore keep the
+completion the maintainer checked on the previous head: the same 4096-descriptor
+budget, OUT_DSCR_ERR and `running = false` on any fault, and `irq_dirty` set after the
+step. The C3/C6 adapter (`SramOut`) reads and writes only data SRAM; every word, buffer
+and write-back is bounds-checked, and an address outside SRAM is a fault, never MMIO.
+
 ECC supports P-256 scalar multiplication, point verification and combined
 verify/multiply, parameter RAM, reset, raw/masked interrupt state and W1C.
+VERIFICATION_RESULT changes only in the verification modes (2 and 3); plain point
+multiplication (mode 0) leaves it as it was. The header defines the bit as the
+verification result, valid when a calculation is done (`ecc_mult_reg.h:111-113`);
+that mode 0 leaves it unchanged is **inferred**. The PCR reset pulse that
+`ecc_ll_reset_register` issues (PCR ECC_CONF bit 1) returns the accelerator to its
+reset state; a PCR write without the bit, such as the bus-clock enable, does not.
 Noncanonical coordinates are rejected, including a point congruent modulo p
 to a valid point. Unsupported modes and key lengths do not manufacture completion. Arithmetic
 uses the existing big-integer multiplication, reduction and exponentiation.
@@ -64,6 +88,35 @@ parameter and interrupt operations are unchanged. IDF 4.4 is not a fixture input
   `components/soc/esp32c6/include/soc/interrupts.h:98`: ECC source 76.
 * `components/soc/esp32c3/register/soc/reg_base.h:12-16` and the C6 header
   at `39-44`: the SHA/GDMA bases and C6 ECC_MULT base 0x6008b000.
+* `components/soc/esp32c6/register/soc/ecc_mult_reg.h:111-113`: VERIFICATION_RESULT,
+  RO/SS, bit 8. `components/soc/esp32c6/register/soc/pcr_reg.h:1322-1336`: PCR
+  ECC_CONF at offset 0xd8, ECC_CLK_EN bit 0, ECC_RST_EN bit 1.
+  `components/hal/esp32c6/include/hal/ecc_ll.h:40-44`: the reset pulse (1, then 0).
+
+### IDF 4.4 (Arduino-ESP32 2.x) on C3
+
+Arduino-ESP32 2.x builds C3 firmware with ESP-IDF 4.4. The C3 SHA/GDMA layout this
+model uses is the same in IDF **v4.4.8**; no 4.4 firmware fixture is part of this receipt.
+
+* `components/soc/esp32c3/include/soc/hwcrypto_reg.h:53-65`: SHA_MODE 0x00,
+  BLOCK_NUM 0x0c, START 0x10, CONTINUE 0x14, BUSY 0x18, DMA_START 0x1c,
+  DMA_CONTINUE 0x20, H 0x40, TEXT 0x80, as in 5.5.5 (the file differs only in its
+  licence header and AES registers).
+* `components/soc/esp32c3/include/soc/soc.h:33,37`: SHA base 0x6003b000, GDMA base
+  0x6003f000. `components/soc/esp32c3/include/soc/gdma_channel.h:23`: SHA trigger 7.
+* `components/soc/esp32c3/include/soc/gdma_reg.h`: OUT_CONF0 0xd0 with OUT_AUTO_WRBACK
+  bit 2 (`1291`, `1316`), OUT_CONF1 0xd4 with OUT_CHECK_OWNER bit 12 (`1333`, `1336`),
+  OUT_LINK 0xe0 (`1399`), OUT_PERI_SEL 0x100 (`1504`), and OUT_DONE/OUT_EOF/OUT_DSCR_ERR
+  interrupt bits 3/4/6 (`89`, `82`, `68`), which the existing C3 adapter maps.
+* `components/esp_rom/include/esp32c3/rom/lldesc.h:67-79`: `lldesc_t` has the same
+  size/length/EOF/owner/buffer/next layout as 5.x `dma_descriptor_t`.
+
+The 4.4 driver differs in configuration, not layout. `mbedtls/port/sha/dma/sha.c:290-334`
+builds one or two `lldesc_t` (owner set, SUC_EOF on the last), arms GDMA first and then
+writes DMA_START or DMA_CONTINUE; both arm orders are tested here.
+`mbedtls/port/crypto_shared_gdma/esp_crypto_shared_gdma.c:96-127` connects trigger 7 and
+starts the channel without applying a GDMA strategy, so CHECK_OWNER stays at its reset
+value 0. The model treats CHECK_OWNER as optional and is tested both ways.
 
 The C6 baseband offsets 0x418 and 0x810/0x814, start bit 0, TX DC done bit 22
 and calibration done bits 14..16 are **inferred**, not public register facts.
@@ -101,8 +154,8 @@ protocol inputs. No default Rust toolchain is changed.
 [mutations.json](mutations.json) is the rule-removal table: exact source
 replacement, command, failing test names and exit status for each mutation.
 It includes both arm orders, hash state, bounds, ownership, interrupts, C6
-calibration status, ECC arithmetic/verification/reset and the live S3 writeback
-contract. Every retained mutation is killed by a test assertion, not a build
+calibration status, ECC arithmetic/verification/reset, the PCR reset and the live S3
+writeback contract. Every retained mutation is killed by a test assertion, not a build
 failure. [firmware-mutations.json](firmware-mutations.json) separately removes
 C3 SHA DMA, C6 SHA DMA, C6 ECC, TX DC completion and calibration completion;
 each prevents the corresponding firmware golden from passing.
@@ -128,13 +181,15 @@ each prevents the corresponding firmware golden from passing.
 | DMA DONE interrupt | `sha256_split_descriptor_completes_on_start_write` |
 | DMA EOF descriptor | `sha256_split_descriptor_completes_on_start_write` |
 | DMA cycle detection | `cycle_detection_is_independent_of_owner_checking` |
-| DMA descriptor budget | `gdma::crypto_dma_tests::zero_progress_chain_stops_at_descriptor_budget` |
+| DMA descriptor budget | `gdma::transmit::tests::zero_progress_chain_stops_at_the_shared_descriptor_budget` |
+| DMA SRAM-only bounds | `gdma::transmit::tests::sram_bounds_owner_and_partial_output` |
 | S3 writeback side effects | `bus::dma_tests::crypto_descriptor_writeback_preserves_mmio_side_effects` |
 | TX DC completion | `txdc_comparator_outputs_ignore_software_writes` |
 | Calibration completion | `txdc_and_calibration_status_follow_start_without_a_clock` |
 | TX DC comparator mask | `txdc_comparator_outputs_ignore_software_writes` |
 | ECC on-curve equation | `ecc::tests::verification_rejects_off_curve_and_noncanonical_points` |
 | ECC START self-clear | `ecc::tests::scalar_results_match_independent_openssl_vectors` |
+| ECC mode 0 keeps verification result | `ecc::tests::point_multiplication_leaves_the_verification_result` |
 | ECC completion interrupt | `ecc::tests::noncanonical_point_congruent_to_valid_point_is_rejected` |
 | ECC masked interrupt | `ecc_mmio_routes_cached_interrupts_without_clock_work` |
 | ECC canonical coordinates | `ecc::tests::noncanonical_point_congruent_to_valid_point_is_rejected` |
@@ -147,6 +202,8 @@ each prevents the corresponding firmware golden from passing.
 | ECC reset | `ecc::tests::unsupported_modes_do_not_report_success_and_reset_clears_interrupts` |
 | ECC W1C | `ecc::tests::scalar_results_match_independent_openssl_vectors` |
 | ECC MMIO mapping | `ecc_mmio_routes_cached_interrupts_without_clock_work` |
+| PCR ECC reset pulse | `pcr_ecc_reset_pulse_clears_the_accelerator` |
+| PCR reset dispatch | `pcr_ecc_reset_pulse_clears_the_accelerator` |
 | ECC interrupt routing | `ecc_mmio_routes_cached_interrupts_without_clock_work` |
 
 ## Verification
@@ -172,18 +229,16 @@ env -i PATH="$PATH" HOME="$PWD/target/ex220-home" TMPDIR="$PWD/target/ex220-tmp"
   cargo +1.99.0 test --release --workspace
 ```
 
-Final results: **669** CI-policy tests pass; **646** plain tests pass with
+Final results: **734** CI-policy tests pass; **711** plain tests pass with
 **37** ignored. Both Clippy targets, the WASM build, all eight requested WASM
-scenarios, evidence privacy and **44/44** mutation checks pass.
-
-ECC source 76 makes `OPTIONAL_SOURCES[2]` non-zero. The central CPU
-comparison must include C6 hello.
+scenarios, evidence privacy, **43/43** rule mutations and **5/5** firmware
+mutations pass.
 
 ## CPU comparison
 
 Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 954f2a68 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
-Measured on `e3aefb93bcf5dac06653a8a7ad6d67ce17c226e4` against main `954f2a68`; the branch was later rebased onto `2f9443a9` with no change to its own diff. User CPU seconds.
+Measured on `schematik-engineering/esp32sim@e3aefb93` (branch `c3-c6-sha-dma-wifi-cal`, before the rebase onto #201 and the shared-walker change) against main `954f2a68`. User CPU seconds. The current head was not re-timed; see the static comparison below.
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -254,7 +309,7 @@ Status: PASS. Flags: —.
 | 6 | 9 | B→M | 35.864536 | 35.436634 | 1.47/1.88/1.95 | 1.66/1.47/1.66 | accepted |
 | 7 | 10 | M→B | 35.654557 | 36.878955 | 1.88/1.87/1.98 | 1.87/2.68/2.92 | accepted |
 
-Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above. Raw output files are preserved.
+Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above.
 
 An MMIO write tests SHA `dma_pending` once; the SHA/GDMA address filter and
 the transfer are in a `#[cold]`, `#[inline(never)]` C3/C6 helper. Calibration
@@ -263,17 +318,34 @@ grows by one pointer; it uses the existing optional source cache on MMIO
 writes and never joins the periodic device list. No per-tick transfer check is
 added. S3's DMA call sites are unchanged.
 
-Static code comparison: `cargo +1.99.0 build --release -p esp32sim --bin esp32sim`
-(aarch64-apple-darwin, the workspace's fat-LTO release profile) at `954f2a68`
-and at this commit, disassembled per function with `objdump -d`, with absolute
-addresses, branch targets and page offsets normalised. For C6:
+Static code comparison of the current head: `cargo +1.99.0 build --release -p esp32sim --bins`
+(aarch64-apple-darwin, the workspace's fat-LTO release profile) at the base
+`baf9845b` and at this branch's code head, `objdump -d --demangle`, compared per
+function with addresses, branch targets and page offsets normalised. 1868
+functions are identical and 65 differ. All but five of the differing functions are C6
+functions, and the C6 ones differ as described below. The other five:
+
+* S3 `tick_impl` inlines the SHA/AES DMA steps, as main does. The S3 SHA step keeps
+  main's code and calls only the shared gather and block hashing. The frame size is
+  unchanged. Register and stack-slot allocation differs (spill slots renumbered, one
+  block duplicated with an extra reload). The function grows from 3667 to 3743
+  instructions because the inlined DMA step bodies differ; those run only when
+  `dma_pending` is set. This was checked by disassembly, not timing. An earlier
+  shape of this branch moved `Sha` out and back, which grew the frame by 336 bytes;
+  that is reverted.
+* C3 `periph_write` adds the `dma_pending` byte load and branch.
+* `Rsa::write`, `run_cli` and `setup_c6` differ only through inlining and C6
+  construction; none is on an idle path.
+
+For C6 (also checked against `954f2a68` before the rebase):
 
 * `Machine::run`, `step_core`, `Bus::tick` and the `Bus` read/write/fetch
   entry points execute the same instruction sequences; immediates differ by the
   8-byte field shift after `Peripherals`. In `run`, one block that calls the
   allocator has one load fewer.
 * `periph_write` adds one byte load and branch on the common path (`dma_pending`)
-  and the ECC_MULT arm in its block dispatch.
+  and the ECC_MULT arm in its block dispatch. The existing single write-effect test
+  also covers PERIPH_RESET, a wider mask in the same test; the PCR reset handler is a cold call.
 * `refresh_irq` adds the ECC word to the cached optional-source merge
   (`OPTIONAL_SOURCES[2]`); this runs once per interrupt-line refresh.
 * `ModemBb::read` is now out of line from `Peripherals::read32`; it runs only
@@ -293,6 +365,6 @@ RNG and PSK are public test inputs and provide no production security.
 Retained evidence contains source-relative commands, public versions, hashes,
 known-answer vectors and test verdicts. Build logs, absolute build paths and
 ELF debug information are not retained. The binary strings were checked for
-host paths before inclusion. Redaction removes no measured values; there are
-no timing samples in this receipt. No private captures or private firmware are
+host paths before inclusion. Redaction removes no measured values; the CPU
+tables above hold every timing sample. No private captures or private firmware are
 needed to reproduce these tests.
