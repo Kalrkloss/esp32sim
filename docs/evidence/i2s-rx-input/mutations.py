@@ -59,6 +59,17 @@ CASES.extend([
     ('C6 RX work term', 'esp32c6/src/periph.rs', 'self.work_pending = self.spi_exec || self.i2s0.rx_running();', 'self.work_pending = self.spi_exec;', BUS, 'pcm_to_guest_dma_on_all_chips'),
 ])
 
+# 24-bit packing, RX_EOF_NUM reset value and the shared descriptor walker.
+WALK = 'esp-periph/src/gdma/receive.rs'
+CASES.extend([
+    ('24-bit packs 3 bytes', RX, '24 if self.rx_conf & (1 << 16) == 0 => 3,', '24 if false => 3,', UNIT, 'pcm_clock_slots_width_silence_and_reset'),
+    ('RX_24_FILL_EN pads to 4', RX, '24 if self.rx_conf & (1 << 16) == 0 => 3,', '24 => 3,', UNIT, 'pcm_clock_slots_width_silence_and_reset'),
+    ('container width', RX, 'bytes.extend_from_slice(&word[4 - width..]);', 'bytes.extend_from_slice(&word[..]);', UNIT, 'pcm_clock_slots_width_silence_and_reset'),
+    ('RX_EOF_NUM reset 0x40', 'esp-periph/src/i2s.rs', 'ram.write(0x64, 0x40);', '', UNIT, 'rx_eof_num_resets_to_hardware_default'),
+    ('walk budget', WALK, 'if self.remaining == 0 {', 'if false {', UNIT, 'walk_reads_any_word_source_and_stops_at_budget'),
+    ('walk next word', WALK, 'word(8, DmaDescriptorWord::Next)', 'word(4, DmaDescriptorWord::Next)', UNIT, 'walk_reads_any_word_source_and_stops_at_budget'),
+])
+
 def run():
     results = []
     for name, file, old, new, command, test in CASES:

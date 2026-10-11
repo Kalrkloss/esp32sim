@@ -28,7 +28,12 @@ pub struct I2s {
     rx: Option<Box<rx::RxState>>,
 }
 impl I2s {
-    pub fn new(cpu_hz: u64) -> Self { I2s { cpu_hz, streaming: false, rx: None, rx_conf: 0, tx_conf: 0, int_raw: 0, int_ena: 0, ram: RegRam::new(), tx_conf1: 0, tx_clkm_conf: 0, tx_clkm_div_conf: 0, tx_tdm_ctrl: 0xffff, sample_rate: 44100, bytes_per_frame: 1, acc: 0, pcm: Vec::new(), frames_out: 0, tx_started_log: false } }
+    pub fn new(cpu_hz: u64) -> Self {
+        let mut ram = RegRam::new();
+        // RX_EOF_NUM resets to 0x40: esp32s3 i2s_reg.h:1059, esp32c3 i2s_reg.h:1005, esp32c6 i2s_reg.h:1226.
+        ram.write(0x64, 0x40);
+        I2s { cpu_hz, streaming: false, rx: None, rx_conf: 0, tx_conf: 0, int_raw: 0, int_ena: 0, ram, tx_conf1: 0, tx_clkm_conf: 0, tx_clkm_div_conf: 0, tx_tdm_ctrl: 0xffff, sample_rate: 44100, bytes_per_frame: 1, acc: 0, pcm: Vec::new(), frames_out: 0, tx_started_log: false }
+    }
     pub fn tx_running(&self) -> bool { self.tx_conf & (1 << 2) != 0 }
     /// TX or RX running.
     #[inline(always)]

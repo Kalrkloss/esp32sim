@@ -243,7 +243,10 @@ For mono input, duplicate each sample into both lanes. `push` returns the number
 accepted, up to a queue limit of 65,536 frames; retry the remaining frames later.
 `clear()` removes queued data and disables the tone. Empty queues read as zero.
 Queued input pauses while RX or its DMA channel is stopped, including during reboot.
-24/32-bit guest buffers receive signed samples shifted left by 16 in 32-bit words.
+Each 16-bit input sample is the top 16 bits of the guest's sample, low bits zero.
+32-bit RX writes 4 bytes per sample. 24-bit RX writes 3 bytes per sample, the size
+ESP-IDF allocates, unless the firmware sets RX_24_FILL_EN (RX_CONF bit 16), which
+pads each sample to 4 bytes. An unprogrammed RX_EOF_NUM uses the hardware reset value 0x40.
 
 Input attaches to a controller at the PCM/DMA boundary. It does not simulate GPIO
 wiring, serial bit timing, or PDM filter response. Raw PDM, external slave clocks,

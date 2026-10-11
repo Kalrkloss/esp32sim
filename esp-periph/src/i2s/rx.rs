@@ -3,7 +3,12 @@
 // C3 has the same standard-RX fields, no PDM converter (esp32c3 i2s_reg.h:117-230).
 // C6 keeps these fields (esp32c6 i2s_reg.h:149-290, 424-478, 930-945), but uses
 // components/soc/esp32c6/register/soc/pcr_reg.h:719-784 for RX clocks.
-// PCM packing/filter behavior is a model contract, not a hardware measurement.
+// RX_24_FILL_EN: esp32s3 i2s_reg.h:160-165, esp32c3 i2s_reg.h:145-150, esp32c6
+// i2s_reg.h:238-244 (bit 16, default 0). IDF v5.5.5 never sets it; i2s_common.c:451
+// sizes (bits + 7) / 8 bytes per sample on all three targets.
+// PCM packing/filter behavior is a model contract, not a hardware measurement; the
+// left alignment inside a 24/32-bit container is inferred, matching the TX pump's read
+// of the top two bytes of each sample (esp32s3/src/bus/dma.rs, dma_i2s_one).
 use super::I2s;
 use std::collections::VecDeque;
 
@@ -133,6 +138,13 @@ impl I2s {
             return Vec::new();
         };
         let (cpu_hz, mono) = (self.cpu_hz, self.rx_conf & (1 << 5) != 0);
+        // RX_24_FILL_EN (RX_CONF bit 16, reset 0): 0 packs a 24-bit sample in 3 bytes, the
+        // size IDF's i2s_get_buf_size allocates; 1 pads it to a 32-bit word.
+        let width = match bits {
+            16 => 2,
+            24 if self.rx_conf & (1 << 16) == 0 => 3,
+            _ => 4,
+        };
         let rx = self.rx.get_or_insert_with(Box::default);
         rx.acc += cycles * u64::from(rate);
         let frames = rx.acc / cpu_hz;
@@ -145,11 +157,9 @@ impl I2s {
                 if mask & (1 << lane) == 0 {
                     continue;
                 }
-                if bits == 16 {
-                    bytes.extend_from_slice(&sample.to_le_bytes());
-                } else {
-                    bytes.extend_from_slice(&(i32::from(sample) << 16).to_le_bytes());
-                }
+                // Left-aligned: the sample is the top 16 bits of every container.
+                let word = (i32::from(sample) << 16).to_le_bytes();
+                bytes.extend_from_slice(&word[4 - width..]);
                 if mono {
                     break;
                 }
@@ -183,14 +193,24 @@ mod tests {
         i.write(0x50, (1 << 16) | 2);
         assert_eq!(i.rx_data(20000, true), 222i16.to_le_bytes());
         assert_eq!(i.rx_data(20000, true), [0; 2]);
-        for bits in [24, 32] {
+        let word = (-123i32 << 16).to_le_bytes();
+        for (bits, fill, bytes) in [(24, 0, &word[1..]), (24, 1 << 16, &word[..]), (32, 0, &word[..]), (32, 1 << 16, &word[..])] {
+            i.write(0x20, 4 | (1 << 5) | fill);
             i.write(
                 0x28,
                 (24 << 7) | ((bits - 1) << 13) | (15 << 18) | (31 << 24),
             );
             i.rx_input().push(&[[123, -123]]);
-            assert_eq!(i.rx_data(20000, true), (-123i32 << 16).to_le_bytes());
+            assert_eq!(i.rx_data(20000, true), bytes, "{bits}-bit fill {fill}");
         }
+        // Stereo 24-bit without fill: 6 bytes per frame, IDF's 3 bytes per sample.
+        i.write(0x20, 4);
+        i.write(0x28, (24 << 7) | (23 << 13) | (15 << 18) | (31 << 24));
+        i.write(0x50, (1 << 16) | 3);
+        i.rx_input().push(&[[0x1234, -2]]);
+        assert_eq!(i.rx_data(20000, true), [0, 0x34, 0x12, 0, 0xfe, 0xff]);
+        i.write(0x20, 4 | (1 << 5));
+        i.write(0x50, (1 << 16) | 2);
         i.write(0x20, 4 | (1 << 20) | (1 << 21));
         i.write(0x28, (24 << 7) | (15 << 13));
         assert_eq!(i.rx_rate(), Some(4000));
@@ -213,6 +233,11 @@ mod tests {
             i.write(off, value);
             assert!(i.rx_data(20000, true).is_empty());
         }
+    }
+
+    #[test]
+    fn rx_eof_num_resets_to_hardware_default() {
+        assert_eq!(I2s::new(160_000_000).read(0x64), 0x40);
     }
 
     #[test]

@@ -19,25 +19,28 @@ pub enum DmaDescriptorFault {
     PayloadTooShort { expected: usize, actual: usize },
 }
 
+/// The one GDMA descriptor reader shared by every DMA user (I2S RX/TX, LCD_CAM, SPI2, crypto).
 /// Bound work even when guest descriptors make no progress. Streaming rings are valid: the
-/// bound applies to one pump call, not the lifetime of an I2S or LCD channel.
+/// bound applies to one pump call, not the lifetime of an I2S or LCD channel. Each read
+/// charges one step; reads past `budget` fail with `StepBudgetExceeded` without touching memory.
 pub struct DescriptorWalk { pub remaining: usize, budget: usize }
 impl DescriptorWalk {
     pub fn new(budget: usize) -> Self { Self { remaining: budget, budget } }
+    /// Read a descriptor through the guest bus (DMA accesses are unpriced).
     pub fn read(&mut self, bus: &mut impl Bus, addr: u32) -> Result<(u32, DmaDesc), DmaDescriptorFault> {
+        self.read_with(addr, |a| bus.read32_unpriced(a))
+    }
+    /// Read a descriptor from any word source, for callers that hold DMA memory outside a `Bus`.
+    /// Returns DW0 unmodified (for write-back) and the decoded descriptor.
+    pub fn read_with(&mut self, addr: u32, mut word: impl FnMut(u32) -> Result<u32, Fault>) -> Result<(u32, DmaDesc), DmaDescriptorFault> {
         if self.remaining == 0 { return Err(DmaDescriptorFault::StepBudgetExceeded { budget: self.budget }); }
         self.remaining -= 1;
-        try_dma_desc(bus, addr)
+        let mut word = |offset, kind| word(addr.wrapping_add(offset))
+            .map_err(|fault| DmaDescriptorFault::Read { descriptor: addr, word: kind, fault });
+        let dw0 = word(0, DmaDescriptorWord::Control)?;
+        let (buf, next) = (word(4, DmaDescriptorWord::Buffer)?, word(8, DmaDescriptorWord::Next)?);
+        Ok((dw0, DmaDesc::decode(addr, dw0, buf, next)))
     }
-}
-
-/// Read a descriptor through the same decoder as the infallible host-memory API.
-fn try_dma_desc(bus: &mut impl Bus, addr: u32) -> Result<(u32, DmaDesc), DmaDescriptorFault> {
-    let mut word = |offset, word| bus.read32_unpriced(addr.wrapping_add(offset))
-        .map_err(|fault| DmaDescriptorFault::Read { descriptor: addr, word, fault });
-    let dw0 = word(0, DmaDescriptorWord::Control)?;
-    let (buf, next) = (word(4, DmaDescriptorWord::Buffer)?, word(8, DmaDescriptorWord::Next)?);
-    Ok((dw0, DmaDesc::decode(addr, dw0, buf, next)))
 }
 
 impl GdmaInCh {
@@ -118,4 +121,22 @@ impl GdmaInCh {
         true
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn walk_reads_any_word_source_and_stops_at_budget() {
+        // A self-linked descriptor: owner DMA, EOF, size 4, length 2.
+        let mem = |a: u32| match a { 0x100 => Ok((1 << 31) | (1 << 30) | (2 << 12) | 4), 0x104 => Ok(0x200), 0x108 => Ok(0x100), _ => Err(Fault::Prohibited) };
+        let mut walk = DescriptorWalk::new(2);
+        let (dw0, d) = walk.read_with(0x100, mem).unwrap();
+        assert_eq!((dw0 >> 30, d.size, d.length, d.buf, d.next, d.eof, d.owner_dma), (3, 4, 2, 0x200, 0x100, true, true));
+        assert!(walk.read_with(0x100, mem).is_ok());
+        assert_eq!(walk.read_with(0x100, mem).err(), Some(DmaDescriptorFault::StepBudgetExceeded { budget: 2 }));
+        let mut walk = DescriptorWalk::new(1);
+        assert_eq!(walk.read_with(0x104, mem).err(), Some(DmaDescriptorFault::Read { descriptor: 0x104, word: DmaDescriptorWord::Next, fault: Fault::Prohibited }));
+    }
 }
