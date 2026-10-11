@@ -33,8 +33,11 @@ pub struct WifiMac {
 
 impl WifiMac {
 
+    /// DPORT_WIFIMAC_RST clears the MAC registers only. The access point, network, relay queues
+    /// and frame counts belong to the host side, as on S3/C3/C6, whose MAC resets leave
+    /// StationLink alone; a guest reboot applies `StationLink::surviving_reboot` instead.
     pub fn reset(&mut self) {
-        let link = std::mem::take(&mut self.link).surviving_reboot();
+        let link = std::mem::take(&mut self.link);
         let log = self.log;
         *self = Self::default();
         self.link = link;
@@ -151,7 +154,8 @@ impl Device for WifiMac {
 impl SocBus {
     #[inline]
     pub(crate) fn wifi_step(&mut self) {
-        // IDF v5.5.4 register/soc/dport_reg.h:1040-1043 (clock); reset bit inferred.
+        // IDF v5.5.4 register/soc/dport_reg.h:1040-1043 (DPORT_WIFI_CLK_WIFI_EN) and
+        // 1064,1069 (DPORT_CORE_RST_EN_REG, DPORT_WIFIMAC_RST).
         if self.periph.dport.ram.read(0xcc) & 0x406 != 0x406
             || self.periph.dport.ram.read(0xd0) & (1 << 2) != 0
         {
@@ -370,6 +374,8 @@ mod tests {
         assert_eq!(b.periph.wifi.events, 0);
         assert_eq!(b.periph.cpu_lines(0) & (1 << 7), 0);
         assert!(b.periph.wifi.link.ap().is_some() && b.periph.wifi.link.net().is_some());
+        // The MAC reset leaves the host-side link and its counts alone, as on S3/C3/C6.
+        assert_eq!(b.periph.wifi.link.tx_frames(), 1);
     }
 
     #[test]

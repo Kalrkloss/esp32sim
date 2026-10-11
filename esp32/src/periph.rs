@@ -729,6 +729,7 @@ impl Peripherals {
                 v &= !(1 << 5);
             }
         }
+        // IDF v5.5.4 dport_reg.h:1064,1069: DPORT_CORE_RST_EN_REG bit 2 is DPORT_WIFIMAC_RST.
         if addr == 0x3ff0_00d0 && v & (1 << 2) != 0 { self.wifi.reset(); }
         if addr == 0x3ff0_00c4 && v & (1 << 11) != 0 {
             self.ledc = ClassicLedc::new();
