@@ -1,7 +1,6 @@
 # EX215: pin-routed audio sources and ADC streams
 
-Builds on the local `i2s-rx-input` branch (EX214, `06c04176`), above upstream
-main `2f9443a9`.
+Base: PR #201, branch `i2s-rx-input` (EX214), on upstream main `eec7b2c9`.
 This adds host source clocks and pin routing to the existing receiver. It does
 not add a second DMA walker or input transport. ADC streams use main's analog
 source replacement and completed-conversion observation paths.
@@ -14,17 +13,27 @@ RX uses zero-order resampling, with one shared timeline when two receivers hear
 the same source. An empty queue yields silence. A source matches data input,
 BCLK and WS matrix routes, including inversion bits. PDM sources match the
 converted-PDM mode and clock/data routes. The lowest matching slot wins.
-Without a bank, controller-bound EX214 input remains available. An attached
-empty bank produces silence. Controller input is a `PcmSource` too; one packing
-function accepts the selected producer as a closure.
+A matched source that underruns is silent. A receiver whose route matches no slot,
+or a chip with no bank, uses the controller-bound EX214 input (`--i2s-tone`,
+`i2s_input`). Controller input is a `PcmSource` too; one packing function accepts
+the selected producer as a closure. `tone()` is rejected on a routed source, which
+samples its queue by absolute time; hosts push generated frames instead.
 
-Source banks are allocated on first host access, inside controller 0's lazily
+Routing compares the RX BCK/WS output signals only. In ESP-IDF full-duplex standard
+mode the later-initialised channel becomes the slave and the BCK/WS pins usually
+carry the TX output signals (IDF v5.5.5 `components/esp_driver_i2s/i2s_std.c`,
+lines 214–237 and 292–297). Such a setup matches no routed source and falls back to
+controller input.
+
+The bank is attached by `SocBus::attach_pcm_sources()`, inside controller 0's lazily
 allocated EX214 receiver state; every receiver of the chip borrows that one
 bank for its RX interval. Their clocks advance lazily
 from absolute emulated cycles at host access and before an active RX interval.
 Unselected/stopped sources therefore lose elapsed samples without any new
-per-tick loop. Obtain `SocBus::pcm_sources()` before pushing or inspecting its
-slots. Sources, clock phase and buffered samples survive a chip reset.
+per-tick loop. Call `attach_pcm_sources()` before each push or slot edit; it
+synchronizes the clock and on S3 flushes deferred ticks. `SocBus::pcm_sources()` is
+read-only: it never attaches, flushes or advances time, and shows the bank as of its
+last synchronization. Sources, clock phase and buffered samples survive a chip reset.
 
 `AnalogStream` attaches through `AnalogSource::Stream`. Host handles share a
 bounded queue. Host timestamps are bus cycles (`bus.cycles()`). Conversions
@@ -33,10 +42,22 @@ cycle at which that clock started, set on attach and on chip reset, so samples
 stay aligned to bus time across resets. Attach a stream to one chip only. Voltage streams carry finite `f32` volts through the existing calibration
 curve. `AnalogSource::RawStream` carries `u16` counts, accepts only `push_raw`,
 and bypasses attenuation/calibration. Both use the same `ClockedQueue<T>` as
-I2S for sample clocks, phase and the two-second drop-old buffer. Conversion
+I2S for sample clocks, phase and the two-second drop-old buffer. Stream rates are
+1 Hz–96 kHz, so slow sensor streams are accepted; PCM sources stay at 8–96 kHz. Conversion
 uses `AnalogInputs.cpu_hz`; streams store no duplicate clock frequency. Invalid pushes
 leave queue and time intact. ADC underrun holds the last sample, unlike I2S
 silence. Source replacement retains the existing generation accounting rule.
+
+## Why sources and streams are one change
+
+Pin-routed PCM sources and ADC streams use one timing model. `ClockedQueue<T>` holds
+the host sample clock, fractional phase, two-second drop-old buffer and zero-order
+selection. Both evaluate it lazily from absolute bus cycles with a recorded
+clock offset, so neither adds a per-tick hook. Both attach through the same host
+source API shape (a host-owned source, attached once, synchronized on host access).
+ADC streams were the second consumer of `ClockedQueue` and shaped its hold/silence,
+generic sample type and clock-offset rules. Splitting the PR would land one consumer
+with a queue shaped for the other.
 
 ## Register references
 
@@ -44,6 +65,8 @@ ESP-IDF v5.5.5, public Arduino-ESP32 3.3.11 headers:
 
 - `components/soc/esp32s3/include/soc/gpio_sig_map.h`, lines 56–71:
   I2S0 data/BCLK/WS 25/26/27 and I2S1 30/31/32.
+- `components/esp_driver_i2s/i2s_std.c`, lines 214–237 and 292–297: full-duplex
+  BCK/WS signal choice (routing limitation above).
 - `components/soc/esp32c3/include/soc/gpio_sig_map.h`, lines 38–43:
   data/BCLK/WS 15/16/17. C6 has these at lines 34–39 in its corresponding file.
 - `components/soc/esp32s3/register/soc/gpio_reg.h`, lines 2672–2678 and
@@ -66,10 +89,11 @@ python3 docs/evidence/audio-sources-adc-stream/mutations.py
 ```
 
 The source tests pin route changes, multiple rates, both S3 ports, PDM wiring,
-reset, DMA stalls and exact samples. ADC tests pin exact raw counts for all
+reset, DMA stalls and exact samples. They also check that inspecting the bank attaches
+nothing and that controller input survives a bank with no matching slot. ADC tests pin exact raw counts for all
 attenuations on three chips and conversion generations. Unit tests cover
 phase, long stalls, source priority, replacement, validation and drop-old
-queues. `mutations.json` maps 44 removal mutations to their killing tests.
+queues. `mutations.json` maps 48 removal mutations to their killing tests.
 
 `checks.json` records required native/WASM checks. Workspace tests run with an
 empty `HOME`, with only `ESP32SIM_ROM_DIR` as a firmware-input variable for the
@@ -81,9 +105,9 @@ No JIT implementation changes are included.
 
 ## CPU comparison
 
-Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 2f9443a9 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
+Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 2f9443a9 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none. Pocket Tank was not timed. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
-Measured on `725b527e` against main `2f9443a9`; the branch was since rebased onto `fe3a9c08` (docs and web only) with no change to its own diff. User CPU seconds.
+Measured on `schematik-engineering/esp32sim@725b527e` (branch `audio-sources-adc-stream`) against main `2f9443a9`. User CPU seconds. The October 11 review commit changes host-call paths, the unmatched-route fallback inside an active RX interval and stream validation; idle-path disassembly against the measured code is below.
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -136,7 +160,7 @@ Status: PASS. Flags: —.
 | 6 | 7 | B→M | 2.351075 | 2.362864 | 1.81/1.75/1.81 | 1.81/1.81/1.81 | accepted |
 | 7 | 8 | M→B | 2.314663 | 2.335915 | 1.75/1.75/1.75 | 1.75/1.69/1.75 | accepted |
 
-Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above. Raw output files are preserved.
+Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above. Only the tables above are retained.
 
 No source-bank or ADC-stream tick hook is installed. The bank lives in I2S0's
 lazily allocated receiver state, so no bus or peripheral struct gains a field.
@@ -146,7 +170,7 @@ comes from main's per-block `pre_access` assignment. Stream time offsets are
 written only on attach and on chip reset; the MMIO paths are unchanged.
 
 Release-binary disassembly (`cargo +1.99.0 build --release --bins`, aarch64,
-addresses, padding and page offsets normalised) against EX214 `06c04176`:
+addresses, padding and page offsets normalised) against EX214 `schematik-engineering/esp32sim@06c04176`:
 
 - Identical: C3/C6 `SocBus::tick`, `next_deadline`, `refresh_irq`,
   `periph_read`, `periph_write` and `Peripherals::read32`; S3 `tick_impl`,

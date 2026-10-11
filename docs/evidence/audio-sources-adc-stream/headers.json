@@ -28,5 +28,10 @@
     "version": "ESP-IDF v5.5.5",
     "path": "components/soc/esp32c6/register/soc/gpio_reg.h",
     "sha256": "cdfd68565fd88be714a14748d02395acf5fbe98261568460a442a76aafe574b0"
+  },
+  {
+    "version": "ESP-IDF v5.5.5",
+    "path": "components/esp_driver_i2s/i2s_std.c",
+    "sha256": "ad1698e2101552846f88e0fe7f458082e6a657efd0b607a2566a1cc7a50ea7dd"
   }
 ]
