@@ -16,16 +16,18 @@
     "command": "cargo +1.99.0 test --release --workspace -- --include-ignored --skip external_",
     "exit_code": 0,
     "empty_home": true,
-    "passed": 656,
-    "ignored": 0
+    "passed": 704,
+    "ignored": 0,
+    "failed": 0
   },
   {
     "check": "plain-tests",
     "command": "cargo +1.99.0 test --release --workspace",
     "exit_code": 0,
     "empty_home": true,
-    "passed": 635,
-    "ignored": 35
+    "passed": 683,
+    "ignored": 35,
+    "failed": 0
   },
   {
     "check": "wasm",
