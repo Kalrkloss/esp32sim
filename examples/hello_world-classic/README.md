@@ -16,7 +16,7 @@ cp .pio/build/esp32dev/firmware.bin ../../web/wasm/fw/public/classic-hello_world
 `CONFIG_APP_REPRODUCIBLE_BUILD=y` removes timestamps and maps source paths;
 CMake fixes the project version to `1`. Two clean builds in different source
 and output directories produced identical binaries. Hashes are in
-[EX223 inputs](../../docs/evidence/classic-core/inputs.json). The linked
+[EX230 inputs](../../docs/evidence/classic-core/inputs.json). The linked
 licences are in [the notice](../../web/wasm/fw/public/classic-hello-NOTICE.txt).
 
 The CI golden boots the fetched ECO3 ROM through this bootloader into the

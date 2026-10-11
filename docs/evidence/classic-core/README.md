@@ -1,6 +1,6 @@
-# EX223: classic ESP32 core
+# EX230: classic ESP32 core
 
-Base: upstream `2f9443a9`. The classic chip uses the shared hooks merged in
+Base: upstream main `eec7b2c9`. The classic chip uses the shared hooks merged in
 #183, including the LX6-only UR 234-236 gate. No shared CPU or bus trait changes. Timer stepping and
 alarm-gap logic are shared through `#[inline(always)]` `Timer` helpers; S3/C3/C6 keep 54-bit
 masks and main's unsaturated deadline product, classic uses 64-bit masks and a saturating
@@ -48,8 +48,8 @@ remain unchanged. JIT implementation files are unchanged.
 ## Results
 
 Rust 1.99.0: native and WASM Clippy pass with warnings denied. Empty-HOME
-CI-mode workspace: 707 passed, zero failed. Plain workspace with no firmware
-variables: 685 passed, 36 ignored, zero failed. All eight production WASM
+CI-mode workspace: 709 passed, zero failed. Plain workspace with no firmware
+variables: 687 passed, 36 ignored, zero failed. All eight production WASM
 scenarios pass. Evidence privacy check passes. Existing goldens are unchanged.
 The fixture reports silicon revision v2.0 despite using the ECO3 ROM; the
 model does not supply the additional revision-3 date bit. Its boot output
@@ -81,7 +81,7 @@ on hardware. This fixture does not establish an IDF 4.4 firmware contract.
 
 Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 954f2a68 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
-Measured on `274516d43c8a1505a39c8ed1db49d82aee648f24` against main `954f2a68`. The branch was since rebased onto `fe3a9c08` and gained one commit that returns shared `RtcCntl::write` to main's code; the static check below covers the current head. The whole stack is measured again at #212. User CPU seconds.
+Measured on schematik-engineering/esp32sim@274516d4 (branch `esp32-classic-2-core` at the time) against main `954f2a68`. The branch has since gained one commit that returns shared `RtcCntl::write` to main's code and was rebased onto `eec7b2c9`; the static check below covers both. The whole stack is measured again at #212. User CPU seconds.
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -150,10 +150,10 @@ Status: PASS. Flags: —.
 | 6 | 7 | B→M | 2.440300 | 2.440420 | 2.52/2.52/2.52 | 2.56/2.52/2.56 | accepted |
 | 7 | 8 | M→B | 2.442235 | 2.434022 | 2.52/2.48/2.52 | 2.48/2.48/2.48 | accepted |
 
-Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above. Raw output files are preserved.
+Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above. Raw output files are not committed; every accepted pair is in the tables above.
 
 Static check (no timing): release `esp32sim` binaries from main `2f9443a9`
-and this branch were disassembled with `llvm-objdump -d` and compared function
+and this branch before the rebase were disassembled with `llvm-objdump -d` and compared function
 by function after normalising addresses, alignment `nop`s, adrp page offsets
 and linker-chosen symbol aliases. The S3/C3/C6 execution path is
 instruction-identical to main, including `Machine::run`, `step_core`, each
@@ -163,11 +163,13 @@ offset to the 4 KiB block so the shared `RtcCntl::write` keeps main's code.
 Shared `Gpio::write`, which the classic GPIO adapter also calls, uses `ubfx`
 instead of `lsr` for one register index, with the same instruction count.
 Other differences are in CLI setup and reporting, `Cpu::dump`, a coverage
-report and the opt-in register-trace observer.
+report and the opt-in register-trace observer. The comparison was repeated
+against main `eec7b2c9` on the rebased stack tip (#211); the S3/C3/C6 hot
+path result is unchanged.
 
 ## Privacy
 
 No private captures are retained. Firmware reproducible-build settings map
 source paths to generic labels. Input records contain hashes and public tool
 versions; link-map paths are omitted. License notices retain upstream legal
-attribution. No speed conclusion is drawn from these correctness runs.
+attribution.
