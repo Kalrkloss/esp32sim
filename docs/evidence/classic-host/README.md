@@ -1,109 +1,167 @@
 # EX229: classic host input and I2S receive
 
-Base: `esp32-classic-ble`
-([#211](https://github.com/mikroverk/esp32sim/pull/211), `50178766`), with public
-prerequisites [#201](https://github.com/mikroverk/esp32sim/pull/201) (`06c04176`) and
-[#202](https://github.com/mikroverk/esp32sim/pull/202) (`725b527e`) merged by
-`22d8db41`; both sides are on upstream main `2f9443a9`. The classic branch
-retains its local predecessor as first parent.
-The host PR must wait for those shared prerequisites; this is local ancestry,
-not native GitHub stack registration.
+Base: branch `esp32-classic-ble` (#211), on upstream main `eec7b2c9`. Merge
+`schematik-engineering/esp32sim@b327516e` brings in
+[#201](https://github.com/mikroverk/esp32sim/pull/201) and
+[#202](https://github.com/mikroverk/esp32sim/pull/202) at
+`schematik-engineering/esp32sim@38124b81` (branch `audio-sources-adc-stream`, on
+`i2s-rx-input` `schematik-engineering/esp32sim@baf9845b`). All three branches sit on
+`eec7b2c9`. This PR must wait for #201, #202 and #211.
+
+Commits above #211:
+
+| Commit | Content |
+| --- | --- |
+| `schematik-engineering/esp32sim@b327516e` | Merge, conflict resolutions only: `docs/cli.md` and `docs/experiments.md` keep both sides; `analog.rs` takes #202's `convert` with the classic stack's `pub`; `esp-periph/src/lib.rs` keeps both module lists; `esp32s3/src/bus/dma.rs` takes #201's side. |
+| `schematik-engineering/esp32sim@88831031` | Removes the classic stack's second descriptor reader (`esp_periph::dma` and `dma_descriptor_reader!`). Classic's memory-only word reader goes through #201's `DescriptorWalk::read_with`. |
+| `schematik-engineering/esp32sim@aeb19f27` | Classic I2S0/1 RX, ported to #202's read-only `pcm_sources()` / `attach_pcm_sources()` and #201's RX_24_FILL_EN. |
+| `schematik-engineering/esp32sim@2b58a9be` | Owner check from LC_CONF, DRAM-only DMA, FIFO-reset and slot mapping, IN_DONE/IN_DSCR_EMPTY. |
 
 Classic UART APB/AHB routing, matrix input, GPIO feedback/release, physical SPI,
-raw ADC observations and Ethernet relay are already supplied by EX223-EX228.
-This part adds I2S0/1 RX using the shared PCM packer, source bank, clocked queue
-and receive scatter from EX214/EX215. The routing descriptor now gives BCLK/WS
-indices explicitly because classic's data and clock signals are not adjacent.
-All existing chip callers retain their previous indices.
+raw ADC observations and Ethernet relay already come from EX230 and EX224-EX228.
+This part adds I2S0/1 RX through the shared PCM packer, source bank, clocked
+queue and GDMA receive channel from EX214/EX215. The routing descriptor now
+takes BCLK/WS indices explicitly because classic's data and clock signals are
+not adjacent; S3/C3/C6 pass their previous indices.
 
-The merge keeps one definition of the descriptor word/fault types
-(`esp_periph::dma`) and one bounded descriptor walk, the `dma_descriptor_reader!`
-macro: classic's bus expands it for its memory-only reader, and the bus-generic
-expansion in `esp_periph::gdma` serves GDMA receive and S3's GDMA engines as in #202. Classic maps native register/interrupt values onto the
-shared receive channel. Ownership, memory-only buffers and failed writeback
-cannot publish successful EOF. A null next descriptor stops a completed
-transfer; surplus samples report the shared descriptor-error condition.
+## Register mapping
 
-## Idle structure and inputs
+The adapter keeps classic registers in a `RegRam` and re-encodes them into the
+shared S3-layout model:
+
+- **Owner check.** `I2S_LC_CONF_REG` (+0x60) bit 12 `CHECK_OWNER`, reset 0
+  (`i2s_reg.h:856-868`), drives the shared channel's owner check. IDF v5.5.4 never
+  calls `i2s_ll_dma_enable_owner_check` (`hal/esp32/include/hal/i2s_ll.h:60-63`)
+  from the I2S driver. It sets `owner = 1` once when it allocates the circular
+  ring (`esp_driver_i2s/i2s_common.c:534,551`). The writeback clears the owner bit,
+  so with the reset value the ring keeps running. LC_CONF resets to `0x100`
+  (OUT_EOF_MODE).
+- **DMA reach.** Descriptor reads, buffer writes and descriptor writeback go
+  through a DRAM-only bus for the shared channel. The bus covers
+  `0x3FFA_E000..0x4000_0000` (`SOC_DMA_LOW`/`SOC_DMA_HIGH`,
+  `components/soc/esp32/include/soc/soc.h:203-205`). Registers, ROM, IRAM, RTC
+  memory and flash fault without being accessed. `I2S_INLINK_ADDR` is 20 bits
+  under `0x3FF0_0000` (`i2s_reg.h:763-765`), so offset `0x40000` names the UART0
+  FIFO. It now raises IN_DSCR_ERR and leaves the FIFO alone.
+- **Resets.** `I2S_CONF_REG` bit 1 `RX_RESET` and bit 3 `RX_FIFO_RESET` map onto
+  the shared RX reset bits. Bit 0 `TX_RESET` and bit 2 `TX_FIFO_RESET`
+  (`i2s_reg.h:105-125`) do not touch the receiver. Bit 5 `RX_START` and bit 7
+  `RX_SLAVE_MOD` map as before.
+- **Slot selection.** `RX_CHAN_MOD` (`I2S_CONF_CHAN_REG` bits 4:3,
+  `i2s_reg.h:692-695`) 1 or 2 selects one slot. `RX_MSB_RIGHT` (CONF bit 17,
+  reset 1, `i2s_reg.h:21-23`) decides which one. `i2s_ll_rx_select_std_slot`
+  (`i2s_ll.h:859-875`) writes RIGHT as `msb_right ? 1 : 2` and LEFT as
+  `msb_right ? 2 : 1`, and IDF's standard slot defaults set `msb_right` only for
+  16-bit data (`esp_driver_i2s/include/driver/i2s_std.h:40-41`). CONF resets to
+  `0x30300`.
+- **Sample containers.** Classic keeps 24-bit samples in 32-bit words:
+  `i2s_ll_rx_set_sample_bit` sets RX_FIFO_MOD 2 above 16 bits
+  (`i2s_ll.h:676-680`), and `i2s_get_buf_size` allocates
+  `((bits + 15) / 16) * 2` bytes per sample on ESP32
+  (`esp_driver_i2s/i2s_common.c:447-448`). The adapter therefore sets #201's
+  RX_24_FILL_EN for 24-bit RX.
+- **Interrupts.** The shared channel's IN_DONE, IN_SUC_EOF, IN_DSCR_ERR and
+  IN_DSCR_EMPTY become classic INT_RAW bits 8, 9, 13 and 15
+  (`i2s_reg.h:137-181`). IN_SUC_EOF also latches `I2S_IN_EOF_DES_ADDR_REG`
+  (+0x3c). IN_DSCR_EMPTY uses the shared channel's condition: samples remain
+  after the inlink ended. That this matches the classic bit's meaning is inferred.
+- **EOF.** `RXEOF_NUM` (+0x24, reset 64, `i2s_reg.h:676-682`) counts words
+  (`i2s_ll.h:639-643`). Byte counts above `u32::MAX` raise IN_DSCR_ERR instead of
+  wrapping.
+
+## Idle structure and static check
 
 Classic fields are appended. Receiver state and the PCM bank use #202's boxed
-per-controller state (the bank on controller 0), allocated on host access;
-the shared queue advances lazily on host/RX access, without a per-tick source
-scan. There is no separate receive Cargo feature. An inline clock/channel
-gate guards receive work; the data/completion/fault helpers are inline too.
-No per-tick work is added to S3/C3/C6. No CPU measurements were run.
+per-controller state (the bank on controller 0), allocated on host access. The
+shared queue advances lazily on RX access or `attach_pcm_sources()`; there is no
+per-tick source scan. An inline DPORT clock/channel gate guards receive work.
+No per-tick work is added to S3/C3/C6.
 
-Static check: fat-LTO release builds (`cargo +1.99.0 build --release -p esp32sim
---bins`) of this branch, #202 (`725b527e`) and main (`2f9443a9`) were disassembled
-and compared per function after normalising addresses, padding and page offsets.
-Against #202, every S3/C3/C6 hot function (`Machine::run`/`run_modeled`/
+Static check (no timing): fat-LTO release `esp32sim` binaries (`cargo +1.99.0 build
+--release -p esp32sim --bins`) of `schematik-engineering/esp32sim@2b58a9be`, #202
+(`schematik-engineering/esp32sim@38124b81`) and main `eec7b2c9` were disassembled
+with `llvm-objdump -d` and compared function by function. Addresses, alignment
+`nop`s, adrp page offsets and linker-chosen symbol aliases were normalised. The
+comparison covers 113 S3/C3/C6 hot functions: `Machine::run`/`run_modeled`/
 `run_unmodeled`/`step_core`, bus `tick`/`tick_impl`/`next_deadline`/
-`refresh_tick_budget`/`periph_read`/`periph_write`, GDMA engines, `refresh_irq`)
-is instruction-identical except: the RX-only helpers (C3/C6 `i2s_receive`, S3
-`dma_i2s_port`), which store the two BCLK/WS indices and run only while RX is
-active; and `RtcCntl::write`, `I2c::write`, `Gpio::write` and
-`apply_due_script_events`, which differ from main exactly as on #211. Against
-main, the remaining differences are those #202 already has. Classic's adapter
-writes the shared I2S model through `Device::write`, like the other chips'
-dispatch, so the shared inherent writer keeps one caller.
+`refresh_tick_budget`/`periph_read`/`periph_write`, GDMA engines and
+`esp_periph::gdma`, `refresh_irq`, and the shared device `tick`/`read`/`write`
+paths. Against #202, 104 are instruction-identical. The nine that differ:
 
-The inherited classic fixture/ROM hashes are in [EX223](../classic-core/README.md).
-I2S tests generate their PCM samples and DMA descriptors in memory; there is no
-additional firmware or external-input requirement. ADC stream tests use EX215's
-shared typed raw stream and prove clocking, attenuation bypass and reset state.
+- C3/C6 `i2s_receive` and S3 `dma_i2s_port` store the two BCLK/WS indices. They
+  run only while RX is active.
+- `Gpio::write`, `I2c::write`, `RtcCntl::write` and the three
+  `apply_due_script_events` differ as they already do on #211 (EX228 receipt).
+
+Against main, the differences are the ones #202 already has, plus `Gpio::write`
+and `I2c::write` from the classic stack. Classic's adapter writes the shared I2S
+model through `Device::write`, like the other chips' dispatch, so the shared
+inherent writer keeps one caller.
 
 ## Sources and limits
 
 Classic register definitions: ESP-IDF v5.5.4
-`components/soc/esp32/register/soc/i2s_reg.h:93-98,738-756,1373-1390`.
-`include/soc/gpio_sig_map.h:69-72,299,309-312,343` supplies I2S0/1 input data
-and BCLK/WS indices. `include/soc/interrupts.h:50-51` supplies sources 32/33.
-`register/soc/dport_reg.h:947,965` supplies I2S clock gates;
-`i2s_reg.h:149-178` supplies descriptor-error and successful-EOF bits.
-EX214/EX215 cite IDF v5.5.5 for their S3/C3/C6 layouts; classic uses the
-v5.5.4 headers matching its inherited fixture. No IDF 4.4 validation is claimed.
+`components/soc/esp32/register/soc/i2s_reg.h` at the lines above;
+`include/soc/gpio_sig_map.h:69-72,299,309-312,343` supplies I2S0/1 input data and
+BCLK/WS indices; `include/soc/interrupts.h:50-51` supplies sources 32/33;
+`register/soc/dport_reg.h:947,965` supplies the I2S clock gates. EX214/EX215 cite
+IDF v5.5.5 for the S3/C3/C6 layouts; classic uses the v5.5.4 headers matching its
+inherited fixture. No IDF 4.4 validation is claimed.
 
-The classic adapter supports standard 16/24/32-bit RX with the PLL clock.
-APLL, external slave clocking, ADC-to-I2S capture, serial edge timing and classic
-I2S TX are not implemented here. One shared DMA call uses RXEOF_NUM * 4,
-including EOF across descriptors. IDF v5.5.4 `i2s_reg.h:676-682` defines
-RXEOF_NUM at +0x24 with reset value 64; `components/hal/esp32/include/hal/i2s_ll.h:633-642`
-converts bytes to register words. Word counts above u32::MAX/4 cannot fit the
-shared DMA byte counter and report a descriptor error instead of wrapping.
-Physical routing follows the shared matrix contract; it does not validate
-IO_MUX/pad enable. No hardware microphone or audio-fidelity claim is made.
-An attached empty source bank produces silence; per-controller input is used
-only when no bank has been attached. Host source and queued PCM state survive
-reset. No private application or firmware capture is part of these checks.
+Supported: standard 16/24/32-bit RX with the PLL clock. Not implemented: APLL,
+external slave clocking, ADC-to-I2S capture, serial edge timing, classic I2S TX,
+`RX_RIGHT_FIRST` (stereo frames are always written left first), LC_CONF
+`IN_RST`/`AHBM_RST` and `INLINK_RESTART` continuing from the current descriptor
+(a restart reloads `INLINK_ADDR`). Routing follows the shared matrix contract and
+does not validate IO_MUX/pad enable. A route that matches no source slot reads the
+per-controller input, as #202 specifies. Host source and queued PCM state survive
+reset. No hardware microphone or audio-fidelity claim is made. The inherited
+classic fixture/ROM hashes are in [EX230](../classic-core/README.md). I2S tests
+generate their PCM samples and descriptors in memory; no firmware, external input
+or private capture is involved.
 
 ## Verification
 
-Run the full [EX223 Rust 1.99.0 command set](../classic-core/README.md) on this
-branch, including both Clippy targets, empty-HOME CI-mode and plain release
-workspace tests, production WASM and all eight scenarios, and evidence privacy.
+Commands: the full [EX230 Rust 1.99.0 set](../classic-core/README.md) on
+`schematik-engineering/esp32sim@2b58a9be` (later commits change docs only): both
+Clippy targets with warnings denied, empty-HOME CI-mode
+(`ESP32SIM_ROM_DIR=web/wasm/fw`, `--include-ignored --skip external_`) and plain
+release workspace tests, production WASM build and the eight required scenarios,
+and evidence privacy.
 
-[Mutation table](mutations.json) records 19 replacements killed by assertion
-failures. Run `cargo +1.99.0 test -p esp32 --test TARGET TEST` for integration
-rows or `--lib TEST` otherwise, restoring source after each mutation. EX214/EX215
-retain their own shared-model contracts and mutation receipts.
+Results: both Clippy targets pass; 829 CI-mode workspace tests and 807 plain
+tests (36 ignored) pass with empty HOME; all eight WASM scenarios and evidence
+privacy pass. Existing goldens are byte-identical. No JIT implementation files
+changed.
 
-Results on Rust 1.99.0: both required Clippy targets pass; 816 CI-mode
-workspace tests and 794 plain tests (36 ignored) pass with empty HOME.
-All eight WASM scenarios pass.
-Evidence privacy passes and existing goldens remain byte-identical. No JIT
-implementation files changed.
+[Mutation table](mutations.json): 32 single replacements, all killed by assertion
+failures. For each row, apply the replacement, run
+`cargo +1.99.0 test --release -p esp32 --test TARGET TEST` (or `--lib TEST`
+when the row has no target), then restore the source.
 
-The EOF regression covers a threshold spanning two descriptors, word-to-byte
-scaling, reset value, zero/overflow counts and exhausted destinations. The PCM
-packing test now runs exactly two frames for its two-frame buffer; overflow is
-asserted separately. No firmware golden changes are needed. Shared RX tests
-reuse one signal constant instead of repeated routing literals.
+Regressions specific to the Oct 11 review:
+`i2s_two_descriptor_ring_keeps_running_after_owner_writeback` runs six passes over
+a two-descriptor circular ring with `owner = 1` set once, then shows CHECK_OWNER
+stopping it. `i2s_rejects_empty_unowned_with_check_owner_and_non_dram_descriptors`
+covers size 0, an unowned descriptor with CHECK_OWNER set, DROM/IRAM/RTC
+descriptors and buffers, a buffer straddling DRAM's end, and acceptance of an
+unowned descriptor at the reset value.
+`i2s_inlink_offset_into_registers_does_not_touch_uart_fifo` checks that the UART0
+RX FIFO keeps its bytes and nothing is transmitted.
+`rx_fifo_reset_is_conf_bit_3_not_tx_bit_2`, `rx_chan_mod_selects_slot_by_msb_right`
+and `classic_24_bit_samples_fill_words` pin the CONF mapping.
 
 ## CPU comparison
 
+Not re-measured on this head. An earlier head of branch `esp32-classic-host`,
+`schematik-engineering/esp32sim@bcd4df7e`, was measured against main `2f9443a9`.
+It predates the rebase onto `eec7b2c9`, the updated #201/#202 and the Oct 11
+review commits. Classic code is unused in these workloads. The static check above
+covers the current head.
+
 Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 2f9443a9 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
-Measured on `bcd4df7e` against main `2f9443a9`; the branch was since rebased onto `fe3a9c08` (docs and web only) and its prerequisite branches gained docs-only receipt commits. User CPU seconds.
+User CPU seconds.
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -173,7 +231,4 @@ Status: PASS. Flags: —.
 | 6 | 7 | B→M | 2.412236 | 2.417849 | 3.53/3.53/3.53 | 3.14/3.53/3.53 | accepted |
 | 7 | 8 | M→B | 2.369542 | 2.431076 | 3.53/3.40/3.53 | 3.40/3.40/3.40 | accepted |
 
-Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above. Raw output files are preserved.
-
-
-
+Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above.
