@@ -1,5 +1,5 @@
 {
-  "base": "a175e357b480541f4c07b9671b7b1168de9c1a4e",
+  "base": "2b992d2d2fcf19a83c250a2ba8f9f1d708f991cc",
   "toolchain": "1.99.0",
   "checks": [
     {
@@ -21,7 +21,7 @@
       "check": "workspace",
       "command": "cargo +1.99.0 test --release --workspace -- --include-ignored --skip external_",
       "exit": 0,
-      "passed": 768,
+      "passed": 795,
       "failed": 0,
       "ignored": 0,
       "HOME": "empty",
@@ -33,9 +33,9 @@
       "check": "plain",
       "command": "cargo +1.99.0 test --release --workspace",
       "exit": 0,
-      "passed": 745,
+      "passed": 769,
       "failed": 0,
-      "ignored": 37,
+      "ignored": 44,
       "HOME": "empty",
       "emulator_environment": []
     },
@@ -81,6 +81,6 @@
   },
   "cpu_comparison": "Historical tables only; no new CPU benchmark.",
   "jit_differential": "Not required: no JIT code changed",
-  "production_wasm_sha256": "6ee18f09831800f5ce05466844a2fe7ca76cbdaff8507866571478204c95b6a1",
-  "rebase_results": "rebase-a175.json"
+  "production_wasm_sha256": "ec9539942447cb86c353b2b3f316e3a75439abd8806a360bf8f0b738b6bc6f7e",
+  "rebase_results": "rebase-2b.json"
 }

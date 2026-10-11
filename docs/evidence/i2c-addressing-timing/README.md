@@ -1,6 +1,6 @@
 # EX216: I2C addressing and transfer time
 
-Base: upstream main `a175e357b480541f4c07b9671b7b1168de9c1a4e` (#201/#202/#203 merged).
+Base: upstream main `2b992d2d2fcf19a83c250a2ba8f9f1d708f991cc` (#201/#202/#203/#196 merged).
 S3, C3 and C6 share one controller. Device callbacks can change the primary
 address, match aliases and accept write-only general calls. A single `start_address(configured, address, read)` callback matches and accepts
 the address after physical pin filtering. Every matching device receives the
@@ -88,8 +88,8 @@ node tools/check-evidence-privacy.mjs
 python3 docs/evidence/i2c-addressing-timing/mutate.py
 ```
 
-Release workspace: **768 passed**, zero ignored under CI policy; plain tests:
-**745 passed, 37 ignored**. Both runs use an empty HOME, with only
+Release workspace: **795 passed**, zero ignored under CI policy; plain tests:
+**769 passed, 44 ignored**. Both runs use an empty HOME, with only
 the ROM input for CI policy and no firmware-related variables for plain tests. Build-tool locations are
 supplied separately so changing HOME does not hide the Rust installation.
 Temporary test output stays inside the worktree. Reproduce the clean environment
@@ -173,29 +173,27 @@ and completion leaves C3 pin service, with a 6-cycle STOP deadline.
 the optional cache. `controller_leaves_optional_dispatch_after_completion_and_reset`
 checks I2C deadline methods before, during and after a transfer and after reset.
 
-### Rebase onto merged #203
+### Rebase onto current main
 
-Current base: upstream main `a175e357`. Rust 1.99.0 AArch64 release binaries,
-separate target directories, `llvm-objdump -d --demangle --no-show-raw-insn`
-and `asmcmp.py` address normalization. [Current structured comparison](rebase-a175.json)
-records selected emitted functions and every probed layout field. The older
-`ff64902a` comparison below is historical, not the current base.
+Current base: upstream main `2b992d2d` (#203 and #196 merged). Rust 1.99.0
+AArch64 release binaries, separate target directories,
+`llvm-objdump -d --demangle --no-show-raw-insn` and `asmcmp.py` normalization.
+[Current structured comparison](rebase-2b.json) records selected emitted functions
+and every probed layout field. The PR's Rust diff against this main is byte-identical
+to its Rust diff against `a175e357`; no further implementation change was made.
 
-C3 keeps both the existing SHA DMA pending test and I2C's cached pin-block
-classification. Optional deadlines are scanned only through `active_optional`;
-I2C IRQs retain one owner, the gated pin-source scan. C6 SPI/I2S pending work
-still precedes board advance and peripheral ticks. All 185 probed Peripherals/
-SocBus size/offset records match main across S3/C3/C6; `I2c` is 184 bytes on
-both revisions. No production change beyond conflict resolution was needed.
+C3 retains the `write32` boolean / `pins_active()` update followed by the SHA DMA
+pending hook. Optional deadlines use `active_optional` only; the gated pin-source
+scan remains I2C's single IRQ owner. C6 SPI/I2S work precedes board advance and
+peripheral ticks. All 185 Peripherals/SocBus size/offset records match main
+across S3/C3/C6; `I2c` remains 184 bytes on both revisions.
 
-C3 BLE_LC `next_deadline` is no longer emitted as a separate function; its
-active-only use is inlined into the optional-deadline dispatcher.
-All compared emitted Machine run/step bodies match. The selected differing
-functions are listed below; the complete MMIO/tick paths are not claimed
-instruction-identical. Optional tick/deadline dispatch and I2C write activation,
-board-before-peripheral ordering, cached IRQ sources, and C6 PCR clock sampling
-account for the source changes; register allocation and block placement also
-differ. This is static evidence, not a new CPU measurement.
+All compared emitted Machine run/step bodies match. C3 BLE_LC's standalone
+`next_deadline` is absent in the branch; active-only use is inlined into optional
+dispatch. Selected differences are listed below, not claimed instruction-identical.
+They cover I2C activation, ticking and active-list deadlines, board ordering,
+cached IRQ sources and C6 PCR clock sampling, plus register/block placement.
+This is static evidence, not CPU timing.
 
 | Chip / function | Main instructions | Branch instructions |
 | --- | ---: | ---: |
@@ -205,10 +203,10 @@ differ. This is static evidence, not a new CPU measurement.
 | S3 `Peripherals::tick_optional` | 312 | 394 |
 | S3 `Peripherals::source_status` | 263 | 252 |
 | C3 `next_deadline` | 200 | 194 |
-| C3 `periph_write` | 1676 | 1705 |
+| C3 `periph_write` | 1705 | 1734 |
 | C3 `pin_deadline` | 211 | 205 |
 | C3 `tick_with_pins` | 521 | 542 |
-| C3 `Peripherals::tick_optional` | 299 | 340 |
+| C3 `Peripherals::tick_optional` | 324 | 365 |
 | C6 `tick` | 2036 | 2042 |
 | C6 `next_deadline` | 290 | 298 |
 | C6 `periph_write` | 1747 | 1799 |
@@ -258,7 +256,7 @@ This is a correctness check, not a CPU timing measurement.
 
 Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 2f9443a9 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
-Measured on `schematik-engineering/esp32sim@b1c67907` (branch `i2c-addressing-timing`, before its rebases) against main `2f9443a9`. These are historical CPU samples, not measurements of the `a175e357` rebase. The Pocket Tank table likewise retains its earlier main `eec7b2c9` and fork control revision. The rebase onto merged #203 is checked by release disassembly and field-offset dumps; the instantaneous-control correctness check is separate from CPU timing. No new CPU benchmark was run. User CPU seconds.
+Measured on `schematik-engineering/esp32sim@b1c67907` (branch `i2c-addressing-timing`, before its rebases) against main `2f9443a9`. These are historical CPU samples, not measurements of the `2b992d2d` rebase. The Pocket Tank table likewise retains its earlier main `eec7b2c9` and fork control revision. The rebase onto merged #203 is checked by release disassembly and field-offset dumps; the instantaneous-control correctness check is separate from CPU timing. No new CPU benchmark was run. User CPU seconds.
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
