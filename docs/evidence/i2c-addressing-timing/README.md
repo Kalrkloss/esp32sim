@@ -1,6 +1,6 @@
 # EX216: I2C addressing and transfer time
 
-Base: upstream main `2f9443a90a8cfbd81764af7fdabcbd8d33eaf283`.
+Base: upstream main `eec7b2c9923194ec0eb1e9dfa099b9b77aa939e3`.
 S3, C3 and C6 share one controller. Device callbacks can change the primary
 address, match aliases and accept write-only general calls. A single `start_address(configured, address, read)` callback matches and accepts
 the address after physical pin filtering. Every matching device receives the
@@ -17,10 +17,18 @@ S3/C6 advance the board before the peripheral tick and deliver its inputs after 
 under main's existing `board_edges` gate (`drain_board_inputs` is main's
 `deliver_board_inputs` without the advance). No CPU-loop fields were added; C3 pin activation uses one inlined predicate.
 
+Ordering consequence: because the board advances before peripheral ticks, an
+input edge that an RMT or LEDC callback makes due within the same tick is
+delivered one tick later than on main. Existing goldens other than panel-sid
+(below) are unchanged by this.
+
 Related experiments: EX201 and EX206 established physical pin matching and
 timestamped board callbacks but left I2C instantaneous; EX209 added removal.
 EX216 adds address fanout and elapsed bus time to those existing paths.
-There were no open upstream pull requests when overlapping changes were checked.
+Overlaps: #207 (classic stack) also rewrites the `I2c` core, making it
+const-generic over the command-slot count and rewriting `run()`. Agreed merge
+order: #199 lands first; #207 is rebased onto it (and onto #205) and takes this
+I2C core. #208–#212 are stacked on #207 and carry the same change.
 
 ## Register sources and model limits
 
@@ -81,8 +89,8 @@ node tools/check-evidence-privacy.mjs
 python3 docs/evidence/i2c-addressing-timing/mutate.py
 ```
 
-Release workspace: **703 passed**, zero ignored under CI policy; plain tests:
-**682 passed, 35 ignored**. Both results repeat with an empty HOME, with only
+Release workspace: **705 passed**, zero ignored under CI policy; plain tests:
+**684 passed, 35 ignored**. Both results repeat with an empty HOME, with only
 the ROM input for CI policy and no firmware-related variables for plain tests. Build-tool locations are
 supplied separately so changing HOME does not hide the Rust installation.
 Temporary test output stays inside the worktree. Reproduce the clean environment
@@ -180,7 +188,7 @@ match main apart from alignment padding. S3 hot functions that differ:
 
 Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 2f9443a9 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
-Measured on `b1c67907` against main `2f9443a9`, which differs from its base `fe3a9c08` only in docs and web. Pocket Tank is not compared: finite I2C transfer time changes the game's time-derived seed, so its console differs from main by design. User CPU seconds.
+Measured on `schematik-engineering/esp32sim@b1c67907` (branch `i2c-addressing-timing` before its rebase onto `eec7b2c9`; later commits change only docs) against main `2f9443a9`. Between `2f9443a9` and the base `eec7b2c9`, main changed docs, web and #213 (C3/C6 debug areas reapplied on guest restart, not on the hello workloads' run loop). User CPU seconds.
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -233,9 +241,26 @@ Status: PASS. Flags: —.
 | 6 | 7 | B→M | 3.079720 | 3.033229 | 2.57/2.45/2.57 | 2.62/2.57/2.62 | accepted |
 | 7 | 8 | M→B | 3.083089 | 3.104397 | 2.45/2.45/2.45 | 2.45/2.41/2.45 | accepted |
 
-Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above. Raw output files are preserved.
+Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above. Raw output files are not committed.
 
-No CPU benchmarks were run for this revision. Central comparison remains required before merge.
+### Pocket Tank
+
+Status: PENDING central measurement. On this branch, finite I2C transfer time
+changes the game's time-derived seed, so the PR's Pocket Tank run executes
+different guest work from main and a direct timing pair is not an emulator
+overhead comparison ([pocket-tank.md](pocket-tank.md)).
+
+The comparison arm is an instantaneous-I2C control build: this branch's code
+with one change, `I2c::run()` calling `self.advance(u64::MAX)` right after
+`self.schedule()`, so every command list completes at TRANS_START with zero bus
+time, as on main. Everything else stays as on this branch: address fanout,
+aliases, general call, optional dispatch, the S3/C3/C6 tick order (board
+before peripherals) and the controller layout. A transfer never stays active,
+so I2C never joins the optional deadline list. Single correctness runs of the
+control (30 emulated seconds, `waveshare-amoled18-v2`) reproduce main
+`eec7b2c9`'s console SHA-256 and instruction count exactly; see
+[pocket-tank.md](pocket-tank.md). Main vs control timing remains to be
+measured centrally.
 
 ## Evidence scope
 

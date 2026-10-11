@@ -1,13 +1,14 @@
 {
+  "base": "eec7b2c9923194ec0eb1e9dfa099b9b77aa939e3",
   "main": {
     "console_sha256": "c3776029dd98a1cd1ad148aa3cfdbd6639a49e465157214c2f1ca34ac5e2bbd5",
     "console_bytes": 21394,
     "core_instructions": [
-      4446180089,
-      5627653686
+      4446180034,
+      5627653631
     ],
-    "instructions": 10073833775,
-    "cycles": 7200000055,
+    "instructions": 10073833665,
+    "cycles": 7200000000,
     "exceptions": 1006391,
     "interrupts": 95179,
     "per_source": [
@@ -24,11 +25,11 @@
     "console_sha256": "880ce5621ddef2109e54978f10e698ee2efd954dd5b7504a8f144c9c25fe8100",
     "console_bytes": 21468,
     "core_instructions": [
-      4548165404,
-      6107970383
+      4548165341,
+      6107970320
     ],
-    "instructions": 10656135787,
-    "cycles": 7200000063,
+    "instructions": 10656135661,
+    "cycles": 7200000000,
     "exceptions": 1047933,
     "interrupts": 100129,
     "per_source": [
@@ -45,11 +46,11 @@
     "console_sha256": "c3776029dd98a1cd1ad148aa3cfdbd6639a49e465157214c2f1ca34ac5e2bbd5",
     "console_bytes": 21394,
     "core_instructions": [
-      4446180089,
-      5627653686
+      4446180034,
+      5627653631
     ],
-    "instructions": 10073833775,
-    "cycles": 7200000055,
+    "instructions": 10073833665,
+    "cycles": 7200000000,
     "exceptions": 1006391,
     "interrupts": 95179,
     "per_source": [
@@ -66,11 +67,12 @@
     "byte_offset": 8919,
     "line": 171
   },
-  "console_diff_sha256": "651a2d32d394a79d250d414d242a46a86d02089bd1c612d555986f6736f581dd",
+  "console_diff_sha256": "307da194d561eed7d740c909ba56e6c26015e5905425dd982a3f8551f25a1b13",
+  "console_diff_command": "diff -u --label main --label candidate main.console candidate.console",
   "first_second_trace": {
     "equal": true,
     "events": 825,
-    "normalized_sha256": "ab0f07eab09cfe09cdd99138b89e86d7f5475f898c3c02cc8e5a8f631f79d44f",
+    "normalized_sha256": "7432fa53edecb13f6351a9ec7e1e70694dbb1f2d6d8c904bdd8a049a6fcd10c4",
     "starts": {
       "0x20 W": 3,
       "0x15 W": 95,
@@ -112,6 +114,6 @@
       2097152
     ]
   },
-  "scope": "One 30-second correctness run per arm; 1-second diagnostic traces. No CPU measurements retained. instant is candidate with only run() executing advance(u64::MAX) immediately after schedule().",
-  "candidate_controller_sha256": "1208c83ac4973c1609d1eb5ebf284b79e85f39d18100bbfc92da2feb6d75f3ef"
+  "scope": "One 30-second correctness run per arm on base eec7b2c9; 1-second diagnostic traces (main eec7b2c9 vs candidate with pocket-trace.patch, --debug i2c, lines starting [i2c] after mapping read=false/true to W/R). No CPU measurements retained. instant is the candidate with instant-i2c-control: run() calls advance(u64::MAX) immediately after schedule().",
+  "candidate_controller_sha256": "1864aac258b80f21388d6fc0c004102068f6175c88857582bd6ee2dd37c884d1"
 }

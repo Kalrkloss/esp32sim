@@ -1,5 +1,5 @@
 {
-  "base": "2f9443a90a8cfbd81764af7fdabcbd8d33eaf283",
+  "base": "eec7b2c9923194ec0eb1e9dfa099b9b77aa939e3",
   "environment": {
     "os": "Darwin",
     "os_version": "27.0.1",
@@ -40,14 +40,14 @@
         "ESP32SIM_ROM_DIR": "web/wasm/fw"
       },
       "exit": 0,
-      "passed": 703,
+      "passed": 705,
       "ignored": 0
     },
     {
       "check": "plain",
       "command": "cargo +1.99.0 test --release --workspace",
       "exit": 0,
-      "passed": 682,
+      "passed": 684,
       "ignored": 35
     },
     {
@@ -59,7 +59,7 @@
         "build_environment": "PATH, RUSTUP_HOME, CARGO_HOME, TMPDIR only"
       },
       "exit": 0,
-      "passed": 703,
+      "passed": 705,
       "ignored": 0
     },
     {
@@ -71,7 +71,7 @@
         "build_environment": "PATH, RUSTUP_HOME, CARGO_HOME, TMPDIR only"
       },
       "exit": 0,
-      "passed": 682,
+      "passed": 684,
       "ignored": 35
     },
     {
@@ -167,7 +167,7 @@
       "check": "evidence-privacy",
       "command": "node tools/check-evidence-privacy.mjs",
       "exit": 0,
-      "tracked_files_checked": 1690,
+      "tracked_files_checked": 1694,
       "gzip_files_checked": 20,
       "manual_review": "Changed source, tests, JSON and script reviewed; no personal or private source material retained."
     }
@@ -178,13 +178,13 @@
     "total": 44,
     "profile": "test (debug)"
   },
-  "cpu_comparison": "PENDING",
+  "cpu_comparison": "S3/C3/C6 hello measured (see README); Pocket Tank PENDING central measurement against the instantaneous-I2C control",
   "jit_differential": "Not required: no JIT code changed",
-  "production_wasm_sha256": "4a0e6e8a2d014f8a1a33e1c14422515929a8043dce6df1d656332bcaf4fed1ed",
+  "production_wasm_sha256": "7e8d9d7e07761f70b2b9f685af71657672aad1bcbd800c0b0ed5e1674b3fa125",
   "pocket_tank_correctness": {
     "receipt": "pocket-tank.md",
     "results": "pocket-tank.json",
-    "verdict": "Expected elapsed-bus-time divergence; unchanged address/data replies and exact main console/counts when only I2C time is removed.",
+    "verdict": "Expected elapsed-bus-time divergence; unchanged address/data replies and exact main console/instructions when only I2C time is removed (instantaneous-I2C control).",
     "fixture": "pocket_tank_amoled_transfers_complete_at_programmed_bus_rate",
     "passed": true
   }

@@ -4,11 +4,12 @@ Verdict: expected workload divergence from finite I2C transfers, not an
 addressing failure, new NACK or stalled transfer. The shared controller needs
 no correction for this workload. Exact hardware timing remains unvalidated.
 
-Base is main `017af5241f48855c412d912ff91f0a801dd3c1bd`; the controller source used for these runs is identified by
+Base is main `eec7b2c9923194ec0eb1e9dfa099b9b77aa939e3`; the controller source used for these runs is identified by
 `candidate_controller_sha256` in `pocket-tank.json`; firmware and other sources
 are identified by `inputs.json`. `pocket-tank.json` records console
 hashes, instruction counts, stop totals and per-source interrupt counts.
-No CPU benchmark was run. The CLI's incidental wall-time/speed fields are
+This file is a correctness record; the CPU status is in the receipt's
+`## CPU comparison` section. The CLI's incidental wall-time/speed fields are
 excluded from evidence and are not used for this conclusion.
 
 ## Console comparison
@@ -19,7 +20,7 @@ channels, no inputs, and 30 emulated seconds.
 
 | Observation | Main | Candidate |
 |---|---|---|
-| Instructions | 10,073,833,775 | 10,656,135,787 |
+| Instructions | 10,073,833,665 | 10,656,135,661 |
 | Console SHA-256 | `c3776029dd98a1cd1ad148aa3cfdbd6639a49e465157214c2f1ca34ac5e2bbd5` | `880ce5621ddef2109e54978f10e698ee2efd954dd5b7504a8f144c9c25fe8100` |
 | First changed line, board revision V2 | 293 ms | 294 ms |
 | Display initialization warning | 373 ms | 374 ms |
@@ -46,8 +47,8 @@ and RTC-unset warning remain; neither run adds an I2C error. Touch ID remains
 zero in the existing mode-0 stub.
 
 The console diff was inspected directly, including its interleaved fragments.
-The exact two consoles and unified diff are retained with the local PR handoff;
-`pocket-tank.json` identifies the bytes. They are not added as raw logs to Git.
+`pocket-tank.json` identifies the console and diff bytes; the raw consoles are
+not committed.
 
 ## Which transfers change
 
@@ -111,12 +112,16 @@ from that tag**. Source hashes are retained. The seed explanation is inferred
 from that source and the observed population change; the control below proves
 the causal effect of bus time independently of source-version identity.
 
-Control: use the candidate unchanged except append `self.advance(u64::MAX);`
-after `self.schedule();` in `I2c::run()`, making transfers synchronous again.
-The 30-second console becomes **byte-identical to main**, with exactly
-10,073,833,775 instructions, 1,006,391 exceptions, 95,179 interrupts, and the
-same per-source counts. This isolates elapsed I2C time from aliases, address
-updates, board tick order and other branch changes. The control is not shipped.
+Control (instantaneous-I2C build, not shipped): the candidate unchanged
+except that `I2c::run()` calls `self.advance(u64::MAX);` right after
+`self.schedule();`, so each command list completes at TRANS_START with zero
+bus time. Aliases, address updates, optional dispatch, board tick order and
+the controller layout stay as on this branch. The 30-second console is
+**byte-identical to main `eec7b2c9`**, with exactly 10,073,833,665
+instructions (both cores equal), 1,006,391 exceptions, 95,179 interrupts and
+the same per-source counts. This isolates elapsed I2C time from every other
+branch change, and makes the control the comparison arm for the pending
+central Pocket Tank timing.
 
 Real I2C transfers take finite bus time, so allowing firmware time and its
 seeded workload to change is appropriate. These results do not establish that
@@ -141,14 +146,14 @@ cargo +1.99.0 build --release --bins
 diff -u main.console candidate.console
 ```
 
-Build main from `git archive 017af524` into a worktree-local scratch directory;
-use this worktree's firmware paths for both binaries. For the first-second
+Build main from `git archive eec7b2c9` into a worktree-local scratch directory;
+use this worktree's firmware paths for all binaries. For the control, apply
+the one-hunk change above to a copy of the candidate. For the first-second
 trace, replace 30 with 1 and add `--debug i2c`. `pocket-trace.patch` adds only
 diagnostic logging of timing registers, deadlines and ACK outcomes to the
-candidate. Apply it with `git apply --unidiff-zero` before the diagnostic build and
-reverse it with `git apply -R --unidiff-zero` afterward;
-its output does not alter the transfer state. Normalize the address log
-spelling and compare only lines beginning `[i2c]`.
+candidate; it applies to this branch's head with `git apply` (reverse with
+`git apply -R`), and its output does not alter the transfer state. Map
+`read=false`/`read=true` to `W`/`R` and compare only lines beginning `[i2c]`.
 
 `pocket_tank_amoled_transfers_complete_at_programmed_bus_rate` replays the
 observed expander, probe, touch-ID, IMU configuration/readback and RTC-read
@@ -156,4 +161,4 @@ transfers against the real AMOLED board device set. It asserts no completion
 one APB tick early, completion on the expected tick, no NACK, exact FIFO data,
 and command-done bits. It uses committed register fixtures and needs no model
 file, firmware build or developer-machine input. Changing nine clocks per
-byte to ten kills it; all 39 mutations in `mutations.json` are killed.
+byte to ten kills it; all 44 mutations in `mutations.json` are killed.
