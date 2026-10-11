@@ -356,11 +356,15 @@ impl Device for ClassicUart {
 pub struct ClassicRtc(pub RtcCntl);
 impl ClassicRtc {
     fn new() -> Self {
-        Self(RtcCntl::with_wdt_base(0x8c))
+        let mut rtc = RtcCntl::with_wdt_base(0x8c);
+        // IDF v5.5.4 rtc_cntl_reg.h:505-523: WAKEUP_ENA resets to 12.
+        rtc.ram.write(0x34, 12 << 11);
+        Self(rtc)
     }
     fn off(off: u32) -> u32 {
         match off {
             0x34 => 0x38,
+            0x38 => 0x34, // keep WAKEUP_STATE separate from shared RESET_STATE
             0xb0..=0xbc => off + 0x10,
             _ => off,
         }
@@ -377,6 +381,9 @@ impl Device for ClassicRtc {
     fn write(&mut self, off: u32, v: u32) -> WriteEffect {
         if off == 0x48 {
             self.0.ram.write(0x44, self.0.ram.read(0x44) & !v);
+        } else if off == 0x38 {
+            // WAKEUP_CAUSE[10:0] is read-only; wake events are not modeled here.
+            self.0.ram.write(0x34, v & (0xfff << 11));
         } else {
             // The mask states the 4 KiB block range S3/C3/C6 callers already prove, so the shared
             // RtcCntl::write keeps main's code (no extra index masking).

@@ -2,6 +2,16 @@ use esp_soc::SocBus as _;
 use emu_core::bus::Bus as _;
 
 #[test]
+fn wakeup_state_cannot_alias_reset_cause() {
+    let mut bus = esp32::bus::SocBus::new(4 << 20, [0; 6]);
+    bus.set_reset_cause(12);
+    assert_eq!(bus.read32(0x3ff4_8038).unwrap(), 12 << 11);
+    bus.write32(0x3ff4_8038, u32::MAX).unwrap();
+    assert_eq!(bus.read32(0x3ff4_8034).unwrap(), 12 | (12 << 6));
+    assert_eq!(bus.read32(0x3ff4_8038).unwrap(), 0xfff << 11);
+}
+
+#[test]
 fn gpio23_is_visible_but_unbonded_or_invalid_pins_are_hidden() {
     let bus = esp32::bus::SocBus::new(4 << 20, [0; 6]);
     assert!(bus.gpio_state(23).is_some());
