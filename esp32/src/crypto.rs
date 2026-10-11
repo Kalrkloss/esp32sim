@@ -239,6 +239,49 @@ mod tests {
         }
     }
 
+    /// ESP32 TRM v5.8 tables 14.3-2 (text) and 14.3-3 (AES-128 key): register words for the
+    /// FIPS-197 C.1 key 000102..0f, plaintext 00112233..ff and ciphertext 69c4e0d8..c55a under
+    /// each two-bit endian setting, written out literally rather than derived by a helper.
+    const TRM_KEY: [[u32; 4]; 4] = [
+        [0x0c0d_0e0f, 0x0809_0a0b, 0x0405_0607, 0x0001_0203],
+        [0x0f0e_0d0c, 0x0b0a_0908, 0x0706_0504, 0x0302_0100],
+        [0x0001_0203, 0x0405_0607, 0x0809_0a0b, 0x0c0d_0e0f],
+        [0x0302_0100, 0x0706_0504, 0x0b0a_0908, 0x0f0e_0d0c],
+    ];
+    const TRM_PLAIN: [[u32; 4]; 4] = [
+        [0xccdd_eeff, 0x8899_aabb, 0x4455_6677, 0x0011_2233],
+        [0xffee_ddcc, 0xbbaa_9988, 0x7766_5544, 0x3322_1100],
+        [0x0011_2233, 0x4455_6677, 0x8899_aabb, 0xccdd_eeff],
+        [0x3322_1100, 0x7766_5544, 0xbbaa_9988, 0xffee_ddcc],
+    ];
+    const TRM_CIPHER: [[u32; 4]; 4] = [
+        [0x70b4_c55a, 0xd8cd_b780, 0x6a7b_0430, 0x69c4_e0d8],
+        [0x5ac5_b470, 0x80b7_cdd8, 0x3004_7b6a, 0xd8e0_c469],
+        [0x69c4_e0d8, 0x6a7b_0430, 0xd8cd_b780, 0x70b4_c55a],
+        [0xd8e0_c469, 0x3004_7b6a, 0x80b7_cdd8, 0x5ac5_b470],
+    ];
+
+    #[test]
+    fn aes_endian_register_layouts_match_trm_tables() {
+        for (key, key_words) in TRM_KEY.iter().enumerate() {
+            for (input, plain) in TRM_PLAIN.iter().enumerate() {
+                for (output, cipher) in TRM_CIPHER.iter().enumerate() {
+                    let endian = (output << 4 | input << 2 | key) as u32;
+                    let mut aes = ClassicAes::new();
+                    aes.write(0x40, endian);
+                    aes.write(8, 0);
+                    for (i, (&k, &t)) in key_words.iter().zip(plain).enumerate() {
+                        aes.write(0x10 + 4 * i as u32, k);
+                        aes.write(0x30 + 4 * i as u32, t);
+                    }
+                    aes.write(0, 1);
+                    let got: [u32; 4] = std::array::from_fn(|i| aes.read(0x30 + 4 * i as u32));
+                    assert_eq!(got, *cipher, "endian={endian:#04x}");
+                }
+            }
+        }
+    }
+
     fn padded(message: &[u8], block: usize) -> Vec<u8> {
         let mut bytes = message.to_vec();
         bytes.push(0x80);
