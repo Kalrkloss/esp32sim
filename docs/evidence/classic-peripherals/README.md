@@ -75,10 +75,10 @@ rows naming an integration target, then restore it. The LEDC shadow test
 isolates channel updates from timer updates; neither missing latch gate is
 hidden by the other one.
 
-Results on Rust 1.99.0: both Clippy checks pass with warnings denied;
-746 CI-mode workspace tests pass; 724 plain workspace tests pass with 36
-ignored. Both workspace runs use an empty HOME. All eight production WASM
-scenarios and evidence privacy pass. Goldens remain byte-identical.
+Rust 1.99.0 on the ff64902a-based source: both Clippy targets pass with warnings
+denied; 776 CI-mode workspace tests and 754 plain tests
+(36 ignored) pass with empty HOME. All eight production WASM scenarios
+and evidence privacy pass. Classic and existing goldens remain byte-identical.
 
 ## CPU comparison
 
