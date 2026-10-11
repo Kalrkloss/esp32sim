@@ -1,0 +1,20 @@
+{
+  "upstream_base": "ff64902a",
+  "validated_source": "b2a14582a0f6b3fdf0525cf6e5e99a5eb1cf7b29",
+  "source_unchanged_by_following_documentation": true,
+  "clippy_native": "pass",
+  "clippy_wasm": "pass",
+  "test_ci": {
+    "passed": 809,
+    "failed": 0,
+    "ignored": 0
+  },
+  "test_plain": {
+    "passed": 787,
+    "failed": 0,
+    "ignored": 36
+  },
+  "wasm_scenarios": 8,
+  "privacy": "pass",
+  "goldens": "unchanged"
+}

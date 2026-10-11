@@ -50,9 +50,10 @@ DAC gates, touch routing, timestamp sampling, RTC GPIO isolation, reboot
 retention, MMIO probe visibility and script validation. Apply each row and run
 `cargo +1.99.0 test -p CRATE --lib TEST`, then restore it.
 
-Results on Rust 1.99.0: both required Clippy checks pass; 779 CI-mode
-workspace tests and 757 plain tests (36 ignored) pass with empty HOME.
-All eight WASM scenarios and evidence privacy pass. Goldens unchanged.
+Rust 1.99.0 on the ff64902a-based source: both Clippy targets pass with warnings
+denied; 809 CI-mode workspace tests and 787 plain tests
+(36 ignored) pass with empty HOME. All eight production WASM scenarios
+and evidence privacy pass. Classic and existing goldens remain byte-identical.
 
 ## CPU comparison
 
