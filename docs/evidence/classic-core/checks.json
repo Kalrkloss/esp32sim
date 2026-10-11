@@ -1,6 +1,6 @@
 {
   "upstream_base": "2b992d2d",
-  "validated_source": "affe080946c59a7bfd33a17c16725372307a41e1",
+  "validated_source": "702fd1173dff655f8c3de35d3d9f18a4b9818bc5",
   "test_followup": "review_core rerun after strengthening idle-bound coverage",
   "clippy_native": "pass",
   "clippy_wasm": "pass",
@@ -31,5 +31,12 @@
     22.086
   ],
   "flash_16mb_boots": 3,
-  "cpu_benchmark_run": false
+  "cpu_benchmark_run": false,
+  "disassembly": {
+    "base": "2b992d2d",
+    "source": "702fd117",
+    "same": 115,
+    "different": 0,
+    "missing": 0
+  }
 }

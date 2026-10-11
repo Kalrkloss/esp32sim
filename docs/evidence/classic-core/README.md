@@ -220,6 +220,16 @@ report and the opt-in register-trace observer. The comparison was repeated
 against main `eec7b2c9` on the rebased stack tip (#211); the S3/C3/C6 hot
 path result is unchanged.
 
+## Current static code-generation check
+
+Release binaries at main `2b992d2d` and source `702fd117` were disassembled
+and compared with `asmcmp.py` and the hot-path selector (addresses, relocation
+pages and symbol aliases normalized). All **115 selected S3/C3/C6 hot functions
+match**, with zero differences or missing functions. The earlier GPIO index
+`lsr`/`ubfx` difference above is historical: explicitly inlining the shared
+GPIO write into its layout adapters restores identical fixed-chip code.
+No S3/C3/C6 chip source or shared CCOUNT reset behavior changed.
+
 ## Privacy
 
 No private captures are retained. Firmware reproducible-build settings map
