@@ -4,7 +4,12 @@ Verdict: expected workload divergence from finite I2C transfers, not an
 addressing failure, new NACK or stalled transfer. The shared controller needs
 no correction for this workload. Exact hardware timing remains unvalidated.
 
-Base is main `eec7b2c9923194ec0eb1e9dfa099b9b77aa939e3`; the controller source used for these runs is identified by
+Current base: main `ff64902ab01f91f7e57e00d213412a11cc1999fc`. A single
+main/control correctness run on that base reproduces the console hash,
+10073833665 instructions and stop totals below; see
+[rebase-validation.json](rebase-validation.json). No new CPU timing is claimed.
+
+The historical finite-time/trace runs below used main `eec7b2c9923194ec0eb1e9dfa099b9b77aa939e3`; the controller source used for those runs is identified by
 `candidate_controller_sha256` in `pocket-tank.json`; firmware and other sources
 are identified by `inputs.json`. `pocket-tank.json` records console
 hashes, instruction counts, stop totals and per-source interrupt counts.

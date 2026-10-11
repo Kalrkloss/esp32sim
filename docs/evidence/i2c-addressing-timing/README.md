@@ -1,6 +1,6 @@
 # EX216: I2C addressing and transfer time
 
-Base: upstream main `eec7b2c9923194ec0eb1e9dfa099b9b77aa939e3`.
+Base: upstream main `ff64902ab01f91f7e57e00d213412a11cc1999fc` (#201/#202 merged).
 S3, C3 and C6 share one controller. Device callbacks can change the primary
 address, match aliases and accept write-only general calls. A single `start_address(configured, address, read)` callback matches and accepts
 the address after physical pin filtering. Every matching device receives the
@@ -69,9 +69,8 @@ new PWM device model. No classic ESP32 or physical sensor validation is claimed.
 
 ## Verification
 
-Both strict Clippy checks, the release build, eight production WASM demos,
-WASM section/timing/BLE ABI checks, virtual-quantum tests, CI Node/Python
-checks and evidence privacy checks pass.
+Both strict Clippy checks, the release binary build, eight production WASM demos,
+WASM section/timing/BLE ABI checks and evidence privacy checks pass.
 
 Commands run from the repository root with Rust 1.99.0; the default toolchain
 was not changed. Final check results are in `checks.json`; source, firmware and public-header hashes
@@ -89,8 +88,8 @@ node tools/check-evidence-privacy.mjs
 python3 docs/evidence/i2c-addressing-timing/mutate.py
 ```
 
-Release workspace: **705 passed**, zero ignored under CI policy; plain tests:
-**684 passed, 35 ignored**. Both results repeat with an empty HOME, with only
+Release workspace: **736 passed**, zero ignored under CI policy; plain tests:
+**715 passed, 35 ignored**. Both runs use an empty HOME, with only
 the ROM input for CI policy and no firmware-related variables for plain tests. Build-tool locations are
 supplied separately so changing HOME does not hide the Rust installation.
 Temporary test output stays inside the worktree. Reproduce the clean environment
@@ -174,21 +173,50 @@ and completion leaves C3 pin service, with a 6-cycle STOP deadline.
 the optional cache. `controller_leaves_optional_dispatch_after_completion_and_reset`
 checks I2C deadline methods before, during and after a transfer and after reset.
 
-S3 machine code: release `esp32sim` binaries of main and this branch
-(`cargo +1.99.0 build --release -p esp32sim --bins`, arm64 macOS) were
-disassembled and compared per function with addresses normalised.
-`Machine::run`, `run_unmodeled`, `run_modeled`, `step_core`,
-`settle_modeled_time`, `function_hook`, the Xtensa core and `periph_read`
-match main apart from alignment padding. S3 hot functions that differ:
-`tick_impl` (one `board_edges` test before the peripheral tick),
-`refresh_tick_budget` (the deadline query's active-list length test),
-`periph_write_inner` and `source_status` (rows above).
+### Rebase onto #201/#202
+
+Release binaries built with Rust 1.99.0 on arm64 macOS were compared against
+`ff64902a` using `llvm-objdump -d --demangle --no-show-raw-insn` and the
+address-normalizing `asmcmp.py` comparator. [Structured results](rebase-validation.json)
+retain normalized instruction counts, field offsets and the single-run Pocket Tank check.
+
+- S3 `run_unmodeled`, `run_modeled`, `step_core`, bus `tick` and `periph_read`
+  are identical. `tick_impl`: 3667 → 3673 instructions; `refresh_tick_budget`:
+  278 → 282; `periph_write_inner`: 1663 → 1742.
+- C3 `run`, `run_unmodeled`, `step_core`, bus `tick`, `pending_work` and
+  `periph_read` are identical. `next_deadline`: 200 → 194 (the active optional
+  list replaces the static BLE_LC deadline poll); `periph_write`: 1660 → 1691.
+- C6 `run`, `run_unmodeled`, `step_core`, `pending_work` and `periph_read`
+  are identical. Bus `tick`: 2036 → 2042; `next_deadline`: 290 → 298;
+  `periph_write`: 1660 → 1741. `devices` is inlined into `tick`; S3 `run`
+  has no separate emitted symbol, so its emitted CLI caller and run bodies were checked.
+- S3 `tick_impl` and C6 `tick` retain exactly the same call multisets as main
+  (164 and 88 call sites respectively), with board advance moved before tick
+  and one extra `board_edges` test. Register allocation and stack slots also
+  change; these functions are not byte-identical. Deadline/write differences
+  are the optional-list and I2C write activation changes described above.
+- `offset_of!` dumps match field-for-field: all 72 S3 `SocBus`/`Peripherals`
+  fields, both struct sizes and `I2c` size (75 entries total). `I2c` remains
+  184 bytes, `Peripherals` 9360, `SocBus` 12408; `i2c` and `periph` remain at
+  offset zero, preserving the niche-driven enclosing layout.
+- C6 `pending_work` keeps SPI and I2S RX service before board advance;
+  C3 MMIO keeps main's combined SPI_EXEC/RX_CONF handling, RX-state update
+  and work refresh while returning the existing pin-block classification.
+  Main's PCM routing, ADC streams and shared GDMA walker are retained.
+
+The instantaneous-I2C control is the rebased source plus only
+`self.advance(u64::MAX)` after `self.schedule()` in `I2c::run()`. One run
+per arm, 30 emulated seconds on `waveshare-amoled18-v2`, matches main
+`ff64902a`: **10073833665 instructions** (cores 4446180034 / 5627653631),
+1006391 exceptions, 95179 interrupts and console SHA-256
+`c3776029dd98a1cd1ad148aa3cfdbd6639a49e465157214c2f1ca34ac5e2bbd5`.
+This is a correctness check, not a CPU timing measurement.
 
 ## CPU comparison
 
 Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 2f9443a9 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
-Measured on `schematik-engineering/esp32sim@b1c67907` (branch `i2c-addressing-timing` before its rebase onto `eec7b2c9`; later commits change only docs) against main `2f9443a9`. Between `2f9443a9` and the base `eec7b2c9`, main changed docs, web and #213 (C3/C6 debug areas reapplied on guest restart, not on the hello workloads' run loop). User CPU seconds.
+Measured on `schematik-engineering/esp32sim@b1c67907` (branch `i2c-addressing-timing`, before its rebases) against main `2f9443a9`. These are historical CPU samples, not measurements of the `ff64902a` rebase. The Pocket Tank table likewise retains its earlier main `eec7b2c9` and fork control revision. The rebase onto #201/#202 is checked by release disassembly, field-offset dumps and correctness runs below; no new CPU benchmark was run. User CPU seconds.
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -245,7 +273,13 @@ Max load in summary includes accepted warmup and measured pairs; discarded attem
 
 ### Pocket Tank
 
-Status: PENDING central measurement. On this branch, finite I2C transfer time
+Measured against main `eec7b2c9` with the same method as the hello table above (user CPU, one warmup and seven alternating load-gated pairs), the control arm built from `schematik-engineering/esp32sim@7b404a99` (branch `i2c-addressing-timing-instant-control`). Instruction counts and console hashes are identical in every pair:
+
+| Workload | Main median (range) | Control median (range) | Change | Control slower in N/7 | Instructions | max load |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Pocket Tank | 35.5447 (34.9420–37.9908) | 35.2735 (34.9134–35.5341) | -0.76% | 2/7 | 10073833665 | 5.05 |
+
+Why a control: on this branch, finite I2C transfer time
 changes the game's time-derived seed, so the PR's Pocket Tank run executes
 different guest work from main and a direct timing pair is not an emulator
 overhead comparison ([pocket-tank.md](pocket-tank.md)).
@@ -259,8 +293,8 @@ before peripherals) and the controller layout. A transfer never stays active,
 so I2C never joins the optional deadline list. Single correctness runs of the
 control (30 emulated seconds, `waveshare-amoled18-v2`) reproduce main
 `eec7b2c9`'s console SHA-256 and instruction count exactly; see
-[pocket-tank.md](pocket-tank.md). Main vs control timing remains to be
-measured centrally.
+[pocket-tank.md](pocket-tank.md). The historical timing result is the table above;
+no new timing is claimed for the rebase.
 
 ## Evidence scope
 

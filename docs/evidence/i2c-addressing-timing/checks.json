@@ -1,22 +1,11 @@
 {
-  "base": "eec7b2c9923194ec0eb1e9dfa099b9b77aa939e3",
-  "environment": {
-    "os": "Darwin",
-    "os_version": "27.0.1",
-    "architecture": "arm64",
-    "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
-    "node": "v22.23.1"
-  },
+  "base": "ff64902ab01f91f7e57e00d213412a11cc1999fc",
+  "toolchain": "1.99.0",
   "checks": [
     {
-      "check": "panel",
-      "command": "cargo +1.99.0 test --release -p esp32sim --test goldens panel_sid -- --include-ignored",
-      "environment": {
-        "ESP32SIM_ROM_DIR": "web/wasm/fw"
-      },
-      "exit": 0,
-      "passed": 1,
-      "ignored": 0
+      "check": "fetch-assets",
+      "command": "tools/fetch-demo-assets.sh --no-linux",
+      "exit": 0
     },
     {
       "check": "clippy-native",
@@ -29,75 +18,54 @@
       "exit": 0
     },
     {
-      "check": "build",
-      "command": "cargo +1.99.0 build --release --workspace",
-      "exit": 0
-    },
-    {
-      "check": "workspace",
+      "check": "workspace-rom",
       "command": "cargo +1.99.0 test --release --workspace -- --include-ignored --skip external_",
-      "environment": {
-        "ESP32SIM_ROM_DIR": "web/wasm/fw"
-      },
       "exit": 0,
-      "passed": 705,
-      "ignored": 0
-    },
-    {
-      "check": "plain",
-      "command": "cargo +1.99.0 test --release --workspace",
-      "exit": 0,
-      "passed": 684,
-      "ignored": 35
-    },
-    {
-      "check": "empty-home-rom",
-      "command": "cargo +1.99.0 test --release --workspace -- --include-ignored --skip external_",
+      "passed": 736,
+      "failed": 0,
+      "ignored": 0,
       "environment": {
         "HOME": "empty directory",
         "firmware_inputs": "ESP32SIM_ROM_DIR=web/wasm/fw",
-        "build_environment": "PATH, RUSTUP_HOME, CARGO_HOME, TMPDIR only"
-      },
-      "exit": 0,
-      "passed": 705,
-      "ignored": 0
+        "build_environment": "PATH, RUSTUP_HOME, CARGO_HOME, CARGO_TARGET_DIR, RUSTUP_TOOLCHAIN, TMPDIR"
+      }
     },
     {
-      "check": "empty-home-plain",
+      "check": "workspace-plain",
       "command": "cargo +1.99.0 test --release --workspace",
+      "exit": 0,
+      "passed": 715,
+      "failed": 0,
+      "ignored": 35,
       "environment": {
         "HOME": "empty directory",
         "firmware_inputs": "none",
-        "build_environment": "PATH, RUSTUP_HOME, CARGO_HOME, TMPDIR only"
-      },
-      "exit": 0,
-      "passed": 684,
-      "ignored": 35
-    },
-    {
-      "check": "virtual-quantum",
-      "command": "cargo +1.99.0 test --release -p esp32s3 --test machine --test virtual_stops",
-      "environment": {
-        "ESP32SIM_VQ_NATIVE": "1"
-      },
-      "exit": 0,
-      "passed": 41,
-      "ignored": 0
+        "build_environment": "PATH, RUSTUP_HOME, CARGO_HOME, CARGO_TARGET_DIR, RUSTUP_TOOLCHAIN, TMPDIR"
+      }
     },
     {
       "check": "wasm-build",
-      "command": "tools/wasm-build.sh",
-      "environment": {
-        "RUSTUP_TOOLCHAIN": "1.99.0"
-      },
+      "command": "RUSTUP_TOOLCHAIN=1.99.0 tools/wasm-build.sh",
       "exit": 0
     },
     {
       "check": "wasm-demos",
       "command": "node tools/wasm-test.mjs hello c3-hello c6-hello c6-energy-scan c6-contiki c6-contiki-net c6-rpl-net panel",
-      "environment": {
-        "ESP32SIM_ROM_DIR": "web/wasm/fw"
-      },
+      "exit": 0
+    },
+    {
+      "check": "privacy",
+      "command": "node tools/check-evidence-privacy.mjs",
+      "exit": 0
+    },
+    {
+      "check": "build",
+      "command": "cargo +1.99.0 build --release --bins",
+      "exit": 0
+    },
+    {
+      "check": "mutate",
+      "command": "python3 docs/evidence/i2c-addressing-timing/mutate.py",
       "exit": 0
     },
     {
@@ -114,78 +82,14 @@
       "check": "ble-abi",
       "command": "node wasm/tests/ble-api.mjs web/wasm/esp32sim.wasm web/wasm/fw/public web/wasm/fw/esp32c3_rev3_rom.elf",
       "exit": 0
-    },
-    {
-      "command": "node --test docs/evidence/perf-x5-2026-09-22/verify-results.test.mjs",
-      "exit": 0
-    },
-    {
-      "command": "node docs/evidence/perf-x5-2026-09-22/verify-results.mjs",
-      "exit": 0
-    },
-    {
-      "command": "node --test docs/evidence/perf-x5-2026-09-22/m1-before-after/verify.test.mjs",
-      "exit": 0
-    },
-    {
-      "command": "node docs/evidence/perf-x5-2026-09-22/m1-before-after/verify.mjs",
-      "exit": 0
-    },
-    {
-      "command": "node --test docs/evidence/perf-x5-2026-09-22/historical-before-after/verify.test.mjs",
-      "exit": 0
-    },
-    {
-      "command": "node docs/evidence/perf-x5-2026-09-22/historical-before-after/verify.mjs",
-      "exit": 0
-    },
-    {
-      "command": "node tools/worker-pacing-test.mjs",
-      "exit": 0
-    },
-    {
-      "command": "node tools/worker-channel-test.mjs",
-      "exit": 0
-    },
-    {
-      "command": "node --test tools/touch-input-test.mjs",
-      "exit": 0
-    },
-    {
-      "command": "node --test tools/wasm-build-policy.test.mjs",
-      "exit": 0
-    },
-    {
-      "command": "python3 -m unittest discover -s tools/browser-benchmark -p test_*.py",
-      "exit": 0
-    },
-    {
-      "command": "node --test tools/browser-benchmark/battery-failure.test.mjs tools/browser-benchmark/verdict.test.mjs tools/browser-benchmark/experiments.test.mjs tools/browser-benchmark/battery-workload.test.mjs",
-      "exit": 0
-    },
-    {
-      "check": "evidence-privacy",
-      "command": "node tools/check-evidence-privacy.mjs",
-      "exit": 0,
-      "tracked_files_checked": 1694,
-      "gzip_files_checked": 20,
-      "manual_review": "Changed source, tests, JSON and script reviewed; no personal or private source material retained."
     }
   ],
   "mutations": {
-    "command": "python3 docs/evidence/i2c-addressing-timing/mutate.py",
-    "killed": 44,
     "total": 44,
-    "profile": "test (debug)"
+    "killed": 44
   },
-  "cpu_comparison": "S3/C3/C6 hello measured (see README); Pocket Tank PENDING central measurement against the instantaneous-I2C control",
+  "cpu_comparison": "Historical tables only: fork b1c67907 and control 7b404a99. Rebase checked by disassembly; no new CPU benchmark.",
   "jit_differential": "Not required: no JIT code changed",
-  "production_wasm_sha256": "7e8d9d7e07761f70b2b9f685af71657672aad1bcbd800c0b0ed5e1674b3fa125",
-  "pocket_tank_correctness": {
-    "receipt": "pocket-tank.md",
-    "results": "pocket-tank.json",
-    "verdict": "Expected elapsed-bus-time divergence; unchanged address/data replies and exact main console/instructions when only I2C time is removed (instantaneous-I2C control).",
-    "fixture": "pocket_tank_amoled_transfers_complete_at_programmed_bus_rate",
-    "passed": true
-  }
+  "production_wasm_sha256": "acecac33250b9b4eb56558390bc60106b7c437ded45dd902925001e09a528fb0",
+  "rebase_results": "rebase-validation.json"
 }
