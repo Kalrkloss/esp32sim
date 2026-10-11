@@ -46,7 +46,7 @@
   },
   {
     "mutation": "PCM source priority",
-    "test": "lowest_matching_source_wins_and_empty_bank_is_silent",
+    "test": "lowest_matching_source_wins_and_unmatched_receivers_keep_controller_input",
     "killed": true
   },
   {
@@ -65,13 +65,18 @@
     "killed": true
   },
   {
-    "mutation": "PCM empty bank silence",
-    "test": "lowest_matching_source_wins_and_empty_bank_is_silent",
+    "mutation": "ADC rate validation",
+    "test": "stream_clock_bound_hold_and_shared_handle",
     "killed": true
   },
   {
-    "mutation": "ADC rate validation",
+    "mutation": "ADC slow streams allowed",
     "test": "stream_clock_bound_hold_and_shared_handle",
+    "killed": true
+  },
+  {
+    "mutation": "routed tone rejected",
+    "test": "tone_is_rejected_on_routed_sources",
     "killed": true
   },
   {
@@ -217,6 +222,21 @@
   {
     "mutation": "shared lazy host synchronization",
     "test": "routing_timing_dma_stall_and_reset_on_all_chips",
+    "killed": true
+  },
+  {
+    "mutation": "unmatched receiver falls back",
+    "test": "inspecting_the_bank_keeps_controller_input_on_all_chips",
+    "killed": true
+  },
+  {
+    "mutation": "unmatched receiver falls back (unit)",
+    "test": "lowest_matching_source_wins_and_unmatched_receivers_keep_controller_input",
+    "killed": true
+  },
+  {
+    "mutation": "inspection reads attached bank",
+    "test": "inspecting_the_bank_keeps_controller_input_on_all_chips",
     "killed": true
   }
 ]
