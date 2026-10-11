@@ -305,7 +305,9 @@ impl Device for ClassicGpio {
             }
         } else {
             let pending = self.gpio.changes.len();
-            self.gpio.write(Self::gpio_off(off), v);
+            // Translation stays inside the 4 KiB GPIO window. Make that bound
+            // explicit so shared Gpio::write retains fixed-chip register indexing.
+            self.gpio.write(Self::gpio_off(off) & 0xfff, v);
             self.gpio.changes.truncate(pending);
             self.gpio.out &= (1 << 40) - 1;
             self.gpio.enable &= (1 << 34) - 1;
