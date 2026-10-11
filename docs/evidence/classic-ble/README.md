@@ -32,9 +32,10 @@ apply the source replacement and run `cargo +1.99.0 test -p CRATE --lib TEST`,
 then restore it. Callback entry checks, instruction/cycle accounting, RAM
 bounds, hook registration, ELF size and reset restoration are exercised.
 
-Results: both Clippy targets pass with warnings denied; 786 CI-mode
-workspace tests and 764 plain tests (36 ignored) pass with empty HOME.
-All eight WASM scenarios and evidence privacy pass; goldens unchanged.
+Rust 1.99.0 on the ff64902a-based source: both Clippy targets pass with warnings
+denied; 816 CI-mode workspace tests and 794 plain tests
+(36 ignored) pass with empty HOME. All eight production WASM scenarios
+and evidence privacy pass. Classic and existing goldens remain byte-identical.
 
 ## CPU comparison
 
