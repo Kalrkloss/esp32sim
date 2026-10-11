@@ -211,5 +211,21 @@
     "test": "clearing_duty_start_before_the_wrap_cancels_a_pending_update",
     "crate": "esp32",
     "killed": true
+  },
+  {
+    "file": "esp-soc/src/uart.rs",
+    "mutation": "(10, 9, 4) -> (10, 9, 0)",
+    "test": "uart1_uart2_native_pads_use_iomux_function_4",
+    "crate": "esp32",
+    "target": "host_devices",
+    "killed": true
+  },
+  {
+    "file": "esp-soc/src/uart.rs",
+    "mutation": "(17, 16, 4) -> (17, 16, 0)",
+    "test": "uart1_uart2_native_pads_use_iomux_function_4",
+    "crate": "esp32",
+    "target": "host_devices",
+    "killed": true
   }
 ]

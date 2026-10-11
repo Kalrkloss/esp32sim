@@ -1,6 +1,6 @@
 # EX224: classic ESP32 peripheral adapters
 
-Base: `esp32-classic-2-core`, `d80dd522`. Adds I2C0/1, sixteen LEDC
+Base: branch `esp32-classic-2-core` (#206). Adds I2C0/1, sixteen LEDC
 channels, SPI2/3 and eight RMT channels. Board callbacks are gated while no board is attached;
 LED output uses the existing BoardModel/Ws2812Chain path. I2S RX belongs
 to EX229. No MCPWM implementation is added for classic in this part.
@@ -34,7 +34,11 @@ shared `fill_spi_w!` macro and RMT bits the shared `ws2812_bit!` decoder;
 S3/C3/C6 expand both to their previous inline code. I2C uses I2c<16> directly,
 with blocked-line timeout handled at START. Pin routes use the shared router
 over a linear copy of the classic pad registers in which the GPIO-matrix
-function carries the S3/C3/C6 number; existing chips' pin tables are unchanged.
+function carries the S3/C3/C6 number; existing chips' pin tables are unchanged. UART1/UART2 native pads use IO_MUX
+function 4 (`io_mux_reg.h:181,189,242,250`: `FUNC_SD_DATA2_U1RXD`,
+`FUNC_SD_DATA3_U1TXD`, `FUNC_GPIO16_U2RXD`, `FUNC_GPIO17_U2TXD`), as selected by
+`uart_set_pin` through `uart_pins.h`; UART0 keeps function 0. A host-device test
+covers Arduino `Serial2` on GPIO16/17 and the absence of routes on reset pads.
 The inactive-board gate has an assertion test that rejects tick/MMIO callbacks.
 
 The shared RMT engine generalization is not included: classic tests require
@@ -53,17 +57,17 @@ controls. `ledc_reg.h` lines 1464-1472 and 1666-1674 define timer resolution.
 `i2c_reg.h` defines sixteen command slots; `components/hal/esp32/include/hal/i2c_ll.h`
 defines their old opcode mapping. `clk_tree_defs.h:40` supplies the nominal
 8.5 MHz RC_FAST clock; the port corrects the prototype's 8 MHz value. Code comments cite these sources. The
-firmware boot regression uses the IDF 5.5.4 fixture and hashes from EX223.
+firmware boot regression uses the IDF 5.5.4 fixture and hashes from EX230.
 No hardware or IDF 4.4 validation is claimed.
 
 ## Checks
 
-Use the full EX223 command set on this branch, including both Clippy targets,
+Use the full EX230 command set on this branch, including both Clippy targets,
 empty-HOME workspace runs with ROM-only inputs and with no firmware variables,
 all eight production WASM scenarios, and evidence privacy. No goldens are
 regenerated. No JIT implementation changes.
 
-[Mutation table](mutations.json) records 30 mutations killed by assertion
+[Mutation table](mutations.json) records 32 mutations killed by assertion
 failures. Apply each single replacement and run
 `cargo +1.99.0 test -p CRATE --lib TEST`, or `--test TARGET TEST` for
 rows naming an integration target, then restore it. The LEDC shadow test
@@ -71,13 +75,13 @@ isolates channel updates from timer updates; neither missing latch gate is
 hidden by the other one.
 
 Results on Rust 1.99.0: both Clippy checks pass with warnings denied;
-743 CI-mode workspace tests pass; 721 plain workspace tests pass with 36
+746 CI-mode workspace tests pass; 724 plain workspace tests pass with 36
 ignored. Both workspace runs use an empty HOME. All eight production WASM
 scenarios and evidence privacy pass. Goldens remain byte-identical.
 
 ## CPU comparison
 
-Not measured separately. The stack tip, PR #212 (`bcd4df7e`, which contains this change), was measured against main `2f9443a9` with the method in the classic-host receipt (user CPU, one warmup and seven alternating load-gated pairs, identical instruction counts and console hashes):
+Not measured separately. The stack tip, PR #212 (schematik-engineering/esp32sim@bcd4df7e, branch `esp32-classic-host`, which contains this change), was measured against main `2f9443a9` with the method in the classic-host receipt (user CPU, one warmup and seven alternating load-gated pairs, identical instruction counts and console hashes):
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -86,16 +90,18 @@ Not measured separately. The stack tip, PR #212 (`bcd4df7e`, which contains this
 | S3 hello | 24.6510 (23.7365–32.0593) | 24.3939 (23.8923–27.6721) | -1.04% | 4/7 | 1789819657 | 4.96 |
 | C3 hello | 2.3837 (2.3635–2.5350) | 2.4178 (2.3742–2.5332) | +1.43% | 5/7 | 4800000000 | 3.53 |
 
-Static check (no timing): release `esp32sim` binaries from main `2f9443a9` and
-this branch were disassembled with `llvm-objdump -d` and compared function by
+That measurement predates the Oct 11 review commits and the rebase onto main `eec7b2c9`. Those commits add no S3/C3/C6 execution-path instructions; the static check below was repeated on the rebased stack tip (#211).
+
+Static check (no timing): release `esp32sim` binaries from main `eec7b2c9` and
+the rebased stack tip were disassembled with `llvm-objdump -d` and compared function by
 function after normalising addresses, alignment `nop`s, adrp page offsets and
 linker-chosen symbol aliases. The S3/C3/C6 execution path is instruction-identical
 to main: `Machine::run`, `step_core`, each `SocBus` `tick` and `next_deadline`, S3 `tick_impl`,
 `refresh_tick_budget` and GDMA engines, the MMIO dispatchers, `TimerGroup::tick`, and the UART,
-TIMG, SHA, LEDC and RMT tick and register paths, and RTC_CNTL. Remaining differences: shared `Gpio::write` (`ubfx` for `lsr`, inherited from EX223); `I2c::write`, whose bounds-check panic calls share one source location in the macro
+TIMG, SHA, LEDC and RMT tick and register paths, and RTC_CNTL. Remaining differences: shared `Gpio::write` (`ubfx` for `lsr`, inherited from EX230); `I2c::write`, whose bounds-check panic calls share one source location in the macro
 expansion, so three merge and the END arm moves; `Ledc::output`, the host PWM query, and the `Peripherals::new` constructors.
 
 ## Privacy and limits
 
 Only source expressions, test names and outcomes are retained. No private
-firmware, captures, machine identifiers or timing samples are included.
+firmware, captures or machine identifiers are included.
