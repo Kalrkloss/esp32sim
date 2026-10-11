@@ -67,25 +67,31 @@ per-tick source scan. An inline DPORT clock/channel gate guards receive work.
 No per-tick work is added to S3/C3/C6.
 
 Static check (no timing): fat-LTO release `esp32sim` binaries (`cargo +1.99.0 build
---release -p esp32sim --bins`) of `schematik-engineering/esp32sim@2b58a9be`, #202
-(`schematik-engineering/esp32sim@38124b81`) and main `eec7b2c9` were disassembled
-with `llvm-objdump -d` and compared function by function. Addresses, alignment
-`nop`s, adrp page offsets and linker-chosen symbol aliases were normalised. The
-comparison covers 113 S3/C3/C6 hot functions: `Machine::run`/`run_modeled`/
-`run_unmodeled`/`step_core`, bus `tick`/`tick_impl`/`next_deadline`/
-`refresh_tick_budget`/`periph_read`/`periph_write`, GDMA engines and
-`esp_periph::gdma`, `refresh_irq`, and the shared device `tick`/`read`/`write`
-paths. Against #202, 104 are instruction-identical. The nine that differ:
+--release -p esp32sim --bins`) of upstream main `ff64902a` and branch
+`esp32-classic-host-ff` at `schematik-engineering/esp32sim@d7b3109a0125ad55bebe19a4b05b2f5ddfef43f8`
+were disassembled with `llvm-objdump -d --demangle --no-show-raw-insn`.
+The comparison normalises addresses, alignment `nop`s, adrp page offsets and
+linker-chosen aliases whose target bodies have the same shape. Of 113 selected
+S3/C3/C6 hot functions, 104 match and nine differ; none are missing. Binary hashes
+and the complete differing-function list are in [codegen.json](codegen.json).
 
-- C3/C6 `i2s_receive` and S3 `dma_i2s_port` store the two BCLK/WS indices. They
-  run only while RX is active.
-- `Gpio::write`, `I2c::write`, `RtcCntl::write` and the three
-  `apply_due_script_events` differ as they already do on #211 (EX228 receipt).
+- C3/C6 `i2s_receive` and S3 `dma_i2s_port` materialise the explicit BCLK/WS
+  indices needed for classic's non-adjacent signals. These changes execute only
+  in active RX paths; the other chips retain their original signal values.
+- `Gpio::write` uses `ubfx` instead of `lsr` for a register index, at the same
+  instruction count. `I2c::write` reorders its END arm and merges equivalent
+  bounds-panic sites from the macro expansion. `RtcCntl::write` has the inherited
+  classic-stack register-write code-generation differences.
+- The three `apply_due_script_events` functions have the inherited classic touch
+  event variant in the dispatch enum; this changes dispatch code when script
+  events are applied, not the no-event execution loop.
 
-Against main, the differences are the ones #202 already has, plus `Gpio::write`
-and `I2c::write` from the classic stack. Classic's adapter writes the shared I2S
-model through `Device::write`, like the other chips' dispatch, so the shared
-inherent writer keeps one caller.
+`Machine::run`/`run_modeled`/`run_unmodeled`/`step_core`, the selected bus tick,
+deadline and MMIO-dispatch functions, shared GDMA receive/scatter, interrupt
+refresh and the other selected peripheral tick paths match main. The nine
+exceptions are the same functions documented on the pre-rebase stack; this is
+not a claim that every MMIO or active-device instruction matches main, and no
+new CPU timing was collected.
 
 ## Sources and limits
 
@@ -111,8 +117,8 @@ or private capture is involved.
 
 ## Verification
 
-Commands: the full [EX230 Rust 1.99.0 set](../classic-core/README.md) on
-`schematik-engineering/esp32sim@2b58a9be` (later commits change docs only): both
+Commands: the full [EX230 Rust 1.99.0 set](../classic-core/README.md), with the
+validated source revision and counts in [checks.json](checks.json): both
 Clippy targets with warnings denied, empty-HOME CI-mode
 (`ESP32SIM_ROM_DIR=web/wasm/fw`, `--include-ignored --skip external_`) and plain
 release workspace tests, production WASM build and the eight required scenarios,
@@ -146,7 +152,7 @@ Not re-measured on this head. An earlier head of branch `esp32-classic-host`,
 `schematik-engineering/esp32sim@bcd4df7e`, was measured against main `2f9443a9`.
 It predates the rebase onto `eec7b2c9`, the updated #201/#202 and the Oct 11
 review commits. Classic code is unused in these workloads. The static check above
-covers its explicitly named pre-rebase revisions, not this head.
+covers the ff64902a-based source without making a new timing claim.
 
 Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 2f9443a9 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
