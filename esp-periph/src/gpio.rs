@@ -115,6 +115,9 @@ impl Gpio {
             _ => self.ram.read(off),
         }
     }
+    // Keep the Device wrapper specialized to its bounded register offset even
+    // when another chip adapter also calls this shared implementation.
+    #[inline(always)]
     pub fn write(&mut self, off: u32, v: u32) {
         let (old, old_enable) = (self.out, self.enable);
         match off {
