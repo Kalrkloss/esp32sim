@@ -91,13 +91,6 @@
     "killed": true
   },
   {
-    "file": "esp32/src/soc.rs",
-    "mutation": "self.periph.adc.restore_inputs(old.adc); -> drop(old.adc);",
-    "test": "reboot_preserves_host_analog_input_but_resets_dac_registers",
-    "crate": "esp32",
-    "killed": true
-  },
-  {
     "file": "esp32/src/periph.rs",
     "mutation": "self.rtc_pads & (1 << pin) == 0 && -> true &&",
     "test": "rtc_mux_disconnects_digital_gpio_and_exposes_nominal_adc_vref",
@@ -116,13 +109,6 @@
     "mutation": "self.gpio.status = status; false -> self.gpio.status = status | self.gpio.status; false",
     "test": "rtc_mux_disconnects_digital_gpio_and_exposes_nominal_adc_vref",
     "crate": "esp32",
-    "killed": true
-  },
-  {
-    "file": "esp-soc/src/machine.rs",
-    "mutation": "if pn >= 64 -> if pn > 64",
-    "test": "analog_scripts_validate_inputs_and_keep_panel_touch_separate",
-    "crate": "esp32sim",
     "killed": true
   },
   {
@@ -158,6 +144,48 @@
     "mutation": "out |= convert(); -> out |= 0;",
     "test": "sens_edges_preserve_only_the_selected_hardware_result",
     "crate": "esp-periph",
+    "killed": true
+  },
+  {
+    "file": "esp32/src/periph.rs",
+    "mutation": "mmio::write32(self, addr, v); (RTC_IO arm) -> self.adc.rtc_io.write(addr - 0x3ff4_8400, v);",
+    "test": "sens_and_rtc_io_accesses_reach_mmio_probes",
+    "crate": "esp32",
+    "killed": true
+  },
+  {
+    "file": "esp32/src/periph.rs",
+    "mutation": "0x48 \"SENS\" alias (adc) delta -0x800 @ 0x800..=0x8ff => []; -> (removed)",
+    "test": "sens_and_rtc_io_accesses_reach_mmio_probes",
+    "crate": "esp32",
+    "killed": true
+  },
+  {
+    "file": "esp32/src/periph.rs",
+    "mutation": "self.adc = adc; -> drop(adc);",
+    "test": "reboot_keeps_rtc_domain_analog_registers_and_host_inputs",
+    "crate": "esp32",
+    "killed": true
+  },
+  {
+    "file": "esp32/src/periph.rs",
+    "mutation": "self.gpio.rtc_pads = self.adc.rtc_pad_mask(); (restore_rtc_analog) -> (removed)",
+    "test": "reboot_keeps_rtc_domain_analog_registers_and_host_inputs",
+    "crate": "esp32",
+    "killed": true
+  },
+  {
+    "file": "esp32/src/soc.rs",
+    "mutation": "crate::adc::touch_pin(pin) -> pin < 64",
+    "test": "analog_scripts_validate_inputs_and_keep_panel_touch_separate",
+    "crate": "esp32sim",
+    "killed": true
+  },
+  {
+    "file": "esp-soc/src/soc.rs",
+    "mutation": "fn has_touch_pad(&self, _pin: u8) -> bool { false } -> { true }",
+    "test": "analog_scripts_validate_inputs_and_keep_panel_touch_separate",
+    "crate": "esp32sim",
     "killed": true
   }
 ]

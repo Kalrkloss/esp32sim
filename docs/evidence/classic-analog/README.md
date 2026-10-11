@@ -1,6 +1,6 @@
 # EX227: classic ADC, DAC and touch pads
 
-Base: `esp32-classic-5-wifi`, `d538ea84`. Builds on EX226. Reuses main's
+Base: branch `esp32-classic-5-wifi` (#209). Builds on EX226. Reuses main's
 AnalogInputs, raw-count validation, sample observations and waveform timing.
 Classic supplies two SAR register layouts, eighteen ADC pads, two DACs,
 ten touch pads and RTC mux isolation. The shared script accepts
@@ -24,27 +24,38 @@ The voltage model inverts the nominal line-fitting coefficients with a
 high-range LUT correction. Touch counts (300 touched, 1000 released),
 conversion completion and nominal DAC millivolts are inferred. No hardware
 calibration, ADC DMA/continuous mode, DAC cosine generation or touch IRQ
-model is claimed. Host analog and touch state survive reset; registers reset.
+model is claimed. SENS and RTC_IO are RTC-domain registers: like RTC_CNTL's
+register RAM they survive a guest reboot, including touch-timer and DAC power
+state, together with host analog and touch inputs.
+
+SENS (`0x3ff4_8800`) and RTC_IO (`0x3ff4_8400`) are mounted as range-limited
+entries of block `0x48` in the classic `device_set!` table, so `mmio::read32`/
+`write32` record them for `Wants::MMIO` probes and `log_all` tracing. The write
+intercept keeps only the RTC pad isolation update. `rtc_cntl_reg.h:246,277-279`
+defines `RTC_CNTL_TOUCH_SLP_TIMER_EN` (STATE0 bit 23); `efuse_reg.h:169,177-183`
+defines `EFUSE_RD_ADC_VREF` in `EFUSE_BLK0_RDATA4_REG` bits 12:8, whose `0x10`
+is the nominal 1100 mV sign-magnitude zero. `touchpad` script lines are
+rejected for GPIOs without a capacitive pad and on S3/C3/C6.
 
 ## Verification
 
-Run the full [EX223 check set](../classic-core/README.md), including empty-HOME
+Run the full [EX230 check set](../classic-core/README.md), including empty-HOME
 workspace runs and all eight WASM scenarios. Inherited fixture/ROM input
 hashes are recorded there. Existing goldens remain unchanged; no JIT changes.
 
-[Mutation table](mutations.json) contains 23 killed replacements covering
+[Mutation table](mutations.json) contains 27 killed replacements covering
 start edges, controller selection, pad cardinality, power, width/attenuation,
-DAC gates, touch routing, timestamp sampling, RTC GPIO isolation, reset and
-script validation. Apply each row and run
+DAC gates, touch routing, timestamp sampling, RTC GPIO isolation, reboot
+retention, MMIO probe visibility and script validation. Apply each row and run
 `cargo +1.99.0 test -p CRATE --lib TEST`, then restore it.
 
-Results on Rust 1.99.0: both required Clippy checks pass; 774 CI-mode
-workspace tests and 752 plain tests (36 ignored) pass with empty HOME.
+Results on Rust 1.99.0: both required Clippy checks pass; 779 CI-mode
+workspace tests and 757 plain tests (36 ignored) pass with empty HOME.
 All eight WASM scenarios and evidence privacy pass. Goldens unchanged.
 
 ## CPU comparison
 
-Not measured separately. The stack tip, PR #212 (`bcd4df7e`, which contains this change), was measured against main `2f9443a9` with the method in the classic-host receipt (user CPU, one warmup and seven alternating load-gated pairs, identical instruction counts and console hashes):
+Not measured separately. The stack tip, PR #212 (schematik-engineering/esp32sim@bcd4df7e, branch `esp32-classic-host`, which contains this change), was measured against main `2f9443a9` with the method in the classic-host receipt (user CPU, one warmup and seven alternating load-gated pairs, identical instruction counts and console hashes):
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -53,13 +64,15 @@ Not measured separately. The stack tip, PR #212 (`bcd4df7e`, which contains this
 | S3 hello | 24.6510 (23.7365–32.0593) | 24.3939 (23.8923–27.6721) | -1.04% | 4/7 | 1789819657 | 4.96 |
 | C3 hello | 2.3837 (2.3635–2.5350) | 2.4178 (2.3742–2.5332) | +1.43% | 5/7 | 4800000000 | 3.53 |
 
-Static check (no timing): release `esp32sim` binaries from main `2f9443a9` and
-this branch were disassembled with `llvm-objdump -d` and compared function by
+That measurement predates the Oct 11 review commits and the rebase onto main `eec7b2c9`. Those commits add no S3/C3/C6 execution-path instructions; the static check below was repeated on the rebased stack tip (#211).
+
+Static check (no timing): release `esp32sim` binaries from main `eec7b2c9` and
+the rebased stack tip were disassembled with `llvm-objdump -d` and compared function by
 function after normalising addresses, alignment `nop`s, adrp page offsets and
 linker-chosen symbol aliases. The S3/C3/C6 execution path is instruction-identical
 to main: `Machine::run`, `step_core`, each `SocBus` `tick` and `next_deadline`, S3 `tick_impl`,
 `refresh_tick_budget` and GDMA engines, the MMIO dispatchers, `TimerGroup::tick`, and the UART,
-TIMG, SHA, LEDC and RMT tick and register paths. Remaining differences: shared `Gpio::write` (`ubfx` for `lsr`, inherited from EX223); `I2c::write`, whose bounds-check panic calls share one source location in the macro
+TIMG, SHA, LEDC and RMT tick and register paths. Remaining differences: shared `Gpio::write` (`ubfx` for `lsr`, inherited from EX230); `I2c::write`, whose bounds-check panic calls share one source location in the macro
 expansion, so three merge and the END arm moves; `Ledc::output`, the host PWM query, and the `Peripherals::new` constructors; drop glue for `StationLink` and `Tcp`; the analog I2C masters keep main's code
 because `Regi2c` is inlined into each chip; `RtcCntl::write` places the SENS one-shot START-low block differently (five fewer
 instructions; the arm runs only on ADC one-shot writes); `apply_due_script_events` and `ScriptAction` clone, format and drop gain the `TouchPad`
