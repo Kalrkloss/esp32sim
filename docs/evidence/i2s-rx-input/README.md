@@ -178,6 +178,13 @@ Disassembly of `cargo +1.99.0 build --release --bins` output (fat LTO) via
 | C6 `SocBus::periph_write` | 1594 → 1656 | I2S block arm; RX_CONF shares the SPI effect test |
 | S3 `SocBus::periph_write_inner` | 1632 → 1664 | field offsets +16 bytes; I2S write arms longer |
 
+October 11 review changes (24-bit packing, RX_EOF_NUM reset, `read_with`) against
+the measured code (`52d09c73`, same diff as `c4ffbf4d`): normalised release disassembly
+is identical for 1944 of 1948 functions, including S3 `tick_impl`, `dma_i2s_port` and
+`refresh_tick_budget` and C3/C6 `tick` and `next_deadline`. The differences are
+`I2s::rx_data`, which runs only while RX is active, and the three `Peripherals::new`
+constructors (RX_EOF_NUM default).
+
 ## Limits
 
 No microphone firmware golden, hardware audio capture, pin serializer, filter,

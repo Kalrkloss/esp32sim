@@ -140,11 +140,7 @@ impl I2s {
         let (cpu_hz, mono) = (self.cpu_hz, self.rx_conf & (1 << 5) != 0);
         // RX_24_FILL_EN (RX_CONF bit 16, reset 0): 0 packs a 24-bit sample in 3 bytes, the
         // size IDF's i2s_get_buf_size allocates; 1 pads it to a 32-bit word.
-        let width = match bits {
-            16 => 2,
-            24 if self.rx_conf & (1 << 16) == 0 => 3,
-            _ => 4,
-        };
+        let packed24 = bits == 24 && self.rx_conf & (1 << 16) == 0;
         let rx = self.rx.get_or_insert_with(Box::default);
         rx.acc += cycles * u64::from(rate);
         let frames = rx.acc / cpu_hz;
@@ -158,8 +154,13 @@ impl I2s {
                     continue;
                 }
                 // Left-aligned: the sample is the top 16 bits of every container.
-                let word = (i32::from(sample) << 16).to_le_bytes();
-                bytes.extend_from_slice(&word[4 - width..]);
+                if bits == 16 {
+                    bytes.extend_from_slice(&sample.to_le_bytes());
+                } else if packed24 {
+                    bytes.extend_from_slice(&(i32::from(sample) << 8).to_le_bytes()[..3]);
+                } else {
+                    bytes.extend_from_slice(&(i32::from(sample) << 16).to_le_bytes());
+                }
                 if mono {
                     break;
                 }
