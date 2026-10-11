@@ -6,13 +6,13 @@
     "new": "if false {",
     "command": "cargo +1.99.0 test -p esp32c3 -p esp32c6 --test sha_dma",
     "killed_by": [
-      "cycle_detection_is_independent_of_owner_checking",
       "sha_before_gdma_waits_for_channel_and_never_ticks",
-      "owner_check_is_optional_and_requested_length_bounds_input",
-      "invalid_chains_raise_descriptor_error_without_hashing",
-      "one_dma_request_hashes_every_block_without_reinitializing",
       "dma_continue_preserves_the_previous_hash_state",
-      "sha256_split_descriptor_completes_on_start_write"
+      "invalid_chains_raise_descriptor_error_without_hashing",
+      "sha256_split_descriptor_completes_on_start_write",
+      "cycle_detection_is_independent_of_owner_checking",
+      "owner_check_is_optional_and_requested_length_bounds_input",
+      "one_dma_request_hashes_every_block_without_reinitializing"
     ],
     "exit": 101
   },
@@ -23,13 +23,13 @@
     "new": "if false {",
     "command": "cargo +1.99.0 test -p esp32c3 -p esp32c6 --test sha_dma",
     "killed_by": [
+      "invalid_chains_raise_descriptor_error_without_hashing",
+      "owner_check_is_optional_and_requested_length_bounds_input",
+      "sha256_split_descriptor_completes_on_start_write",
       "cycle_detection_is_independent_of_owner_checking",
       "sha_before_gdma_waits_for_channel_and_never_ticks",
-      "one_dma_request_hashes_every_block_without_reinitializing",
-      "owner_check_is_optional_and_requested_length_bounds_input",
-      "invalid_chains_raise_descriptor_error_without_hashing",
-      "sha256_split_descriptor_completes_on_start_write",
-      "dma_continue_preserves_the_previous_hash_state"
+      "dma_continue_preserves_the_previous_hash_state",
+      "one_dma_request_hashes_every_block_without_reinitializing"
     ],
     "exit": 101
   },
@@ -62,11 +62,11 @@
     "new": "let mut first = false;",
     "command": "cargo +1.99.0 test -p esp32c3 -p esp32c6 --test sha_dma",
     "killed_by": [
-      "dma_continue_preserves_the_previous_hash_state",
-      "owner_check_is_optional_and_requested_length_bounds_input",
+      "one_dma_request_hashes_every_block_without_reinitializing",
       "sha256_split_descriptor_completes_on_start_write",
       "sha_before_gdma_waits_for_channel_and_never_ticks",
-      "one_dma_request_hashes_every_block_without_reinitializing"
+      "owner_check_is_optional_and_requested_length_bounds_input",
+      "dma_continue_preserves_the_previous_hash_state"
     ],
     "exit": 101
   },
@@ -99,8 +99,8 @@
     "new": "self.dma_pending = true;",
     "command": "cargo +1.99.0 test -p esp32c3 -p esp32c6 --test sha_dma",
     "killed_by": [
-      "one_dma_request_hashes_every_block_without_reinitializing",
-      "dma_continue_preserves_the_previous_hash_state"
+      "dma_continue_preserves_the_previous_hash_state",
+      "one_dma_request_hashes_every_block_without_reinitializing"
     ],
     "exit": 101
   },
@@ -111,9 +111,9 @@
     "new": "self.busy = true;\n        let want",
     "command": "cargo +1.99.0 test -p esp32c3 -p esp32c6 --test sha_dma",
     "killed_by": [
-      "invalid_chains_raise_descriptor_error_without_hashing",
+      "sha256_split_descriptor_completes_on_start_write",
       "dma_continue_preserves_the_previous_hash_state",
-      "sha256_split_descriptor_completes_on_start_write"
+      "invalid_chains_raise_descriptor_error_without_hashing"
     ],
     "exit": 101
   },
@@ -135,8 +135,8 @@
     "new": "memory.out_channel().int_raw |= 0;",
     "command": "cargo +1.99.0 test -p esp32c3 -p esp32c6 --test sha_dma",
     "killed_by": [
-      "cycle_detection_is_independent_of_owner_checking",
-      "invalid_chains_raise_descriptor_error_without_hashing"
+      "invalid_chains_raise_descriptor_error_without_hashing",
+      "cycle_detection_is_independent_of_owner_checking"
     ],
     "exit": 101
   },
@@ -291,8 +291,8 @@
     "new": "self.ram.read(off)",
     "command": "cargo +1.99.0 test -p esp32c6 --test wifi",
     "killed_by": [
-      "txdc_comparator_outputs_ignore_software_writes",
-      "txdc_and_calibration_status_follow_start_without_a_clock"
+      "txdc_and_calibration_status_follow_start_without_a_clock",
+      "txdc_comparator_outputs_ignore_software_writes"
     ],
     "exit": 101
   },
@@ -463,8 +463,8 @@
     "new": "0x8e \"ECC_MULT\"",
     "command": "cargo +1.99.0 test -p esp32c6 --test ecc",
     "killed_by": [
-      "ecc_mmio_routes_cached_interrupts_without_clock_work",
-      "pcr_ecc_reset_pulse_clears_the_accelerator"
+      "pcr_ecc_reset_pulse_clears_the_accelerator",
+      "ecc_mmio_routes_cached_interrupts_without_clock_work"
     ],
     "exit": 101
   },
@@ -491,14 +491,25 @@
     "exit": 101
   },
   {
+    "mutation": "I2S allocation prefix",
+    "file": "esp32c6/src/periph.rs",
+    "old": "    pub i2s0: esp_periph::I2s,\n    pub ecc: crate::ecc::Ecc,",
+    "new": "    pub ecc: crate::ecc::Ecc,\n    pub i2s0: esp_periph::I2s,",
+    "command": "cargo +1.99.0 test -p esp32c6 --test layout",
+    "killed_by": [
+      "optional_devices_preserve_the_existing_i2s_indirection"
+    ],
+    "exit": 101
+  },
+  {
     "mutation": "ECC interrupt routing",
     "file": "esp32c6/src/periph.rs",
-    "old": "(ecc) => [src::ECC]",
-    "new": "(ecc) => []",
+    "old": "(optional.ecc) => [src::ECC]",
+    "new": "(optional.ecc) => []",
     "command": "cargo +1.99.0 test -p esp32c6 --test ecc",
     "killed_by": [
-      "ecc_mmio_routes_cached_interrupts_without_clock_work",
-      "pcr_ecc_reset_pulse_clears_the_accelerator"
+      "pcr_ecc_reset_pulse_clears_the_accelerator",
+      "ecc_mmio_routes_cached_interrupts_without_clock_work"
     ],
     "exit": 101
   }

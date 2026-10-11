@@ -53,7 +53,8 @@ CASES = [
     ("ECC MMIO mapping", "esp32c6/src/periph.rs", '0x8b "ECC_MULT"', '0x8e "ECC_MULT"', ["-p", "esp32c6", "--test", "ecc"]),
     ("PCR ECC reset pulse", "esp32c6/src/periph.rs", "if off == 0xd8 && v & 2 != 0 {", "if false {", ["-p", "esp32c6", "--test", "ecc"]),
     ("PCR reset dispatch", "esp32c6/src/periph.rs", " | WriteEffect::PERIPH_RESET) {", ") {", ["-p", "esp32c6", "--test", "ecc"]),
-    ("ECC interrupt routing", "esp32c6/src/periph.rs", '(ecc) => [src::ECC]', '(ecc) => []', ["-p", "esp32c6", "--test", "ecc"]),
+    ("I2S allocation prefix", "esp32c6/src/periph.rs", "    pub i2s0: esp_periph::I2s,\n    pub ecc: crate::ecc::Ecc,", "    pub ecc: crate::ecc::Ecc,\n    pub i2s0: esp_periph::I2s,", ["-p", "esp32c6", "--test", "layout"]),
+    ("ECC interrupt routing", "esp32c6/src/periph.rs", '(optional.ecc) => [src::ECC]', '(optional.ecc) => []', ["-p", "esp32c6", "--test", "ecc"]),
 ]
 
 firmware = sys.argv[1:] == ["--firmware"]

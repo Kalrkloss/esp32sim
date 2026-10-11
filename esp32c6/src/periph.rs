@@ -329,6 +329,14 @@ pub fn efuse_c6(mac: [u8; 6], rev_major: u32, rev_minor: u32, pkg: u32, blk_majo
     e
 }
 
+/// Cold devices share one allocation so unused ECC does not grow the hot bus.
+/// I2S stays at offset zero: its existing data path keeps the same indirection.
+#[repr(C)]
+pub struct OptionalPeripherals {
+    pub i2s0: esp_periph::I2s,
+    pub ecc: crate::ecc::Ecc,
+}
+
 pub struct Peripherals {
     pub adc: esp_periph::sar_adc::SarAdc,
     pub uart: [Uart; 2],
@@ -369,12 +377,10 @@ pub struct Peripherals {
     last_status: [u32; 4],
     pub ledc: Ledc,
     pub mcpwm: Mcpwm,
-    /// Boxed: the controller is cold unless firmware uses I2S.
-    pub i2s0: Box<esp_periph::I2s>,
+    /// Boxed: these devices are cold unless firmware configures them.
+    pub optional: Box<OptionalPeripherals>,
     /// SPI command or I2S RX pending, refreshed only when either changes.
     pub work_pending: bool,
-    /// Boxed: Peripherals grows by one pointer, not by the ECC parameter RAM.
-    pub ecc: Box<crate::ecc::Ecc>,
 }
 
 // Every peripheral, where it sits (4 KB block number from 0x60000000), and its interrupt sources.
@@ -390,7 +396,7 @@ device_set! { Peripherals; inline always; clock: (clock) CPU_HZ, [(ClockDomain::
     0x08 "TIMG0" (timg[0]) => [src::TG0_T0];
     0x09 "TIMG1" (timg[1]) => [src::TG1_T0];
     0x0a "SYSTIMER" (systimer) => [src::SYSTIMER_T0, src::SYSTIMER_T1, src::SYSTIMER_T2];
-    0x0c "I2S" optional (i2s0) => [src::I2S];
+    0x0c "I2S" optional (optional.i2s0) => [src::I2S];
     0x0f "USB_SERIAL_JTAG" (usb) => [src::USB_SERIAL_JTAG];
     0x10 "INTMTX" (intmtx) => [];
     0x14 "MCPWM" optional (mcpwm) => [src::MCPWM0];
@@ -401,7 +407,7 @@ device_set! { Peripherals; inline always; clock: (clock) CPU_HZ, [(ClockDomain::
     0x89 "SHA" (sha) => [];
     0x8a "RSA" (rsa) => [src::RSA];
     // IDF v5.5.5 soc/esp32c6/register/soc/reg_base.h:44; include/soc/interrupts.h:98.
-    0x8b "ECC_MULT" optional (ecc) => [src::ECC];
+    0x8b "ECC_MULT" optional (optional.ecc) => [src::ECC];
     0x90 "IO_MUX" (io_mux) => [];
     0x91 "GPIO" (gpio) => [src::GPIO];
     0x96 "PCR" (pcr) => [];
@@ -442,12 +448,12 @@ impl Peripherals {
             efuse: efuse_c6(mac, 0, 1, 1, 0, 3),
             spi0: SpiMemC6({ let mut s = SpiMem::new(false); s.has_psram = false; s }),
             spi1: SpiMemC6({ let mut s = SpiMem::new(true); s.has_psram = false; s }),   // no PSRAM on the C6
-            sha: Sha::new(), aes: Aes::new(), rsa: Rsa::new(), ecc: Default::default(),
+            sha: Sha::new(), aes: Aes::new(), rsa: Rsa::new(),
             rmt: RmtC6::new(CPU_HZ), gdma: GdmaC6::new(), spi2: GpSpi::new(), radio: Ieee802154::new(), modem_bb: ModemBb::new(), wifi_mac: WifiMac::new(),
             intmtx: IntMatrix::new(), intc: Intc::new(), cache: Cache::new(), lpsys: LpSys::new(), pcr: Pcr::new(), ana_mst: AnaMst::new(), assist_debug: AssistDebug::new(),
             rng: Rng::new(), cpu_sub: RegRam::new(),
             misc: Misc::new(), spi_exec: false, clock: Self::new_clock(),
-            i2s0: Box::new(esp_periph::I2s::new(CPU_HZ)), work_pending: false,
+            optional: Box::new(OptionalPeripherals { i2s0: esp_periph::I2s::new(CPU_HZ), ecc: Default::default() }), work_pending: false,
             last_status: [0; 4],
         }
     }
@@ -516,13 +522,13 @@ impl Peripherals {
         }
     }
 
-    pub fn refresh_work(&mut self) { self.work_pending = self.spi_exec || self.i2s0.rx_running(); }
+    pub fn refresh_work(&mut self) { self.work_pending = self.spi_exec || self.optional.i2s0.rx_running(); }
 
     /// PCR reset pulse for a peripheral modeled here; only ECC uses it so far.
     #[cold]
     #[inline(never)]
     fn pcr_reset(&mut self) {
-        self.ecc.reset();
+        self.optional.ecc.reset();
         self.refresh_optional(0x8b);
     }
 

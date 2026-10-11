@@ -443,13 +443,13 @@ impl SocBus {
     // ESP-IDF v5.5.5 components/soc/esp32c6/include/soc/gdma_channel.h:13, I2S0 trigger 3.
     fn i2s_rx_step(&mut self, cycles: u64) {
         let Some(ch) = self.periph.gdma.gdma.in_channel_for(3) else { return };
-        self.periph.i2s0.rx_pcr_clock(self.periph.pcr.read(0x78), self.periph.pcr.read(0x7c));
+        self.periph.optional.i2s0.rx_pcr_clock(self.periph.pcr.read(0x78), self.periph.pcr.read(0x7c));
         let bytes = self.i2s_receive(cycles);
-        let eof = self.periph.i2s0.read(0x64);
+        let eof = self.periph.optional.i2s0.read(0x64);
         let mut channel = self.periph.gdma.gdma.inp[ch];
         let mut irq_changed = false;
         let _ = channel.receive(self, &bytes, Some(eof), false, Self::is_periph, &mut irq_changed);
-        self.periph.i2s0.recycle_rx_buffer(bytes);
+        self.periph.optional.i2s0.recycle_rx_buffer(bytes);
         self.irq_dirty |= irq_changed;
         self.periph.gdma.gdma.inp[ch] = channel;
     }
@@ -459,16 +459,16 @@ impl SocBus {
     #[inline(never)]
     fn i2s_receive(&mut self, cycles: u64) -> Vec<u8> {
         let signals = esp_periph::i2s::RxSignals { data: 15, input_select_bit: 7, output_mask: 0x1ff };
-        let mut bank = self.periph.i2s0.take_pcm_bank();
-        let bytes = self.periph.i2s0.receive(cycles, self.cycles, false, &self.periph.gpio, signals, bank.as_deref_mut());
-        self.periph.i2s0.restore_pcm_bank(bank);
+        let mut bank = self.periph.optional.i2s0.take_pcm_bank();
+        let bytes = self.periph.optional.i2s0.receive(cycles, self.cycles, false, &self.periph.gpio, signals, bank.as_deref_mut());
+        self.periph.optional.i2s0.restore_pcm_bank(bank);
         bytes
     }
 
     #[inline(never)]
     fn pending_work(&mut self, cycles: u32) {
         if self.periph.spi_exec { self.run_spi(); }
-        if self.periph.i2s0.rx_running() { self.i2s_rx_step(u64::from(cycles)); }
+        if self.periph.optional.i2s0.rx_running() { self.i2s_rx_step(u64::from(cycles)); }
     }
 
     fn devices(&mut self, cycles: u32) {

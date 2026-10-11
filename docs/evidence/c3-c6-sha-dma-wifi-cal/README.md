@@ -204,6 +204,7 @@ each prevents the corresponding firmware golden from passing.
 | ECC MMIO mapping | `ecc_mmio_routes_cached_interrupts_without_clock_work` |
 | PCR ECC reset pulse | `pcr_ecc_reset_pulse_clears_the_accelerator` |
 | PCR reset dispatch | `pcr_ecc_reset_pulse_clears_the_accelerator` |
+| I2S allocation prefix | `optional_devices_preserve_the_existing_i2s_indirection` |
 | ECC interrupt routing | `ecc_mmio_routes_cached_interrupts_without_clock_work` |
 
 ## Verification
@@ -229,16 +230,33 @@ env -i PATH="$PATH" HOME="$PWD/target/ex220-home" TMPDIR="$PWD/target/ex220-tmp"
   cargo +1.99.0 test --release --workspace
 ```
 
-Final results: **734** CI-policy tests pass; **711** plain tests pass with
+Final results: **736** CI-policy tests pass; **713** plain tests pass with
 **37** ignored. Both Clippy targets, the WASM build, all eight requested WASM
-scenarios, evidence privacy, **43/43** rule mutations and **5/5** firmware
+scenarios, evidence privacy, **44/44** rule mutations and **5/5** firmware
 mutations pass.
 
 ## CPU comparison
 
+### Restacked head versus parent #201
+
+The central load-gated run of `schematik-engineering/esp32sim@3d9eee3c`
+(branch `c3-c6-sha-dma-wifi-cal`) against parent
+`schematik-engineering/esp32sim@baf9845b` found C6 hello **1.37% slower in
+7/7 pairs**, 3.0448 → 3.0866 median user CPU seconds. Guest instruction counts
+and console hashes matched. This is a flagged idle cost, not a pass or a
+proven layout-only timing effect. C3 was −0.89% (1/7 slower), S3 +0.09%
+(5/7), and Pocket Tank −0.36% (4/7). The samples and conditions are retained
+in [cpu-parent.md](cpu-parent.md).
+
+The size-neutral cold-device allocation below restores the parent's hot
+layout and execution-loop code. **The fix is pending central remeasurement.**
+No CPU benchmark was run for the layout fix.
+
+### Historical pre-restack measurement
+
 Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 954f2a68 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
-Measured on `schematik-engineering/esp32sim@e3aefb93` (branch `c3-c6-sha-dma-wifi-cal`, before the rebase onto #201 and the shared-walker change) against main `954f2a68`. User CPU seconds. The current head was not re-timed; see the static comparison below.
+Measured on `schematik-engineering/esp32sim@e3aefb93` (branch `c3-c6-sha-dma-wifi-cal`, before the rebase onto #201 and the shared-walker change) against main `954f2a68`. User CPU seconds. These historical samples do not describe the restacked head or its layout fix.
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -311,48 +329,60 @@ Status: PASS. Flags: —.
 
 Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above.
 
-An MMIO write tests SHA `dma_pending` once; the SHA/GDMA address filter and
-the transfer are in a `#[cold]`, `#[inline(never)]` C3/C6 helper. Calibration
-has no clock, timer, deadline or added field. ECC is boxed, so C6 `Peripherals`
-grows by one pointer; it uses the existing optional source cache on MMIO
-writes and never joins the periodic device list. No per-tick transfer check is
-added. S3's DMA call sites are unchanged.
+### Release disassembly and native layout
 
-Static code comparison of the current head: `cargo +1.99.0 build --release -p esp32sim --bins`
-(aarch64-apple-darwin, the workspace's fat-LTO release profile) at the base
-`baf9845b` and at this branch's code head, `objdump -d --demangle`, compared per
-function with addresses, branch targets and page offsets normalised. 1868
-functions are identical and 65 differ. All but five of the differing functions are C6
-functions, and the C6 ones differ as described below. The other five:
+Built parent `schematik-engineering/esp32sim@baf9845b`, measured head
+`schematik-engineering/esp32sim@3d9eee3c`, and this commit's source with
+`cargo +1.99.0 build --release -p esp32sim --bins`, separate target directories,
+`aarch64-apple-darwin`, and the workspace fat-LTO profile. Compared
+`objdump -d --demangle --no-show-raw-insn` per function, normalizing instruction
+addresses, branch/call targets, page offsets and nop/udf padding. ICF aliases
+are matched by callee shape; field offsets and other immediates are retained.
+[codegen.json](codegen.json) records the selected functions and `offset_of!`
+layout probe, including the before/fixed values.
 
-* S3 `tick_impl` inlines the SHA/AES DMA steps, as main does. The S3 SHA step keeps
-  main's code and calls only the shared gather and block hashing. The frame size is
-  unchanged. Register and stack-slot allocation differs (spill slots renumbered, one
-  block duplicated with an extra reload). The function grows from 3667 to 3743
-  instructions because the inlined DMA step bodies differ; those run only when
-  `dma_pending` is set. This was checked by disassembly, not timing. An earlier
-  shape of this branch moved `Sha` out and back, which grew the frame by 336 bytes;
-  that is reverted.
-* C3 `periph_write` adds the `dma_pending` byte load and branch.
-* `Rsa::write`, `run_cli` and `setup_c6` differ only through inlining and C6
-  construction; none is on an idle path.
+The extra ECC box grew `Peripherals` from 8624 to 8632 bytes and `SocBus`
+from 10176 to 10184 bytes. `SocBus.periph` remained at zero: this was size
+growth, not a niche-driven relocation of the peripheral block. SRAM moved
+8984 → 8992, cycles 10128 → 10136, and the enclosing machine fields moved by
+eight bytes. ECC now shares the existing I2S allocation in a `repr(C)`
+`OptionalPeripherals`, with I2S at offset zero. Both sizes and every probed
+pre-existing field offset match the parent again; there is no new pointer,
+extra I2S indirection, or periodic ECC work. Native layout and I2S-prefix
+regression tests pin these properties. The source-level C6 I2S field is now
+`periph.optional.i2s0`; its guest register interface is unchanged.
 
-For C6 (also checked against `954f2a68` before the rebase):
+The comparison reports 1920 identical and 13 differing common demangled
+function entries, versus 1868 identical and 65 differing before the layout
+fix. Four of the remaining differing entries combine multiple HashMap
+monomorphizations under one demangled name; those counts do not establish
+four distinct changed hot functions.
 
-* `Machine::run`, `step_core`, `Bus::tick` and the `Bus` read/write/fetch
-  entry points execute the same instruction sequences; immediates differ by the
-  8-byte field shift after `Peripherals`. In `run`, one block that calls the
-  allocator has one load fewer.
-* `periph_write` adds one byte load and branch on the common path (`dma_pending`)
-  and the ECC_MULT arm in its block dispatch. The existing single write-effect test
-  also covers PERIPH_RESET, a wider mask in the same test; the PCR reset handler is a cold call.
-* `refresh_irq` adds the ECC word to the cached optional-source merge
-  (`OPTIONAL_SOURCES[2]`); this runs once per interrupt-line refresh.
-* `ModemBb::read` is now out of line from `Peripherals::read32`; it runs only
-  for baseband reads.
-* New functions (`Ecc`, point arithmetic, `sha_dma_write`) and changed cold
-  functions (`Peripherals::new`, `reboot`, `refresh_optional`, `tick_optional`
-  ECC arm, drop glue) are not on the idle path.
+* **Identical to the parent, including field offsets:** C6 `Machine::run`,
+  `run_unmodeled`, `step_core`, `Bus::tick`, `next_deadline`, `periph_read`,
+  `pending_work`, and the Bus fetch/read/write entry points. Device tick
+  dispatch is inlined in `Bus::tick`, not a separate symbol.
+* **Remaining C6 differences:** `periph_write` (1660 → 1747 instructions,
+  versus 1746 before the fix) still contains the SHA `dma_pending` byte test,
+  ECC dispatch and PCR reset effect. `Peripherals::write32` is inlined there.
+  These are total static function sizes, not instructions executed on each
+  write. The SHA transfer/address filter and PCR reset handler remain cold,
+  out-of-line functions; the common write-effect mask includes PERIPH_RESET.
+  Register allocation is not identical throughout this MMIO function.
+* `refresh_irq` remains 442 → 449 instructions: seven additional instructions
+  merge ECC's cached source word. `refresh_optional` is 225 → 259 and
+  `tick_optional` 194 → 227 because the ECC arm exists, although ECC has no
+  clock and is never placed in the active optional-device list.
+* `Peripherals::read32` is 679 → 677 with the ECC arm and out-of-line
+  `ModemBb::read`; `Peripherals::new` is 1626 → 1658 for cold allocation and
+  initialization. New ECC arithmetic and SHA DMA functions are feature paths.
+* Other PR-wide differences remain C3 `periph_write` (SHA pending test), S3
+  `tick_impl` (shared crypto OUT gather bodies) and `Rsa::write` (LTO outlining).
+  This fix changes no C3/S3 or shared-walker source.
+
+The layout-induced differences are removed. The complete MMIO/interrupt path
+is **not** instruction-identical to #201, and disassembly alone does not prove
+that the 7/7 C6 CPU regression is cured. Central remeasurement is pending.
 
 ## Limits and evidence curation
 
