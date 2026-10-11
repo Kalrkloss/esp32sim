@@ -1,7 +1,7 @@
 # EX220: C3/C6 SHA DMA and C6 Wi-Fi calibration/ECC
 
-Base: #201's branch `i2s-rx-input` at `schematik-engineering/esp32sim@baf9845b`, which is on
-upstream main `eec7b2c9`. The source is the commits on this branch. This change
+Base: upstream main `ff64902a`, which includes merged #201 and #202.
+The source is the commits on this branch. This change
 extends EX202's station contract to unstubbed C6 PHY startup and TLS accelerator
 use. EX210's shared StationLink from merged #193 remains the only Wi-Fi link.
 S3, C3 and C6 share SHA DMA execution. Their crypto OUT gathers read descriptors only
@@ -230,7 +230,7 @@ env -i PATH="$PATH" HOME="$PWD/target/ex220-home" TMPDIR="$PWD/target/ex220-tmp"
   cargo +1.99.0 test --release --workspace
 ```
 
-Final results: **736** CI-policy tests pass; **713** plain tests pass with
+Final results: **751** CI-policy tests pass; **728** plain tests pass with
 **37** ignored. Both Clippy targets, the WASM build, all eight requested WASM
 scenarios, evidence privacy, **44/44** rule mutations and **5/5** firmware
 mutations pass.
@@ -331,15 +331,17 @@ Max load in summary includes accepted warmup and measured pairs; discarded attem
 
 ### Release disassembly and native layout
 
-Built parent `schematik-engineering/esp32sim@baf9845b`, measured head
-`schematik-engineering/esp32sim@3d9eee3c`, and this commit's source with
+The current comparison builds upstream main `ff64902a` and this commit's
+rebased source with
 `cargo +1.99.0 build --release -p esp32sim --bins`, separate target directories,
 `aarch64-apple-darwin`, and the workspace fat-LTO profile. Compared
 `objdump -d --demangle --no-show-raw-insn` per function, normalizing instruction
-addresses, branch/call targets, page offsets and nop/udf padding. ICF aliases
+addresses, branch/call targets, page offsets (including omitted zero offsets)
+and nop/udf padding. ICF aliases
 are matched by callee shape; field offsets and other immediates are retained.
 [codegen.json](codegen.json) records the selected functions and `offset_of!`
-layout probe, including the before/fixed values.
+layout probe. It also retains the earlier before/fixed comparison against
+#201 (`schematik-engineering/esp32sim@baf9845b`).
 
 The extra ECC box grew `Peripherals` from 8624 to 8632 bytes and `SocBus`
 from 10176 to 10184 bytes. `SocBus.periph` remained at zero: this was size
@@ -347,18 +349,19 @@ growth, not a niche-driven relocation of the peripheral block. SRAM moved
 8984 → 8992, cycles 10128 → 10136, and the enclosing machine fields moved by
 eight bytes. ECC now shares the existing I2S allocation in a `repr(C)`
 `OptionalPeripherals`, with I2S at offset zero. Both sizes and every probed
-pre-existing field offset match the parent again; there is no new pointer,
+pre-existing field offset match main `ff64902a`; there is no new pointer,
 extra I2S indirection, or periodic ECC work. Native layout and I2S-prefix
 regression tests pin these properties. The source-level C6 I2S field is now
 `periph.optional.i2s0`; its guest register interface is unchanged.
 
-The comparison reports 1920 identical and 13 differing common demangled
-function entries, versus 1868 identical and 65 differing before the layout
-fix. Four of the remaining differing entries combine multiple HashMap
+The current comparison reports 1932 identical and 15 differing common
+demangled function entries against main `ff64902a`. The historical #201
+comparison was 1868 identical / 65 differing before the layout fix and
+1920 / 13 afterwards. Four of the current differing entries combine multiple HashMap
 monomorphizations under one demangled name; those counts do not establish
 four distinct changed hot functions.
 
-* **Identical to the parent, including field offsets:** C6 `Machine::run`,
+* **Identical to main ff64902a, including field offsets:** C6 `Machine::run`,
   `run_unmodeled`, `step_core`, `Bus::tick`, `next_deadline`, `periph_read`,
   `pending_work`, and the Bus fetch/read/write entry points. Device tick
   dispatch is inlined in `Bus::tick`, not a separate symbol.
@@ -374,14 +377,15 @@ four distinct changed hot functions.
   `tick_optional` 194 → 227 because the ECC arm exists, although ECC has no
   clock and is never placed in the active optional-device list.
 * `Peripherals::read32` is 679 → 677 with the ECC arm and out-of-line
-  `ModemBb::read`; `Peripherals::new` is 1626 → 1658 for cold allocation and
-  initialization. New ECC arithmetic and SHA DMA functions are feature paths.
+  `ModemBb::read`; `Peripherals::new` is 1560 → 1592 for cold allocation and
+  initialization. The C6 guest-reset function and peripheral drop glue also
+  differ in cold allocation/destruction paths. New ECC arithmetic and SHA DMA functions are feature paths.
 * Other PR-wide differences remain C3 `periph_write` (SHA pending test), S3
   `tick_impl` (shared crypto OUT gather bodies) and `Rsa::write` (LTO outlining).
   This fix changes no C3/S3 or shared-walker source.
 
 The layout-induced differences are removed. The complete MMIO/interrupt path
-is **not** instruction-identical to #201, and disassembly alone does not prove
+is **not** instruction-identical to main ff64902a, and disassembly alone does not prove
 that the 7/7 C6 CPU regression is cured. Central remeasurement is pending.
 
 ## Limits and evidence curation
