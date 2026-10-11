@@ -3,6 +3,7 @@
 //! Flash MMU behavior and the ROM integrity payload mapping are inferred from ROM execution.
 use crate::periph::{Peripherals, PERIPH_BASE, PERIPH_END};
 use esp_periph::{Device, RegRam, Rng};
+use esp_periph::gdma::{DescriptorWalk, DmaDescriptorFault};
 use xtensa_lx7::bus::{Bus, Fault};
 
 pub const DRAM_LOW: u32 = 0x3ffa_e000;
@@ -61,9 +62,6 @@ pub struct SocBus {
     pub(crate) clock_half: u64,
     pub(crate) pins_active: bool,
 }
-
-// Classic DMA descriptors are read from internal RAM only.
-esp_periph::dma_descriptor_reader!(SocBus, dma_desc_word);
 
 impl SocBus {
     pub fn new(flash_size: usize, mac: [u8; 6]) -> Self {
@@ -346,18 +344,19 @@ impl SocBus {
         true
     }
     fn dma_desc_word(&mut self, addr: u32) -> Result<u32, Fault> { self.dma_read_word(addr).ok_or(Fault::Unmapped) }
+
     /// Walk a finite descriptor transaction, rejecting cycles and bounding visits. The visitor
     /// returns false once it has consumed the requested payload.
     fn walk_chain(
         &mut self,
         mut desc: u32,
-        mut visit: impl FnMut(&mut Self, u32, esp_periph::DmaDesc) -> Result<bool, esp_periph::dma::DmaDescriptorFault>,
-    ) -> Result<(), esp_periph::dma::DmaDescriptorFault> {
+        mut visit: impl FnMut(&mut Self, u32, esp_periph::DmaDesc) -> Result<bool, DmaDescriptorFault>,
+    ) -> Result<(), DmaDescriptorFault> {
         let mut seen = std::collections::HashSet::new();
         let mut walk = DescriptorWalk::new(1024);
         while desc != 0 {
-            if !seen.insert(desc) { return Err(esp_periph::dma::DmaDescriptorFault::Cycle { descriptor: desc }); }
-            let (control, d) = walk.read(self, desc)?;
+            if !seen.insert(desc) { return Err(DmaDescriptorFault::Cycle { descriptor: desc }); }
+            let (control, d) = walk.read_with(desc, |a| self.dma_desc_word(a))?;
             let (next, eof) = (d.next, d.eof);
             if !visit(self, control, d)? || eof { break; }
             desc = next;
@@ -365,7 +364,6 @@ impl SocBus {
         Ok(())
     }
     fn dma_read_chain(&mut self, desc: u32, wanted: usize) -> Option<(Vec<u8>, u32)> {
-        use esp_periph::dma::DmaDescriptorFault;
         if wanted == 0 { return Some((Vec::new(), 0)); }
         let mut data = Vec::with_capacity(wanted);
         let mut last = 0;
@@ -383,7 +381,6 @@ impl SocBus {
         (data.len() == wanted).then_some((data, last))
     }
     fn dma_write_chain(&mut self, desc: u32, data: &[u8]) -> Option<u32> {
-        use esp_periph::dma::DmaDescriptorFault;
         if data.is_empty() { return Some(0); }
         let mut pos = 0;
         let mut last = 0;
