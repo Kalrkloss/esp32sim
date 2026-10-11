@@ -186,6 +186,15 @@ addresses, padding and page offsets normalised) against EX214 `schematik-enginee
   pending-script branch reaches that code. Script parsing, reboot,
   constructors and drop glue are cold.
 
+October 11 review changes (read-only `pcm_sources`, `attach_pcm_sources`, fallback,
+tone rejection, stream rates; #201's 24-bit packing) against the measured code
+(`e654e192`, same diff as `725b527e`): normalised release disassembly is identical
+for 1953 of 1962 functions, including S3 `tick_impl`, `refresh_tick_budget` and
+`dma_i2s_port` and C3/C6 `tick`, `next_deadline` and `pending_work`. The differences are
+`I2s::receive` (active RX only), the `Peripherals::new` constructors, and the CLI's
+`prepare`/`run_cli` setup. S3 `periph_write_inner` differs only in printing one
+constant-pool load as `[x8]` instead of a page offset.
+
 ## Limits
 
 No unmodified microphone firmware acceptance, hardware capture, RF/audio timing,
