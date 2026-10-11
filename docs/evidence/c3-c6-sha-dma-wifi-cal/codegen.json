@@ -373,7 +373,7 @@
       "fixed_matches_main": true
     }
   ],
-  "limits": "Static comparison only; CPU fix awaits central remeasurement. Remaining SHA/ECC MMIO and interrupt-source costs are not instruction-identical to main ff64902a.",
+  "limits": "Static comparison only; The maintainer subsequently closed the C6 idle-path check: ff64902a versus a175e357, 3.50 versus 3.51 s median user CPU (+0.3%), slower 3/7, identical instructions and console hash. Remaining SHA/ECC MMIO and interrupt-source costs are not instruction-identical to main ff64902a.",
   "historical_parent_comparison": {
     "target": "aarch64-apple-darwin",
     "toolchain": "1.99.0",
@@ -828,6 +828,6 @@
         "fixed_matches_parent": true
       }
     ],
-    "limits": "Static comparison only; CPU fix awaits central remeasurement. Remaining SHA/ECC MMIO and interrupt-source costs are not instruction-identical to the parent."
+    "limits": "Static comparison only; The maintainer subsequently closed the C6 idle-path check: ff64902a versus a175e357, 3.50 versus 3.51 s median user CPU (+0.3%), slower 3/7, identical instructions and console hash. Remaining SHA/ECC MMIO and interrupt-source costs are not instruction-identical to the parent."
   }
 }
