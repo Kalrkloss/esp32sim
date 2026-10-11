@@ -19,20 +19,21 @@ impl Sha {
         if first { self.init(); }
         self.compress();
     }
-    /// Synchronous SHA DMA request, using the S3 crypto descriptor reader.
+    /// Synchronous SHA DMA request through the shared GDMA OUT gather.
     /// IDF v5.5.5 components/soc/esp32c6/register/soc/sha_reg.h:50-120:
     /// six-bit block count, BUSY, DMA_START and DMA_CONTINUE. C3 offsets match
     /// components/soc/esp32c3/include/soc/hwcrypto_reg.h:46-53.
-    pub fn dma_step(&mut self, memory: &mut impl crate::gdma::DmaMemory) {
+    /// A short or malformed chain hashes nothing and raises OUT_DSCR_ERR (bit 2).
+    pub fn dma_step(&mut self, memory: &mut impl crate::gdma::OutMemory) {
         self.dma_pending = false;
         self.busy = false;
         let want = (self.block_num as usize).saturating_mul(self.block_bytes());
-        let input = crate::gdma::gather_dma_out(memory, want);
-        let Some(input) = input.filter(|bytes| bytes.len() == want) else {
+        let mut input = Vec::new();
+        if crate::gdma::gather_out(memory, want, &mut input).is_err() || input.len() != want {
             memory.out_channel().int_raw |= 1 << 2;
             memory.out_channel().running = false;
             return;
-        };
+        }
         let mut first = self.dma_first;
         for block in input.chunks(self.block_bytes()) {
             self.hash_block(block, first);

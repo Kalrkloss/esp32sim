@@ -173,7 +173,7 @@ impl SocBus {
     fn sha_dma_write(&mut self, a: u32) {
         if !matches!(a & !0xfff, 0x6008_9000 | 0x6008_0000) { return; }
         if let Some(ch) = self.periph.gdma.gdma.out_channel_for(7) {
-            let mut memory = esp_periph::gdma::DmaRam { base: SRAM_LOW, bytes: &mut self.sram, channel: &mut self.periph.gdma.gdma.out[ch] };
+            let mut memory = esp_periph::gdma::SramOut { base: SRAM_LOW, bytes: &mut self.sram, channel: &mut self.periph.gdma.gdma.out[ch] };
             self.periph.sha.dma_step(&mut memory);
         }
     }

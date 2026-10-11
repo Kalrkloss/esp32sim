@@ -1,9 +1,9 @@
 //! GDMA transfer engines and descriptor access.
 use super::*;
 use std::collections::HashSet;
-use esp_periph::gdma::GDMA_DESCRIPTOR_STEP_BUDGET;
 
 pub(super) const SPI2_DMA_DESCRIPTOR_STEP_BUDGET: usize = 1024;
+use esp_periph::gdma::GDMA_DESCRIPTOR_STEP_BUDGET;
 
 /// Which end of a memory-to-memory copy faulted.
 pub(super) enum M2mFault { Source, Destination }
@@ -600,7 +600,6 @@ impl SocBus {
         }
     }
 
-    /// Shared camera/crypto receive path. A malformed destination never reports successful EOF.
     fn scatter_dma_in(&mut self, ch: usize, data: &[u8], eof_bytes: Option<u32>, finish: bool) -> Result<(), ()> {
         let mut channel = self.periph.gdma.inp[ch];
         let mut irq_changed = false;
@@ -625,9 +624,10 @@ impl SocBus {
         let (Some(out_ch), Some(in_ch)) = (self.periph.gdma.out_channel_for(6), self.periph.gdma.in_channel_for(6)) else {
             self.periph.aes.state = 2; self.periph.aes.int_raw |= 1; self.irq_dirty = true; return;
         };
-        let Some(input) = esp_periph::gdma::gather_dma_out(&mut CryptoDmaOut { bus: self, channel: out_ch }, usize::MAX) else {
+        let mut input = Vec::new();
+        if esp_periph::gdma::gather_out(&mut CryptoDmaOut { bus: self, channel: out_ch }, usize::MAX, &mut input).is_err() {
             self.fail_dma_out(out_ch); self.periph.aes.state = 0; return;
-        };
+        }
         if self.debug.has("aes") {
             eprintln!("[aes] dma block_mode={} num_blocks={} mode={} bytes={}", self.periph.aes.block_mode, self.periph.aes.num_blocks, self.periph.aes.mode, input.len());
         }
@@ -642,10 +642,12 @@ impl SocBus {
 
 }
 
+/// The S3 bus as crypto DMA memory: main's unpriced bus accesses, so descriptors and write-backs
+/// that land on registers keep their side effects. Descriptor words feed `DescriptorWalk::read_with`.
 struct CryptoDmaOut<'a> { bus: &'a mut SocBus, channel: usize }
-impl esp_periph::gdma::DmaMemory for CryptoDmaOut<'_> {
+impl esp_periph::gdma::OutMemory for CryptoDmaOut<'_> {
     fn out_channel(&mut self) -> &mut esp_periph::GdmaOutCh { &mut self.bus.periph.gdma.out[self.channel] }
-    fn descriptor(&mut self, address: u32) -> Option<(u32, crate::periph::DmaDesc)> { esp_periph::gdma::DescriptorWalk::new(1).read(self.bus, address).ok() }
-    fn append(&mut self, address: u32, count: usize, out: &mut Vec<u8>) -> Option<()> { self.bus.append_mapped_bytes(address, count, out).ok() }
-    fn writeback(&mut self, address: u32, value: u32) -> Option<()> { self.bus.write32_unpriced(address, value).ok() }
+    fn word(&mut self, address: u32) -> Result<u32, Fault> { self.bus.read32_unpriced(address) }
+    fn append(&mut self, address: u32, count: usize, out: &mut Vec<u8>) -> Result<(), (u32, Fault)> { self.bus.append_mapped_bytes(address, count, out) }
+    fn writeback(&mut self, address: u32, value: u32) -> Result<(), Fault> { self.bus.write32_unpriced(address, value) }
 }
