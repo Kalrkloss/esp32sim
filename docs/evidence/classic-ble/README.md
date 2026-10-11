@@ -1,6 +1,7 @@
 # EX228: classic ESP32 shared VHCI adapter
 
-Base: branch `esp32-classic-6-analog` (#210). Builds on EX227 and the shared
+Base: branch `esp32-classic-6-analog-ff` (#210),
+`schematik-engineering/esp32sim@3ecd4e1ade6d7e228b15a5e1f78b029b078107ba`, on upstream main `ff64902a`. Builds on EX227 and the shared
 HCI controller/VHCI lifecycle merged in #172 (EX200). Adds classic LX6
 windowed-ABI calling glue, DRAM bounds, ELF-sized installation and function
 hooks. S3's existing trampoline bytes move into the shared VHCI module;
