@@ -35,7 +35,7 @@
     "killed": true
   },
   {
-    "file": "esp-soc/src/ble/vhci.rs",
+    "file": "esp-soc/src/ble.rs",
     "mutation": "flash[off..off + original.len()].copy_from_slice(&original); -> flash[off..off + original.len()].fill(0);",
     "test": "reboot_restores_controller_flash_even_after_mmu_mapping_changes",
     "crate": "esp32",
