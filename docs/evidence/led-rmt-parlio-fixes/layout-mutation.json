@@ -1,0 +1,12 @@
+{
+  "mutation": "Move PARLIO out of the shared cold allocation back into Peripherals (pre-layout-fix rebased sources)",
+  "command": "cargo +1.99.0 test --release -p esp32c6 --test layout",
+  "test": "cold_devices_do_not_grow_the_native_hot_bus",
+  "source_revision": "schematik-engineering/esp32sim@ef9cb685",
+  "restored_exit": 0,
+  "baseline_exit": 0,
+  "mutated_peripherals_bytes": 8632,
+  "expected_peripherals_bytes": 8624,
+  "mutation_exit": 101,
+  "killed": true
+}

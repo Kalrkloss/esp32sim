@@ -12,22 +12,22 @@
   {
     "check": "workspace",
     "command": "cargo +1.99.0 test --release --workspace -- --include-ignored --skip external_",
+    "exit": 0,
     "HOME": "empty",
     "emulator_environment": [
       "ESP32SIM_ROM_DIR=web/wasm/fw"
     ],
-    "exit": 0,
-    "passed": 755,
+    "passed": 772,
     "failed": 0,
     "ignored": 0
   },
   {
     "check": "plain",
     "command": "cargo +1.99.0 test --release --workspace",
+    "exit": 0,
     "HOME": "empty",
     "emulator_environment": [],
-    "exit": 0,
-    "passed": 732,
+    "passed": 749,
     "failed": 0,
     "ignored": 37
   },
@@ -39,6 +39,11 @@
   {
     "check": "privacy",
     "command": "node tools/check-evidence-privacy.mjs",
+    "exit": 0
+  },
+  {
+    "check": "bins",
+    "command": "cargo +1.99.0 build --release --bins",
     "exit": 0
   }
 ]

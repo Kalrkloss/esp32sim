@@ -1,7 +1,9 @@
 # EX219: LED routing and DMA output
 
-Base: #203's branch `c3-c6-sha-dma-wifi-cal` at `schematik-engineering/esp32sim@3d9eee3c`,
-stacked on #201's `i2s-rx-input` (`baf9845b`) on upstream main `eec7b2c9`. Related EX205 provides CPU-fed
+Base: #203's branch `c3-c6-sha-dma-wifi-cal` at `schematik-engineering/esp32sim@15655505`,
+on upstream main `ff64902a` (includes merged #201 and #202). Verified code head:
+`schematik-engineering/esp32sim@78d45a464202ec639c2c869b71aca386e64569cb` on
+`led-rmt-parlio-fixes`; the following commit updates evidence only. Related EX205 provides CPU-fed
 compact RMT and board pin transport. This change adds mirrored peripheral routes, S3 TX3 DMA
 symbols, and C6 parallel output. It reuses the WS2812 timing constants that EX218 (#204) added
 to `esp-soc/src/devices/ws2812.rs`; the GPIO waveform decoder itself is untouched. GDMA OUT
@@ -85,68 +87,75 @@ description.
 
 ## Idle path
 
-Checked by disassembly, not timing: release binaries of main `2f9443a9` and this
-branch (`cargo +1.99.0 build --release -p esp32sim --bins`, fat LTO, one codegen
-unit), `objdump -d --demangle`, per-function comparison with instruction and
-branch-target addresses and adrp page offsets normalised. 1856 functions are
-identical; the S3 differences are listed here.
+Release AArch64 disassembly on Rust 1.99.0 compares the cold-layout source on
+`led-rmt-parlio-fixes` against main `ff64902a` and parent
+`schematik-engineering/esp32sim@15655505`. Builds use `cargo +1.99.0 build --release
+--bins` and `llvm-objdump -d --demangle --no-show-raw-insn`; `asmcmp.py` normalizes
+instruction/branch addresses, alignment nops, adrp page offsets and equivalent
+call-target aliases (comparator preserved as [asmcmp.py](asmcmp.py)). [asm.json](asm.json) records all selected symbols and links
+complete normalized instruction diffs (large diffs are split into ordered parts).
+Whole-binary difference inventories are [main](asm-main-all.txt) and
+[parent](asm-parent-all.txt), with base-only/head-only symbols in
+[main symbols](asm-main-symbols.json) and [parent symbols](asm-parent-symbols.json).
+Each baseline has 30 differing common functions overall; the selected hot-function
+set has 10 versus main and 9 versus the parent. This is a code-generation check,
+not a timing measurement of the rebased head.
 
-`Rmt` and every structure embedding it keep main's size and field offsets. The
-TX3 queue is a nullable boxed `VecDeque` inside `Rmt`; it takes the 8 bytes of the
-former `i64` CPU/APB ratio, which is now a `u8` in the tail beside `running`
-(`running` stays at the same offset). S3 `Peripherals`, `SocBus`, the CPU run
-loop, JIT helpers and bus read/fetch paths therefore compile to main's
-instructions. The queue is allocated when staged symbols are inserted; FIFO
-reset, DMA disable and a staging failure release it. S3 uses `RmtDma`, a
-`repr(transparent)` wrapper, to select the DMA transmitter variant and to clear
-the queue on CH3 CONF0 writes.
+`size_of!` and `offset_of!` dumps in [layout.json](layout.json) cover all named
+fields of each chip's `Peripherals` and `SocBus`. Reproduce each revision with
+`CARGO_TARGET_DIR=<build-dir> python3 layout_probe.py <checkout>` using the
+[preserved probe](layout_probe.py), with no concurrent builds in that checkout.
+Every size and field offset
+matches main and the parent (185 size/offset records; 258 selected-function
+comparisons across both baselines and all three binaries). The only field-name
+difference against main is C6's
+`i2s0` → `optional`, both at offset 8536. Sizes in bytes:
 
-The transmitter loop is one inlined, const-specialized function. Plain
-`Rmt::tick` (C3/C6) instantiates only the non-DMA variant. `RmtDma::tick` is out
-of line like main's `Rmt::tick`; its idle path (prologue, `running` load, branch)
-is instruction-identical, and `tick_impl` calls it where main calls `Rmt::tick`.
-The only other `tick_impl` change on the idle path is the completed-frame test:
-the route fanout is a cold out-of-line function, so the test branches over a call
-instead of over main's inlined loop.
+| Chip | Peripherals | SocBus |
+| --- | ---: | ---: |
+| C3 | 5136 | 6128 |
+| C6 | 8624 | 10176 |
+| S3 | 9360 | 12408 |
 
-`periph_write_inner` is identical to main except the RMT dispatch target
-(`RmtDma`'s write). Staging sits in the `periph_write` wrapper behind one bit
-test of CH3 CONF0 DMA_ACCESS_EN: three instructions (offset, byte load, branch)
-per peripheral write while RMT DMA is off. With the bit set, a cold function
-checks the address: CH3 CONF0, or a GDMA write to a running trigger-9 channel.
-Writes to other GDMA channels (SPI2, LCD, I2S, camera, crypto) do not stage.
-No DMA pump or staging call runs from a device tick.
+C6 PARLIO shares the existing boxed `OptionalPeripherals` allocation with I2S and
+ECC; I2S remains at offset zero. The nullable PARLIO TX box remains unallocated
+until first relevant MMIO access or selected DMA transfer. PCR clock writes before
+PARLIO is used allocate nothing, and `clock()` stays `None`, so PARLIO never enters
+the optional-device active list. Native regression tests pin C6 hot-bus sizes and
+offsets and the architecture-independent I2S offset-zero contract.
 
-Remaining S3 differences: `gather_dma_out` carries the descriptor alignment,
-length and trigger-9 checks plus the writeback gate (AES, SHA and RMT
-transactions only; SPI2, LCD, I2S and camera use other walkers); `Rmt::tick`
-widens the `u8` ratio on running channels; construction and drop code.
-C3's `tick_with_pins` tests the completed-frame queue before calling a cold
-fanout function.
+All emitted C3/C6 `Machine::run`, `run_unmodeled`, `step_core`, S3 `run_modeled`,
+`run_unmodeled` and `step_core` bodies are instruction-identical to both baselines.
+The emitted C3/C6 deadlines and pending-work functions, all peripheral-read bus
+wrappers, C3/S3 bus ticks and C3 peripheral read dispatch are also identical.
+Inlined accessors (including `devices`, `Peripherals::write32`, S3's deadline and
+S3's run dispatch) have no independent emitted symbol: their callers are checked,
+not counted as separately identical functions. Both native read/write wrappers
+and the S3 access wrappers are included in the comparison.
 
-C6 adds a pointer-sized PARLIO handle to `Peripherals`, which shifts later fields
-by 8 bytes; the C6 bus and run-loop functions differ by those offsets. The PARLIO
-device adds read/write dispatch arms. The C6 write path classifies PARLIO, GDMA
-and the PCR PARLIO clock address inline and stages in a cold function. C6
-`Peripherals::write32` gets no PARLIO code: the PCR PARL_CLK_TX_CONF value is read
-and applied only when staging.
+Every differing selected function is listed below. Counts are normalized
+instructions, not executed instructions or a performance estimate.
 
-PARLIO keeps a nullable boxed TX state at the end of `Peripherals`. Before its
-first MMIO access or selected DMA transfer, no TX state or register RAM is
-allocated. The pointer-sized handle avoids placing the 128-byte TX state among
-hot fields through Rust's field reordering. Layout tests require the handle to
-follow the system timer, clock tree and cached interrupt status.
+| Function | main | #203 parent | head | Difference |
+| --- | ---: | ---: | ---: | --- |
+| C3 `periph_write` | 1660 | 1676 | 1676 | Parent's SHA DMA write hook; identical to parent. |
+| C3 `tick_with_pins` | 521 | 521 | 448 | Completed-frame test and cold route fanout replace first-match delivery; register allocation and block order change. |
+| C6 bus `tick` | 2036 | 2036 | 1980 | RMT frame fanout is cold; register allocation/block order change, not structure offsets. |
+| C6 `periph_write` | 1660 | 1747 | 1822 | Parent ECC/SHA hooks plus PARLIO dispatch and address-gated staging; optional storage indirection. |
+| C6 `tick_optional` | 194 | 227 | 229 | Parent ECC arm plus PARLIO dispatch arm and cold-field offsets; PARLIO never joins the active list. |
+| C6 `Peripherals::read32` | 679 | 677 | 683 | ECC/PARLIO read dispatch and cold allocation references. |
+| S3 bus `write32` | 307 | 307 | 314 | RMT DMA_ACCESS_EN gate and conditional cold staging call. |
+| S3 `periph_write_inner` | 1663 | 1663 | 1663 | RMT dispatch calls `RmtDma::write` instead of `Rmt::write`. |
+| S3 `tick_impl` | 3667 | 3743 | 3683 | `RmtDma::tick`, completed-frame fanout test/cold call, associated register allocation and block placement changes. |
+| S3 `write32_access::<false>` | 194 | 194 | 201 | Same RMT DMA gate/staging hook as bus write32. |
 
-PARLIO `clock()` remains `None`, including during a configured transfer, so
-PARLIO never enters the optional-device active list. A PCR clock write before
-PARLIO is used allocates no TX state.
-
-Source 63 uses the existing optional interrupt cache in status word 1, which
-already contains LEDC and MCPWM. The `OPTIONAL_SOURCES` mask admits PARLIO's
-cached bit without adding a device callback or another status-word load. Shared
-interrupt routing is identical to upstream. Tests cover PARLIO's routed assertion
-and acknowledgement, and prove the unused device has no storage, clock or active
-entry.
+The S3 queue is a nullable boxed `VecDeque` in the former `i64` RMT clock-ratio
+space; the ratio is now `u8` in tail padding, preserving `Rmt` and enclosing layouts.
+Queue allocation is lazy; reset, DMA disable and staging failure release it.
+Plain C3/C6 RMT tick remains the non-DMA specialization; running channels widen the
+clock ratio. DMA staging is never a per-tick pump. No claim is made that changed
+bus functions are instruction-identical or that their timing is unchanged on the
+new base. The historical measured stack and its uncertainty are below.
 
 ## Register sources
 
@@ -215,7 +224,10 @@ fault, queue bounds, the RMT clock ratio and PARLIO packing/clock/IRQ. Storage/i
 mutations force eager PARLIO and RMT DMA allocation (including on a PCR clock write),
 retained RMT queue storage after disable, inline PARLIO TX storage and an active
 PARLIO clock. Each changed source is restored before the next mutation. Every
-mutation fails an assertion in a previously passing focused test.
+mutation fails an assertion in a previously passing focused test. Separately,
+[layout-mutation.json](layout-mutation.json) records the cold-allocation guard:
+restoring the top-level PARLIO field fails `cold_devices_do_not_grow_the_native_hot_bus`;
+the restored coallocated source passes both layout tests.
 
 ## Limits
 
@@ -234,67 +246,78 @@ These tolerances and completion rules are not silicon timing claims.
 
 ## CPU comparison
 
-Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 2f9443a9 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
+Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Baseline `schematik-engineering/esp32sim@3d9eee3c` built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
-Measured on `schematik-engineering/esp32sim@46b0d94c` (branch `led-rmt-parlio-fixes` before its rebases onto #203) against main `2f9443a9`. An earlier run of the same head had run-to-run drift of up to 37% between pairs on Pocket Tank and was repeated; only the repeat is reported. The current head was not re-timed; the idle-path section above gives its disassembly comparison. C3 hello, whose `tick_with_pins` changed, is timed centrally: <C3_TABLE>. User CPU seconds.
+Measured branch `led-rmt-parlio-fixes` at `schematik-engineering/esp32sim@fb4568d9167bf42379523dbc8dd39a71961f21ed`, against parent #203 at `schematik-engineering/esp32sim@3d9eee3c`. These are the measured fork SHAs, not the rebased head. The rebase is checked by release disassembly, not re-timed. User CPU seconds; M denotes the measured parent and B the measured branch.
 
-| Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
+| Workload | Parent median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Pocket Tank | 36.0615 (34.7514–39.3186) | 35.1536 (34.6300–38.5041) | -2.52% | 3/7 | 10073833665 | 4.30 |
-| C6 hello | 3.1824 (3.0831–3.5194) | 3.1577 (3.0538–3.4191) | -0.77% | 3/7 | 4800000000 | 3.85 |
-| S3 hello | 25.0508 (24.1710–29.4907) | 24.7047 (24.1888–29.0515) | -1.38% | 4/7 | 1789819657 | 6.38 |
+| C3 hello | 2.3717 (2.3383–2.3974) | 2.3683 (2.3406–2.3976) | -0.14% | 3/7 | 4800000000 | 4.31 |
+| C6 hello | 3.0813 (3.0613–3.1100) | 3.0896 (3.0707–3.1219) | +0.27% | 4/7 | 4800000000 | 4.76 |
+| Pocket Tank | 35.5661 (35.2486–36.3006) | 35.3132 (34.9827–35.8873) | -0.71% | 1/7 | 10073833665 | 5.20 |
+| S3 hello | 24.3777 (24.2110–25.2191) | 24.1693 (23.9120–25.5136) | -0.85% | 2/7 | 1789819657 | 5.12 |
 
-### Pocket Tank
+### C3 hello
 
 Status: PASS. Flags: —.
 
-| Pair | Attempt | Order | Main s | PR s | Main load before/after/peak | PR load before/after/peak | Result |
+| Pair | Attempt | Order | Parent s | PR s | Parent load before/after/peak | PR load before/after/peak | Result |
 | --- | ---: | --- | ---: | ---: | --- | --- | --- |
-| warmup | 1 | B→M | 34.346091 | 34.444260 | 3.53/2.67/3.53 | 4.30/3.53/4.30 | accepted |
-| 1 | 2 | M→B | 34.754824 | 35.084599 | 2.67/1.93/2.67 | 1.93/2.07/2.10 | accepted |
-| 2 | 3 | B→M | 35.937203 | 34.629986 | 1.95/2.16/2.19 | 2.07/1.95/2.21 | accepted |
-| 3 | 4 | M→B | 34.751428 | 35.067585 | 2.16/1.97/2.16 | 1.97/2.22/2.22 | accepted |
-| 4 | 5 | B→M | 39.318593 | 35.454750 | 2.27/3.67/3.88 | 2.22/2.27/2.27 | accepted |
-| 5 | 6 | M→B | 36.297424 | 35.153575 | 3.67/3.75/4.17 | 3.75/3.54/3.92 | accepted |
-| 6 | 7 | B→M | 36.061525 | 35.233183 | 3.35/2.91/3.35 | 3.54/3.35/3.68 | accepted |
-| 7 | 8 | M→B | 36.490135 | 38.504077 | 2.91/2.98/3.00 | 2.98/3.15/3.28 | accepted |
+| warmup | 1 | B→M | 2.384789 | 2.431075 | 4.31/4.21/4.31 | 4.31/4.31/4.31 | accepted |
+| 1 | 2 | M→B | 2.393159 | 2.359975 | 4.21/4.21/4.21 | 4.21/4.03/4.21 | accepted |
+| 2 | 3 | B→M | 2.371702 | 2.368266 | 4.03/3.95/4.03 | 4.03/4.03/4.03 | accepted |
+| 3 | 4 | M→B | 2.397354 | 2.363437 | 3.95/3.95/3.95 | 3.95/3.95/3.95 | accepted |
+| 4 | 5 | B→M | 2.352910 | 2.374586 | 3.95/4.04/4.04 | 3.95/3.95/3.95 | accepted |
+| 5 | 6 | M→B | 2.338348 | 2.340565 | 4.04/4.04/4.04 | 4.04/4.04/4.04 | accepted |
+| 6 | 7 | B→M | 2.384855 | 2.371508 | 4.11/4.11/4.11 | 4.04/4.11/4.11 | accepted |
+| 7 | 8 | M→B | 2.348362 | 2.397557 | 4.11/4.18/4.18 | 4.18/4.18/4.18 | accepted |
 
 ### C6 hello
 
 Status: PASS. Flags: —.
 
-| Pair | Attempt | Order | Main s | PR s | Main load before/after/peak | PR load before/after/peak | Result |
+| Pair | Attempt | Order | Parent s | PR s | Parent load before/after/peak | PR load before/after/peak | Result |
 | --- | ---: | --- | ---: | ---: | --- | --- | --- |
-| warmup | 1 | B→M | 3.113898 | 3.111458 | 3.15/3.05/3.15 | 3.15/3.15/3.15 | accepted |
-| 1 | 2 | M→B | 3.083412 | 3.133376 | 3.05/2.97/3.05 | 2.97/2.97/2.97 | accepted |
-| 2 | 3 | B→M | 3.199634 | 3.418288 | 3.29/3.11/3.29 | 2.97/3.29/3.29 | accepted |
-| 3 | 4 | M→B | 3.182382 | 3.278481 | 3.11/3.11/3.11 | 3.11/3.66/3.66 | accepted |
-| 4 | 5 | B→M | 3.519430 | 3.419116 | 3.85/3.85/3.85 | 3.66/3.85/3.85 | accepted |
-| 5 | 6 | M→B | 3.305069 | 3.157726 | 3.85/3.78/3.85 | 3.78/3.64/3.78 | accepted |
-| 6 | 7 | B→M | 3.087312 | 3.076582 | 3.64/3.51/3.64 | 3.64/3.64/3.64 | accepted |
-| 7 | 8 | M→B | 3.083069 | 3.053815 | 3.51/3.46/3.51 | 3.46/3.46/3.46 | accepted |
+| warmup | 1 | B→M | 3.105181 | 3.070354 | 4.25/4.39/4.39 | 4.18/4.25/4.25 | accepted |
+| 1 | 2 | M→B | 3.105535 | 3.121899 | 4.39/4.39/4.39 | 4.39/4.44/4.44 | accepted |
+| 2 | 3 | B→M | 3.110040 | 3.102028 | 4.48/4.48/4.48 | 4.44/4.48/4.48 | accepted |
+| 3 | 4 | M→B | 3.078559 | 3.089638 | 4.48/4.44/4.48 | 4.44/4.44/4.44 | accepted |
+| 4 | 5 | B→M | 3.061252 | 3.084151 | 4.57/4.76/4.76 | 4.44/4.57/4.57 | accepted |
+| 5 | 6 | M→B | 3.092194 | 3.088289 | 4.76/4.76/4.76 | 4.76/4.70/4.76 | accepted |
+| 6 | 7 | B→M | 3.079297 | 3.116731 | 4.72/4.72/4.72 | 4.70/4.72/4.72 | accepted |
+| 7 | 8 | M→B | 3.081324 | 3.070723 | 4.72/4.59/4.72 | 4.59/4.59/4.59 | accepted |
+
+### Pocket Tank
+
+Status: PASS. Flags: —.
+
+| Pair | Attempt | Order | Parent s | PR s | Parent load before/after/peak | PR load before/after/peak | Result |
+| --- | ---: | --- | ---: | ---: | --- | --- | --- |
+| warmup | 1 | B→M | 36.023487 | 35.400990 | 4.56/4.55/4.56 | 4.59/4.56/4.64 | accepted |
+| 1 | 2 | M→B | 36.300569 | 35.313242 | 4.55/4.36/4.83 | 4.36/4.44/4.49 | accepted |
+| 2 | 3 | B→M | 35.568462 | 35.318085 | 4.12/3.92/4.12 | 4.44/4.12/4.48 | accepted |
+| 3 | 4 | M→B | 35.287419 | 34.982686 | 3.92/3.97/4.46 | 3.97/4.38/4.38 | accepted |
+| 4 | 5 | B→M | 35.566091 | 35.500187 | 4.42/5.20/5.20 | 4.38/4.42/4.43 | accepted |
+| 5 | 6 | M→B | 35.345058 | 35.198881 | 4.99/4.58/4.99 | 4.58/4.98/4.98 | accepted |
+| 6 | 7 | B→M | 35.248649 | 35.239203 | 4.88/4.73/4.93 | 4.98/4.88/5.03 | accepted |
+| 7 | 8 | M→B | 35.679336 | 35.887337 | 4.73/4.67/4.82 | 4.67/4.21/4.70 | accepted |
 
 ### S3 hello
 
 Status: PASS. Flags: —.
 
-| Pair | Attempt | Order | Main s | PR s | Main load before/after/peak | PR load before/after/peak | Result |
+| Pair | Attempt | Order | Parent s | PR s | Parent load before/after/peak | PR load before/after/peak | Result |
 | --- | ---: | --- | ---: | ---: | --- | --- | --- |
-| warmup | 1 | B→M | 24.542803 | 24.370655 | 3.76/3.64/3.76 | 3.46/3.76/3.90 | accepted |
-| 1 | 2 | M→B | 25.599767 | 26.881910 | 3.64/3.63/3.75 | 3.63/3.89/4.15 | accepted |
-| 2 | 3 | B→M | 25.050774 | 24.704659 | 3.79/3.85/4.01 | 3.89/3.79/3.89 | accepted |
-| 3 | 4 | M→B | 25.417101 | 29.051514 | 3.85/4.53/5.08 | 4.53/6.38/6.38 | accepted |
-| 4 | 5 | B→M | 29.490685 | 26.877363 | 4.09/5.35/5.56 | 4.91/4.09/4.91 | accepted |
-| 5 | 6 | M→B | 33.510618 | 42.946415 | 4.34/6.27/6.68 | 6.27/13.35/13.35 | discarded: load >7 |
-| 5 | 7 | M→B | 34.516602 | 50.924342 | 4.77/5.57/5.57 | 5.57/11.45/11.89 | discarded: load >7 |
-| 5 | 8 | M→B | 26.107778 | 25.741450 | 4.34/7.55/7.55 | 7.55/5.65/7.55 | discarded: load >7 |
-| 5 | 9 | M→B | 24.726422 | 29.589800 | 4.62/5.57/6.21 | 5.57/6.86/7.19 | discarded: load >7 |
-| 5 | 10 | M→B | 24.747253 | 24.349590 | 4.66/4.97/4.97 | 4.97/3.62/4.97 | accepted |
-| 6 | 11 | B→M | 24.170993 | 24.188773 | 2.72/2.37/2.72 | 3.62/2.72/3.62 | accepted |
-| 7 | 12 | M→B | 24.312944 | 24.684476 | 2.37/3.46/3.46 | 3.46/3.07/3.46 | accepted |
+| warmup | 1 | B→M | 24.246281 | 24.163412 | 4.08/4.15/4.15 | 4.21/4.08/4.21 | accepted |
+| 1 | 2 | M→B | 24.377719 | 23.958384 | 4.15/4.66/4.66 | 4.66/4.81/4.81 | accepted |
+| 2 | 3 | B→M | 24.384050 | 23.974155 | 4.52/4.85/4.85 | 4.81/4.52/4.81 | accepted |
+| 3 | 4 | M→B | 24.210977 | 23.911955 | 4.85/4.42/4.85 | 4.42/3.91/4.42 | accepted |
+| 4 | 5 | B→M | 24.307576 | 24.424526 | 4.15/4.72/4.72 | 3.91/4.15/4.25 | accepted |
+| 5 | 6 | M→B | 24.442854 | 24.357124 | 4.72/4.49/4.72 | 4.49/4.74/4.80 | accepted |
+| 6 | 7 | B→M | 24.261986 | 24.169314 | 5.01/4.94/5.01 | 4.74/5.01/5.10 | accepted |
+| 7 | 8 | M→B | 25.219083 | 25.513578 | 4.94/5.02/5.12 | 5.02/4.81/5.10 | accepted |
 
 Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above.
-
 
 
 ## Evidence privacy

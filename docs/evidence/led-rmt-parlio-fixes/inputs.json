@@ -5,11 +5,11 @@
   },
   {
     "path": "esp32s3/src/bus/tests.rs",
-    "sha256": "0c13389cc5fb4d3e6d7804d6549d97eca96b9f7e10a3e809414b76c28be3b89c"
+    "sha256": "75699f35edd58b4f4ef35bc487073f2986f63c1e56033139f1da609f2fb37830"
   },
   {
     "path": "esp32c6/src/parlio.rs",
-    "sha256": "3f603b582b5e661783f68e3ef4e151d75fe051c3423b740a4bdbf97f26f2542d"
+    "sha256": "516dcf074610ac87e48d9fc362dba97c2fe0df00e6f6d38c0d30c1a1fe08ec60"
   },
   {
     "path": "web/wasm/fw/esp32c6_rev0_rom.elf",
@@ -25,7 +25,7 @@
   },
   {
     "path": "esp32c6/src/bus.rs",
-    "sha256": "2f3cea8c05fd8280167d11056902cd87907b71258c75bc65084a02ef6186be7e"
+    "sha256": "dc23204d455e24a61248ed965ca0c807c19b9d57c0bdc2bed0aa4d973b99406f"
   },
   {
     "path": "esp-soc/src/devices/ws2812.rs",
@@ -33,22 +33,26 @@
   },
   {
     "path": "esp-periph/src/rmt.rs",
-    "sha256": "b8bc1686c9eb9bcb2e6a163e9f02283e0423dd0b0cc01435bc87d31324470993"
+    "sha256": "7a499f6a2c6479cff9b08577ec843c259431d96b8aee599050b1b7eed78d45e6"
   },
   {
     "path": "esp32c6/src/periph.rs",
-    "sha256": "5237028334ac199482319338e42d20d2cd67c5ad5efebbd9020f12b770c06799"
+    "sha256": "99bdccdc32e54adf4ae36eed2b562ecd932d370bafd03a97132dde0f607f2e61"
   },
   {
     "path": "esp32s3/src/bus.rs",
-    "sha256": "31530383ecfa0f3fba790d4274d9c9de96bb5222c0afb41fca0dbd0bccc57729"
+    "sha256": "2dfdc8fe9fb93a3b21a0d4bea200140c1a41c8f18b8ec0a10b7590c84847bf51"
   },
   {
     "path": "esp32s3/src/bus/dma.rs",
-    "sha256": "a4fed1efdfb6fc03e80bb6599b05970b9c79b4162cc06e0b6f50a246880a5a8d"
+    "sha256": "b18a1999bda66e9b6f5018e56e1083eae19c0a006ef04a486cc16e1a1028dfe9"
   },
   {
     "path": "esp32c3/src/bus.rs",
-    "sha256": "3cf624bdfda39bdcb34a7fdc119b254b87b92900e50756db745917e387a25da2"
+    "sha256": "f9d9161e622b871df76deb292b4e2619b2f5b04e202610fa9116a235ff0ce951"
+  },
+  {
+    "path": "esp32c6/tests/layout.rs",
+    "sha256": "40caf4aff1ae3420a7c1b9e206a7e6db3ae7a9cc297d9553dce162584fe359f5"
   }
 ]
