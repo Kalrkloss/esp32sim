@@ -1,9 +1,11 @@
 # EX219: LED routing and DMA output
 
-Base: upstream main `2f9443a9` (includes #197, #200 and #204). Related EX205 provides CPU-fed
+Base: #203's branch `c3-c6-sha-dma-wifi-cal` at `schematik-engineering/esp32sim@3d9eee3c`,
+stacked on #201's `i2s-rx-input` (`baf9845b`) on upstream main `eec7b2c9`. Related EX205 provides CPU-fed
 compact RMT and board pin transport. This change adds mirrored peripheral routes, S3 TX3 DMA
 symbols, and C6 parallel output. It reuses the WS2812 timing constants that EX218 (#204) added
-to `esp-soc/src/devices/ws2812.rs`; the GPIO waveform decoder itself is untouched.
+to `esp-soc/src/devices/ws2812.rs`; the GPIO waveform decoder itself is untouched. GDMA OUT
+descriptors are read through EX214's walker and EX220's `gather_out`.
 
 ## Behavior
 
@@ -12,31 +14,74 @@ for IO_MUX, chip-specific masks, output inversion and output-enable selection.
 Two enabled pins on the same signal each receive a frame. A disabled
 software-enable route, inverted route, or non-GPIO mux function does not.
 
-While TX3 DMA_ACCESS_EN is set, S3 stages finite DMA chains when RMT TX3 CONF0
-is written, or when a GDMA register of a running trigger-9 OUT channel is written. It reuses the existing
-`gather_dma_out` Result-based helper and bounded descriptor walker.
-Automatic owner writeback is gated once in this shared helper. Channel 3 consumes
-the staged symbols through the existing timed RMT transmitter. DMA mode bypasses
-CPU-fed RMT memory exhaustion and threshold interrupts. FIFO reset and disabling
-DMA discard staged symbols; starvation waits for more data.
+While TX3 DMA_ACCESS_EN is set, S3 stages TX3 symbols when RMT TX3 CONF0 is written,
+or when a GDMA register of a running trigger-9 OUT channel is written. Staging uses
+#203's shared `gather_out` over #201's descriptor walker; this branch adds no
+descriptor reader. Channel 3 consumes the staged symbols through the existing timed
+RMT transmitter. DMA mode bypasses CPU-fed RMT memory exhaustion and threshold
+interrupts. FIFO reset and disabling DMA discard staged symbols; starvation waits for
+more data.
+
+Each staging step stops after one SUC_EOF node. A chain whose last node links to null
+completes (OUT_TOTAL_EOF, channel stopped). A node with SUC_EOF and a non-null link
+keeps the channel running and records where staging resumes. This is the pattern of
+IDF's RMT DMA driver (v5.5.5 `components/esp_driver_rmt/src/rmt_tx.c`): two ring nodes
+of half the DMA buffer each, both with SUC_EOF, owner check and automatic write-back
+(`42-46`, `79-95`, `693-701`). The OUT_EOF callback re-encodes the consumed half, hands
+it back to DMA and calls `gdma_append`, which sets OUT_LINK RESTART (`1105-1132`). The
+last node's link is cut when the frame ends (`rmt_tx_mark_eof`, `602-649`). RESTART
+resumes after the last staged node rather than at the link address. Staging is
+instantaneous, so it can reach a ring node that the callback has not refilled yet,
+where real hardware is still held back by the RMT FIFO. Such a CPU-owned node at the
+resume point waits for the next append instead of raising a descriptor error. A test
+replays this sequence for a four-half frame and checks every symbol, the owner
+handback and the absence of descriptor errors.
 
 C6 stages finite PARLIO chains on PARLIO and PCR TX-clock writes, and on GDMA
 register writes of a running trigger-9 OUT channel, including prefill while the
-TX clock is disabled. A single C6 gather helper, also used by
-SPI2 and AES, owns descriptor validation, bounded traversal and writeback.
-Malformed OUT chains report a GDMA error without delivering partial SPI/AES output.
-A configured start, complete payload and enabled clock produce lane samples and
-TX EOF. Packing widths 1, 2, 4, 8 and 16, both bit orders, mirrored lanes and
-interrupt enable/clear are modeled. A free function next to `Ws2812Chain` converts
-lane samples to the existing board `rmt_frame` API, iterating routes directly.
-It uses the WS2812 timing constants EX218 added.
-Completed PARLIO data stores samples only; width and clock remain on the peripheral.
+TX clock is disabled. The PCR PARL_CLK_TX_CONF value (clock and TX reset) is applied
+when staging, so a PCR write before PARLIO is used allocates nothing. SPI2, AES and
+PARLIO use the same shared gather through one C6 wrapper that stops the channel after
+the transaction. A configured start, complete payload and enabled clock produce lane
+samples and TX EOF. Packing widths 1, 2, 4, 8 and 16, both bit orders, mirrored lanes
+and interrupt enable/clear are modeled. A free function next to `Ws2812Chain`
+converts lane samples to the existing board `rmt_frame` API, iterating routes
+directly. It uses the WS2812 timing constants EX218 added. Completed PARLIO data
+stores samples only; width and clock remain on the peripheral.
 
-Both staging paths honor descriptor ownership checks and automatic owner
-writeback, preserve descriptor EOF addresses, and set DONE/EOF/TOTAL_EOF or
-DSCR_ERR. Invalid descriptors, lengths, alignment, buffer addresses and cyclic
-chains cannot produce unbounded output. S3 queues at most 4096 pixels' symbols
-plus one end marker; C6 queues at most 65535 bytes. These are emulator limits.
+Invalid descriptors, lengths, alignment, buffer addresses and cyclic chains cannot
+produce unbounded output. S3 queues at most 4096 pixels' symbols plus one end marker
+(staged and not yet transmitted); C6 queues at most 65535 bytes. These are emulator
+limits; a longer frame raises the RMT DMA error (S3) or a GDMA descriptor error (C6).
+
+## Behaviour changes outside the LED path
+
+These change paths that are not LED output. They are listed here and in the PR
+description.
+
+* **Shared OUT gather rules** (`esp-periph/src/gdma/transmit.rs`; used by S3 SHA/AES,
+  C3/C6 SHA, C6 SPI2/AES, S3 RMT and C6 PARLIO):
+  * The owner bit is written back only when OUT_AUTO_WRBACK (OUT_CONF0 bit 2) is set.
+    Before, S3 AES/SHA (main) and #203's C3/C6 SHA always cleared it. IDF
+    v5.5.5's RMT TX driver sets the bit (`rmt_tx.c:42-46`). Its crypto GDMA
+    (`mbedtls/port/crypto_shared_gdma/esp_crypto_shared_gdma.c`) applies no GDMA
+    strategy, and PARLIO clears it (`esp_driver_parlio/src/parlio_tx.c:169-173`), so on
+    hardware those OUT descriptors keep the owner bit. IDF's AES waits on the IN
+    (output) descriptors, which are still written back.
+  * A descriptor address that is not word-aligned, or LENGTH > SIZE, is a descriptor
+    error (OUT_DSCR_ERR). IDF builds neither.
+* **C6 SPI2 and AES** now use the shared gather, so they honour CHECK_OWNER and the
+  write-back gate, and the channel stops with OUT_TOTAL_EOF after the transfer. A
+  malformed OUT chain still completes the SPI transfer or the AES operation with the
+  bytes gathered before the fault, as main does, and GDMA now also raises
+  OUT_DSCR_ERR. (The previous head returned without completing; that is reverted.
+  Completing keeps main's contract, and no hardware run has shown what SPI2 or AES do
+  after an OUT descriptor error.)
+* **RMT frame delivery** reaches a pin only through a valid GPIO matrix route:
+  IO_MUX MCU_SEL selects function 1 (GPIO matrix), FUNC_OUT_SEL selects the RMT signal,
+  and output is enabled (GPIO ENABLE, unless OEN_SEL takes the peripheral's enable).
+  Before, the frame went to the first pin whose FUNC_OUT_SEL matched, whatever its IO_MUX
+  function or output enable, or to pin 255 when none did.
 
 ## Idle path
 
@@ -82,8 +127,9 @@ fanout function.
 C6 adds a pointer-sized PARLIO handle to `Peripherals`, which shifts later fields
 by 8 bytes; the C6 bus and run-loop functions differ by those offsets. The PARLIO
 device adds read/write dispatch arms. The C6 write path classifies PARLIO, GDMA
-and the PCR PARLIO clock address inline and stages in a cold function; C6
-`Peripherals::write32` keeps one address comparison for the PARLIO PCR clock.
+and the PCR PARLIO clock address inline and stages in a cold function. C6
+`Peripherals::write32` gets no PARLIO code: the PCR PARL_CLK_TX_CONF value is read
+and applied only when staging.
 
 PARLIO keeps a nullable boxed TX state at the end of `Peripherals`. Before its
 first MMIO access or selected DMA transfer, no TX state or register RAM is
@@ -92,8 +138,8 @@ hot fields through Rust's field reordering. Layout tests require the handle to
 follow the system timer, clock tree and cached interrupt status.
 
 PARLIO `clock()` remains `None`, including during a configured transfer, so
-PARLIO never enters the optional-device active list. There is exactly one
-PARLIO PCR `set_clock` call.
+PARLIO never enters the optional-device active list. A PCR clock write before
+PARLIO is used allocates no TX state.
 
 Source 63 uses the existing optional interrupt cache in status word 1, which
 already contains LEDC and MCPWM. The `OPTIONAL_SOURCES` mask admits PARLIO's
@@ -146,32 +192,41 @@ fixtures are copied from another checkout or required from a developer machine.
 Existing goldens are unchanged. This branch does not modify JIT code.
 
 The focused tests assert two independent RMT frame deliveries on each chip;
-S3 multi-descriptor symbol output and RMT interrupt state; C6 clock-off prefill,
-three routed outputs, both lane colours, descriptor handback and source-63 IRQ
-assertion/clear. Additional tests cover widths, bit order, reset, starvation,
-malformed descriptors and queue bounds. The shared C6 gather regression pins SPI
+S3 multi-descriptor symbol output and RMT interrupt state; the IDF ping-pong ring
+(four halves, owner handback, no descriptor error) and the wait at a CPU-owned ring
+node; C6 clock-off prefill, three routed outputs, both lane colours, descriptor
+handback and source-63 IRQ assertion/clear. Additional tests cover widths, bit order,
+reset, starvation, malformed descriptors, queue bounds, a PCR clock write that must
+not allocate PARLIO and the PCR TX reset. The shared C6 gather regression pins SPI
 payloads, AES-128 zero-key/zero-input ciphertext, owner handback and completion
-interrupt state with automatic writeback enabled and disabled. These are register-level workloads, not
-a claim of running a particular FastLED or NeoPixel firmware release.
+interrupt state with automatic writeback enabled and disabled; another C6 test
+pins SPI2/AES completion with OUT_DSCR_ERR after a malformed chain. The shared-gather
+unit tests pin the write-back gate, descriptor alignment and LENGTH <= SIZE. These
+are register-level workloads, not a claim of running a particular FastLED or NeoPixel
+firmware release.
 
-`mutations.json` records 38 exact mutations and the tests that kill them, including
+`mutations.json` records 45 exact mutations and the tests that kill them, including
 the MMIO staging hooks and channel gates, the S3 DMA_ACCESS_EN write gate and CH3
-CONF0 address gate, multi-route fanout, DMA mode, reset, ownership, lengths, the
-trigger-9 alignment rule, writeback selection, EOF interrupts, queue bounds, the
-RMT clock ratio and PARLIO packing/clock/IRQ. Storage/idle mutations force eager
-PARLIO and RMT DMA allocation, retained RMT queue storage after disable, inline
-PARLIO TX storage and an active PARLIO clock.
-Each changed source is restored before the next mutation. Every mutation fails
-an assertion in a previously passing focused test.
+CONF0 address gate, multi-route fanout, DMA mode, reset, the shared gather's
+ownership, length, alignment, write-back and EOF rules, the RMT word-alignment and
+MMIO-descriptor rules, the ring wait, RESTART resume and continuation past SUC_EOF,
+C6 transaction stop, total EOF, descriptor error and SPI2/AES completion after a
+fault, queue bounds, the RMT clock ratio and PARLIO packing/clock/IRQ. Storage/idle
+mutations force eager PARLIO and RMT DMA allocation (including on a PCR clock write),
+retained RMT queue storage after disable, inline PARLIO TX storage and an active
+PARLIO clock. Each changed source is restored before the next mutation. Every
+mutation fails an assertion in a previously passing focused test.
 
 ## Limits
 
-Only finite DMA chains are supported. DMA staging and descriptor completion occur
-at MMIO boundaries; FIFO backpressure, concurrent guest buffer modification and
-continuous DMA rings are not modeled. PARLIO completes transactionally rather
+DMA staging and descriptor completion occur at MMIO boundaries. Finite chains and
+IDF's two-node ping-pong ring are supported. Staging is instantaneous: FIFO
+backpressure is stood in for by waiting at a CPU-owned ring node, and concurrent
+guest buffer modification is not modeled. S3 rejects a chain whose staged symbols
+would exceed the queue bound. PARLIO completes transactionally rather
 than after elapsed wire time. It models TX data output, not RX, external input
-clocks, valid-signal gating or every PCR reset interaction. Reserved widths and
-odd byte counts for 16-bit samples do not complete.
+clocks, valid-signal gating, loop transmission or every PCR reset interaction.
+Reserved widths and odd byte counts for 16-bit samples do not complete.
 
 WS2812 high widths of 150–1100 ns, a 550 ns bit split and 50 us reset detection are
 inferred decoder policy. A transaction boundary also terminates a parallel frame.
@@ -181,7 +236,7 @@ These tolerances and completion rules are not silicon timing claims.
 
 Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 2f9443a9 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
-Measured on `46b0d94c` against main `2f9443a9`; the branch was since rebased onto `fe3a9c08` (docs and web only) with no change to its own diff. An earlier run of the same head had run-to-run drift of up to 37% between pairs on Pocket Tank and was repeated; it is kept with the bench evidence. User CPU seconds.
+Measured on `schematik-engineering/esp32sim@46b0d94c` (branch `led-rmt-parlio-fixes` before its rebases onto #203) against main `2f9443a9`. An earlier run of the same head had run-to-run drift of up to 37% between pairs on Pocket Tank and was repeated; only the repeat is reported. The current head was not re-timed; the idle-path section above gives its disassembly comparison. C3 hello, whose `tick_with_pins` changed, is timed centrally: <C3_TABLE>. User CPU seconds.
 
 | Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -238,7 +293,7 @@ Status: PASS. Flags: —.
 | 6 | 11 | B→M | 24.170993 | 24.188773 | 2.72/2.37/2.72 | 3.62/2.72/3.62 | accepted |
 | 7 | 12 | M→B | 24.312944 | 24.684476 | 2.37/3.46/3.46 | 3.46/3.07/3.46 | accepted |
 
-Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above. Raw output files are preserved.
+Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above.
 
 
 
