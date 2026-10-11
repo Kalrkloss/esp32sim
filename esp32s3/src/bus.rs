@@ -806,6 +806,11 @@ impl SocBus {
         self.tick_budget = budget;
     }
 
+    /// Bus cycles at which the current peripheral clock started (deferred ticks excluded).
+    pub(crate) fn peripheral_clock_offset(&self) -> u64 {
+        self.cycles - u64::from(self.tick_pending) - self.periph.clock_cycles()
+    }
+
     /// Deliver the deferred cycles to the device models now.
     pub fn flush_ticks(&mut self) {
         let c = std::mem::take(&mut self.tick_pending);

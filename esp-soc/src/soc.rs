@@ -173,6 +173,12 @@ pub trait SocBus: Bus {
     fn board_ref(&self) -> &dyn BoardModel;
     /// Host PCM source for an I2S controller, or None when the controller is absent.
     fn i2s_input(&mut self, _port: usize) -> Option<&mut esp_periph::i2s::PcmInput> { None }
+    /// The attached pin-routed PCM source bank, read-only, as of its last synchronization.
+    /// Never attaches, flushes ticks or advances source time; None until `attach_pcm_sources`.
+    fn pcm_sources(&self) -> Option<&esp_periph::i2s::PcmSources> { None }
+    /// Attach the pin-routed source bank on first use and synchronize its clock to the bus.
+    /// Call before each push or slot edit. None when the chip has no I2S receiver.
+    fn attach_pcm_sources(&mut self) -> Option<&mut esp_periph::i2s::PcmSources> { None }
     /// Captured audio so far (left channel) and its sample rate.
     fn audio(&self) -> (&[i16], u32);
     fn camera_frames(&self) -> u64 { 0 }
@@ -190,4 +196,11 @@ pub trait SocBus: Bus {
     fn set_reset_cause(&mut self, cause: u32);
     /// Chip-specific end-of-run statistics (audio, WiFi, crypto, DMA engines).
     fn report(&self) -> String { String::new() }
+}
+
+/// Attach and synchronize the shared host source bank without adding device-tick work.
+pub fn attach_pcm_sources(bank: &mut Option<Box<esp_periph::i2s::PcmSources>>, cycles: u64, cpu_hz: u64) -> &mut esp_periph::i2s::PcmSources {
+    let sources = bank.get_or_insert_with(Default::default);
+    sources.advance_to(cycles, cpu_hz);
+    sources
 }

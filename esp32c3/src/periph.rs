@@ -358,6 +358,8 @@ impl Peripherals {
     pub fn tick(&mut self, cycles: u64) { Dispatch::tick(self, cycles); }
 
     #[inline(always)]
+    /// CPU cycles since this peripheral set was built.
+    pub(crate) fn clock_cycles(&self) -> u64 { self.clock.cycles() }
     pub fn cycles_until_timer(&self) -> u32 {
         Dispatch::cycles_until_deadline(self)
     }

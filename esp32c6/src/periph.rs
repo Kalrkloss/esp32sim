@@ -526,6 +526,8 @@ impl Peripherals {
     /// timer countdowns, a running RMT channel), conservative by one device tick;
     /// `u32::MAX` when nothing is armed. What a host that skips idle time may skip.
     pub fn cycles_until_timer(&self) -> u32 { Dispatch::cycles_until_deadline(self) }
+    /// CPU cycles since this peripheral set was built.
+    pub(crate) fn clock_cycles(&self) -> u64 { self.clock.cycles() }
 
     /// Which interrupt sources are asserted right now.
     pub fn source_status(&self) -> [u32; 4] { Dispatch::source_status(self) }
