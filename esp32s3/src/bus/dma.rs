@@ -609,13 +609,22 @@ impl SocBus {
         result.then_some(()).ok_or(())
     }
 
-    /// Feed SHA from its GDMA out channel (peripheral 7).
+    /// Feed SHA from its GDMA out channel (peripheral 7). Main's shape, so the step stays
+    /// inlined in `tick_impl` without growing its frame; only the gather is shared.
     pub(super) fn sha_dma_step(&mut self) {
         self.periph.sha.dma_pending = false;
+        let want = (self.periph.sha.block_num as usize).saturating_mul(self.periph.sha.block_bytes());
         let Some(ch) = self.periph.gdma.out_channel_for(7) else { self.periph.sha.busy = false; return };
-        let mut sha = std::mem::take(&mut self.periph.sha);
-        sha.dma_step(&mut CryptoDmaOut { bus: self, channel: ch });
-        self.periph.sha = sha;
+        // Direct users can set block_num as well as firmware. Reject oversized work before allocating.
+        if want > GDMA_DESCRIPTOR_STEP_BUDGET * 4095 {
+            self.fail_dma_out(ch); self.periph.sha.busy = false; return;
+        }
+        let mut input = Vec::new();
+        if esp_periph::gdma::gather_out(&mut CryptoDmaOut { bus: self, channel: ch }, want, &mut input).is_err() || input.len() != want {
+            self.fail_dma_out(ch); self.periph.sha.busy = false; return;
+        }
+        self.periph.sha.hash_dma_input(&input);
+        self.periph.sha.busy = false;
         self.irq_dirty = true;
     }
 

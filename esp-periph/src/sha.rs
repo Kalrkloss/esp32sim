@@ -34,6 +34,10 @@ impl Sha {
             memory.out_channel().running = false;
             return;
         }
+        self.hash_dma_input(&input);
+    }
+    /// Hash the blocks a DMA request delivered: DMA_START initializes on the first block only.
+    pub fn hash_dma_input(&mut self, input: &[u8]) {
         let mut first = self.dma_first;
         for block in input.chunks(self.block_bytes()) {
             self.hash_block(block, first);
