@@ -11,7 +11,7 @@ pub(crate) struct ClockedQueue<T> {
 }
 impl<T: Copy> ClockedQueue<T> {
     pub(crate) fn new(rate: u32, initial: T, hold: bool) -> Result<Self, &'static str> {
-        if !(8000..=96000).contains(&rate) { return Err("sample rate must be 8000..96000 Hz"); }
+        if !(1..=96000).contains(&rate) { return Err("sample rate must be 1..96000 Hz"); }
         Ok(Self { rate, frames: VecDeque::new(), phase: 0, current: initial, hold, silence: initial })
     }
     pub(crate) fn push(&mut self, samples: impl ExactSizeIterator<Item = T>) {

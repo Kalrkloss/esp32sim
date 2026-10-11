@@ -34,6 +34,10 @@ impl I2s {
     pub fn pcm_bank(&mut self) -> &mut Option<Box<PcmSources>> {
         &mut self.rx.get_or_insert_with(Box::default).sources
     }
+    /// The attached source bank, if any; never allocates.
+    pub fn pcm_bank_ref(&self) -> Option<&PcmSources> {
+        self.rx.as_ref()?.sources.as_deref()
+    }
     /// Lend the source bank to a receive interval; return it with `restore_pcm_bank`.
     pub fn take_pcm_bank(&mut self) -> Option<Box<PcmSources>> {
         self.rx.as_mut().and_then(|rx| rx.sources.take())
@@ -92,16 +96,18 @@ impl I2s {
         if let Some(sources) = sources {
             sources.advance_to(now.saturating_sub(cycles), cpu_hz);
             let selected = if sources.active() { sources.select(gpio, signals, self.rx_conf & (1 << 20) != 0) } else { None };
-            self.rx_data(cycles, pdm2pcm, |offset| selected.map_or([0; 2], |id| sources.sample(id, offset, cpu_hz)))
-        } else {
-            let mut input = self.rx.as_mut().map(|rx| std::mem::take(&mut rx.input)).unwrap_or_default();
-            let rate = self.rx_rate().unwrap_or(1);
-            let bytes = self.rx_data(cycles, pdm2pcm, |_| input.next(rate));
-            if let Some(rx) = &mut self.rx {
-                rx.input = input;
+            if let Some(id) = selected {
+                return self.rx_data(cycles, pdm2pcm, |offset| sources.sample(id, offset, cpu_hz));
             }
-            bytes
         }
+        // No bank, or no slot wired to this controller: per-controller input (`--i2s-tone`, pushes).
+        let mut input = self.rx.as_mut().map(|rx| std::mem::take(&mut rx.input)).unwrap_or_default();
+        let rate = self.rx_rate().unwrap_or(1);
+        let bytes = self.rx_data(cycles, pdm2pcm, |_| input.next(rate));
+        if let Some(rx) = &mut self.rx {
+            rx.input = input;
+        }
+        bytes
     }
 
     pub fn rx_data(&mut self, cycles: u64, pdm2pcm: bool, mut next_frame: impl FnMut(u64) -> [i16; 2]) -> Vec<u8> {

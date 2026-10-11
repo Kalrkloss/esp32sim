@@ -256,22 +256,33 @@ mode does not consume this PCM source. Existing I2S TX capture is unchanged.
 
 ### Independent source clocks
 
-Rust hosts can append `PcmSource` values to the slot vector at
-`SocBus::pcm_sources().unwrap().inputs`. Each source names `PcmPins::I2s`
+Rust hosts attach the shared source bank with `SocBus::attach_pcm_sources()` and
+append `PcmSource` values to its `inputs` slot vector. Each source names `PcmPins::I2s`
 with BCLK/WS/data pins, or `PcmPins::Pdm` with clock/data pins, and a rate from
-8 to 96 kHz. Pushes retain the newest two seconds. Obtain the bank through
-`pcm_sources()` before each push or inspection to synchronize its clock.
-Queues advance during RX/DMA stalls and survive resets. Matrix routes select
-the lowest matching slot; underrun and unmatched wiring produce silence.
-Accessing the bank selects routed input; an empty bank produces silence.
-Hosts that never attach a bank use the per-controller input API. This models matrix
-selection and PCM samples, not IO_MUX, pad enable, serial edges or PDM filtering.
+8 to 96 kHz. Pushes retain the newest two seconds. Call `attach_pcm_sources()`
+before each push or slot edit; it synchronizes the bank's clock (on S3 it also
+flushes deferred ticks). `SocBus::pcm_sources()` is read-only: it returns the
+attached bank as of its last synchronization, or None, and changes nothing.
+Queues advance during RX/DMA stalls and survive resets. Matrix routes select the
+lowest matching slot; a matched source that underruns produces silence. A receiver
+whose route matches no slot keeps its per-controller input, so `--i2s-tone` and
+`i2s_input` pushes keep working with a bank attached. `tone()` is rejected on a
+routed source; push generated frames instead.
+
+Routing matches the RX BCK/WS output signals only. In ESP-IDF full-duplex standard
+mode the later-initialised channel becomes the slave and the BCK/WS pins usually carry
+the TX output signals (IDF v5.5.5 `esp_driver_i2s/i2s_std.c`, lines 214–237 and
+292–297). Such a duplex codec setup matches no routed source and reads its
+per-controller input instead. This
+models matrix selection and PCM samples, not IO_MUX, pad enable, serial edges or
+PDM filtering.
 
 For ADC audio, attach `AnalogSource::Stream(stream.clone())` through `analog_set`.
 Create `AnalogStream::new(rate, bias_volts, cycles)` and push finite `f32` volts
 with `push(samples, cycles, CPU_HZ)`. For exact 12-bit counts, create
 `AnalogStream::new_raw(rate, bias_count, cycles)`, attach it as
 `AnalogSource::RawStream`, and call `push_raw(samples, cycles, CPU_HZ)`.
+Stream rates are 1 Hz to 96 kHz, so slow sensor streams work too.
 Invalid samples leave queue and time intact. Push between emulator runs at the
 bus's current cycle count. Conversion uses `AnalogInputs.cpu_hz`. Buffers retain
 two seconds, drop oldest samples on overflow, and hold the last value on

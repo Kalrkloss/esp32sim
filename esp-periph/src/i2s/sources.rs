@@ -25,6 +25,7 @@ impl Default for PcmSource {
 }
 impl PcmSource {
     pub fn new(rate: u32, pins: PcmPins) -> Result<Self, &'static str> {
+        if !(8000..=96000).contains(&rate) { return Err("PCM source rate must be 8000..96000 Hz"); }
         let valid = match pins {
             PcmPins::I2s { bclk, ws, data } => bclk < 49 && ws < 49 && data < 49 && bclk != ws && bclk != data && ws != data,
             PcmPins::Pdm { clk, data } => clk < 49 && data < 49 && clk != data,
@@ -40,7 +41,9 @@ impl PcmSource {
         self.queue.push(frames[..n].iter().copied());
         n
     }
+    /// Per-controller input only: a routed source samples its queue by absolute time.
     pub fn tone(&mut self, hz: f64, amplitude: f64) -> Result<(), &'static str> {
+        if self.pins.is_some() { return Err("tone is only available on per-controller input; push frames to a routed source"); }
         if !hz.is_finite() || !(0.0..=192000.0).contains(&hz) || !amplitude.is_finite() || !(0.0..=1.0).contains(&amplitude) {
             return Err("I2S tone needs frequency 0..192000 Hz and amplitude 0..1");
         }
@@ -63,8 +66,9 @@ impl PcmSource {
     fn advance(&mut self, cycles: u64, cpu_hz: u64) { self.queue.advance(cycles, cpu_hz); }
 }
 
-/// Shared by all RX ports. Attaching the bank selects physical routing, even when empty.
-/// Slots, audio and clock phase survive chip reset. Lowest matching slot wins.
+/// Shared by all RX ports. A receiver whose matrix route matches a slot reads that slot;
+/// otherwise it keeps its per-controller input. Slots, audio and clock phase survive
+/// chip reset. Lowest matching slot wins. Only the RX BCK/WS output signals are matched.
 #[derive(Default)]
 pub struct PcmSources {
     pub inputs: Vec<Option<PcmSource>>,
@@ -147,7 +151,7 @@ mod tests {
     }
 
     #[test]
-    fn lowest_matching_source_wins_and_empty_bank_is_silent() {
+    fn lowest_matching_source_wins_and_unmatched_receivers_keep_controller_input() {
         use crate::i2s::I2s;
         let mut sources = PcmSources::default();
         sources.inputs.resize_with(16, || None);
@@ -168,9 +172,14 @@ mod tests {
         rx.write(0x50, (1 << 16) | 3);
         rx.write(0x20, 4);
         rx.rx_input().push(&[[12, 34]]);
+        // A matched source that underruns is silent; the controller input stays queued.
         assert_eq!(rx.receive(20000, 20000, false, &gpio, signals, Some(&mut sources)), [0; 4]);
         sources.inputs[15] = None;
-        assert_eq!(rx.receive(20000, 20000, false, &gpio, signals, Some(&mut sources)), [0; 4]);
+        assert_eq!(rx.receive(20000, 40000, false, &gpio, signals, Some(&mut sources)), [12, 0, 34, 0]);
+        rx.rx_input().tone(1000.0, 1.0).unwrap();
+        sources.inputs[3] = Some(PcmSource::new(8000, PcmPins::I2s { bclk: 7, ws: 8, data: 9 }).unwrap());
+        let tone: Vec<_> = (0..3).flat_map(|n| rx.receive(20000, 60000 + 20000 * n, false, &gpio, signals, Some(&mut sources))).collect();
+        assert_eq!(tone, [0, 0, 0, 0, 0x82, 0x5a, 0x82, 0x5a, 0xff, 0x7f, 0xff, 0x7f]);
 
     }
 
@@ -182,6 +191,9 @@ mod tests {
             data: 6,
         };
         assert!(PcmSource::new(0, pins).is_err());
+        assert!(PcmSource::new(7999, pins).is_err());
+        assert!(PcmSource::new(96001, pins).is_err());
+        assert!(PcmSource::new(96000, pins).is_ok());
         assert!(PcmSource::new(8000, PcmPins::Pdm { clk: 49, data: 1 }).is_err());
         assert!(PcmSource::new(8000, PcmPins::Pdm { clk: 1, data: 1 }).is_err());
         let mut source = PcmSource::new(8000, pins).unwrap();
@@ -312,5 +324,14 @@ mod tests {
             assert_eq!(sources.select(&gpio, signals, true), Some(15));
             assert_eq!(sources.select(&gpio, signals, false), None);
         }
+    }
+
+    #[test]
+    fn tone_is_rejected_on_routed_sources() {
+        let mut routed = PcmSource::new(8000, PcmPins::Pdm { clk: 1, data: 2 }).unwrap();
+        routed.push(&[[5; 2]]);
+        assert!(routed.tone(1000.0, 0.5).is_err());
+        assert_eq!((routed.queued_frames(), routed.sample(10000, 80_000_000)), (1, [5; 2]));
+        assert!(PcmSource::default().tone(1000.0, 0.5).is_ok());
     }
 }

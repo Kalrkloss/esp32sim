@@ -102,21 +102,21 @@ fn check(bus: &mut impl SocBus, chip: Chip) {
         .unwrap();
         source.push(&vec![[sample; 2]; rate as usize * 2 + 100]);
         assert_eq!(source.queued_frames(), rate as usize * 2);
-        bus.pcm_sources().unwrap().inputs.resize_with(16, || None);
-        bus.pcm_sources().unwrap().inputs[id] = Some(source);
+        bus.attach_pcm_sources().unwrap().inputs.resize_with(16, || None);
+        bus.attach_pcm_sources().unwrap().inputs[id] = Some(source);
     }
     // All sources advance while RX and DMA are stopped; reset preserves the bank.
     bus.tick(chip.hz / 2);
     bus.flush_ticks();
     assert_eq!(
-        bus.pcm_sources().unwrap().inputs[0]
+        bus.attach_pcm_sources().unwrap().inputs[0]
             .as_ref()
             .unwrap()
             .queued_frames(),
         12000
     );
     assert_eq!(
-        bus.pcm_sources().unwrap().inputs[15]
+        bus.attach_pcm_sources().unwrap().inputs[15]
             .as_ref()
             .unwrap()
             .queued_frames(),
@@ -140,14 +140,14 @@ fn check(bus: &mut impl SocBus, chip: Chip) {
     }
     bus.flush_ticks();
     assert_eq!(
-        bus.pcm_sources().unwrap().inputs[0]
+        bus.attach_pcm_sources().unwrap().inputs[0]
             .as_ref()
             .unwrap()
             .queued_frames(),
         0
     );
     assert_eq!(
-        bus.pcm_sources().unwrap().inputs[15]
+        bus.attach_pcm_sources().unwrap().inputs[15]
             .as_ref()
             .unwrap()
             .queued_frames(),
@@ -175,8 +175,8 @@ fn s3_port_switch_uses_same_source_and_pdm_requires_pdm_wiring() {
     )
     .unwrap();
     source.push(&[[11; 2], [22; 2], [33; 2], [44; 2]]);
-    bus.pcm_sources().unwrap().inputs.resize_with(1, || None);
-    bus.pcm_sources().unwrap().inputs[0] = Some(source);
+    bus.attach_pcm_sources().unwrap().inputs.resize_with(1, || None);
+    bus.attach_pcm_sources().unwrap().inputs[0] = Some(source);
     for (chip, expected) in [
         (S3, 11),
         (
@@ -200,7 +200,7 @@ fn s3_port_switch_uses_same_source_and_pdm_requires_pdm_wiring() {
         );
     }
     assert_eq!(
-        bus.pcm_sources().unwrap().inputs[0]
+        bus.attach_pcm_sources().unwrap().inputs[0]
             .as_ref()
             .unwrap()
             .queued_frames(),
@@ -215,10 +215,40 @@ fn s3_port_switch_uses_same_source_and_pdm_requires_pdm_wiring() {
     assert_eq!(bus.read32(S3.ram + 64).unwrap(), 0);
     let mut pdm = PcmSource::new(8000, PcmPins::Pdm { clk: 4, data: 6 }).unwrap();
     pdm.push(&[[123; 2]; 8]);
-    bus.pcm_sources().unwrap().inputs[0] = Some(pdm);
+    bus.attach_pcm_sources().unwrap().inputs[0] = Some(pdm);
     bus.write32(S3.gpio + 0x554 + 4 * 4, 27).unwrap();
     receiver(&mut bus, S3, true, 1);
     bus.tick(S3.hz / 4000);
     bus.flush_ticks();
     assert_eq!(bus.read32(S3.ram + 64).unwrap(), 123 | (123 << 16));
+}
+
+/// Reading the bank never attaches it, and a bank with no slot wired to a receiver leaves that
+/// receiver on its per-controller input (the `--i2s-tone` / `i2s_input` path).
+fn inspection_keeps_controller_input(bus: &mut impl SocBus, chip: Chip) {
+    let word = |s: i16| s as u16 as u32 | ((-s) as u16 as u32) << 16;
+    assert!(bus.pcm_sources().is_none());
+    bus.i2s_input(chip.port).unwrap().push(&[[321, -321], [654, -654]]);
+    route(bus, chip, [4, 5, 6]);
+    receiver(bus, chip, false, 1);
+    assert!(bus.pcm_sources().is_none());
+    bus.tick(chip.hz / 8000);
+    bus.flush_ticks();
+    assert!(bus.pcm_sources().is_none());
+    assert_eq!(bus.read32(chip.ram + 64).unwrap(), word(321));
+    let mut elsewhere = PcmSource::new(8000, PcmPins::I2s { bclk: 7, ws: 8, data: 9 }).unwrap();
+    elsewhere.push(&[[999; 2]; 4]);
+    bus.attach_pcm_sources().unwrap().inputs.push(Some(elsewhere));
+    assert_eq!(bus.pcm_sources().unwrap().inputs.len(), 1);
+    receiver(bus, chip, false, 1);
+    bus.tick(chip.hz / 8000);
+    bus.flush_ticks();
+    assert_eq!(bus.read32(chip.ram + 64).unwrap(), word(654));
+}
+
+#[test]
+fn inspecting_the_bank_keeps_controller_input_on_all_chips() {
+    inspection_keeps_controller_input(&mut esp32s3::machine([0; 6]).bus, S3);
+    inspection_keeps_controller_input(&mut esp32c3::machine([0; 6], 4 << 20).bus, C3);
+    inspection_keeps_controller_input(&mut esp32c6::machine([0; 6], 4 << 20).bus, C6);
 }

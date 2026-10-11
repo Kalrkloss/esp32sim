@@ -66,6 +66,11 @@ mod tests {
     #[test]
     fn stream_clock_bound_hold_and_shared_handle() {
         assert!(AnalogStream::new(0, 1.0, 0).is_err());
+        assert!(AnalogStream::new(96001, 1.0, 0).is_err());
+        // Slow sensor streams: 1 Hz holds each sample for a full second.
+        let slow = AnalogStream::new(1, 0.0, 0).unwrap();
+        slow.push(&[0.5, 0.25], 0, 1000).unwrap();
+        assert_eq!((slow.sample(999, 1000), slow.sample(1000, 1000), slow.sample(2000, 1000)), (0.0, 0.5, 0.25));
         assert!(AnalogStream::new(8000, f32::NAN, 0).is_err());
         let stream = AnalogStream::new(8000, 1.0, 0).unwrap();
         let mut pads = AnalogInputs::new(80_000_000);

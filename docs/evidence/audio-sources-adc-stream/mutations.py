@@ -15,7 +15,7 @@ BUS_PCM = ['cargo', '+1.99.0', 'test', '-p', 'esp32sim', '--test', 'pcm_sources'
 BUS_ADC = ['cargo', '+1.99.0', 'test', '-p', 'esp32sim', '--test', 'adc_stream']
 QUEUE = 'esp-periph/src/clocked_queue.rs'
 runner.CASES = [
-    ('PCM rate validation', QUEUE, '!(8000..=96000).contains(&rate)', 'false', UNIT, 'source_clock_bound_and_underrun'),
+    ('PCM rate validation', PCM, '!(8000..=96000).contains(&rate)', 'false', UNIT, 'source_clock_bound_and_underrun'),
     ('PCM pin validation', PCM, 'if !valid', 'if false', UNIT, 'source_clock_bound_and_underrun'),
     ('PCM capacity', QUEUE, 'self.rate as usize * 2', 'self.rate as usize * 3', UNIT, 'source_clock_bound_and_underrun'),
     ('PCM oldest discard', QUEUE, 'self.frames.drain(..discard);', 'let _ = discard;', UNIT, 'source_clock_bound_and_underrun'),
@@ -24,12 +24,13 @@ runner.CASES = [
     ('PCM lazy time', PCM, 'now.saturating_sub(self.now)', '0', UNIT, 'absolute_time_is_lazy_monotonic_and_handles_long_stalls'),
     ('PCM monotonic time', PCM, 'self.now.max(now)', 'now', UNIT, 'absolute_time_is_lazy_monotonic_and_handles_long_stalls'),
     ('PCM long clock', QUEUE, 'u128::from(cycles) * u128::from(self.rate)', 'u128::from(cycles * u64::from(self.rate))', UNIT, 'absolute_time_is_lazy_monotonic_and_handles_long_stalls'),
-    ('PCM source priority', PCM, '.position(|source|', '.rposition(|source|', UNIT, 'lowest_matching_source_wins_and_empty_bank_is_silent'),
+    ('PCM source priority', PCM, '.position(|source|', '.rposition(|source|', UNIT, 'lowest_matching_source_wins_and_unmatched_receivers_keep_controller_input'),
     ('PCM BCLK route', PCM, 'gpio.func_out_sel[bclk as usize] & output_mask', '(data as u32 + if pdm { 2 } else { 1 })', UNIT, 'routing_checks_every_wire_and_inversion'),
     ('PCM WS route', PCM, 'ws.is_none_or(|ws| {\n                    gpio.func_out_sel[ws as usize] & output_mask == data as u32 + 2\n                })', 'true', UNIT, 'routing_checks_every_wire_and_inversion'),
     ('PCM resample offset', RX, '(n * cpu_hz - previous).div_ceil(u64::from(rate))', 'cycles', UNIT, 'resampling_is_tick_independent_and_shared_by_receivers'),
-    ('PCM empty bank silence', RX, 'if let Some(sources) = sources {', 'if let Some(sources) = sources.filter(|s| s.active()) {', UNIT, 'lowest_matching_source_wins_and_empty_bank_is_silent'),
-    ('ADC rate validation', QUEUE, '!(8000..=96000).contains(&rate)', 'false', UNIT, 'stream_clock_bound_hold_and_shared_handle'),
+    ('ADC rate validation', QUEUE, '!(1..=96000).contains(&rate)', 'false', UNIT, 'stream_clock_bound_hold_and_shared_handle'),
+    ('ADC slow streams allowed', QUEUE, '!(1..=96000).contains(&rate)', '!(8000..=96000).contains(&rate)', UNIT, 'stream_clock_bound_hold_and_shared_handle'),
+    ('routed tone rejected', PCM, 'if self.pins.is_some() { return Err(', 'if false { return Err(', UNIT, 'tone_is_rejected_on_routed_sources'),
     ('ADC clock validation', ADC, 'cpu_hz == 0 ||', 'false ||', UNIT, 'stream_clock_bound_hold_and_shared_handle'),
     ('ADC finite bias', ADC, '!bias.is_finite()', 'false', UNIT, 'stream_clock_bound_hold_and_shared_handle'),
     ('ADC finite voltage samples', ADC, 'samples.iter().any(|v| !v.is_finite())', 'false', UNIT, 'stream_clock_bound_hold_and_shared_handle'),
@@ -60,6 +61,13 @@ runner.CASES.append(('s3 offset excludes deferred ticks', 'esp32s3/src/bus.rs', 
 runner.CASES.append(('s3 offset excludes peripheral time', 'esp32s3/src/bus.rs', ' - self.periph.clock_cycles()', '', BUS_ADC, ACROSS_RESET))
 runner.CASES.append(('bank returned after RX interval', RX, 'rx.sources = bank;', '', BUS_PCM, 'routing_timing_dma_stall_and_reset_on_all_chips'))
 runner.CASES.append(('shared lazy host synchronization', 'esp-soc/src/soc.rs', 'sources.advance_to(cycles, cpu_hz);', '', BUS_PCM, 'routing_timing_dma_stall_and_reset_on_all_chips'))
+# Reading the bank changes nothing; unmatched receivers keep their controller input.
+INSPECT = 'inspecting_the_bank_keeps_controller_input_on_all_chips'
+FALLBACK_OLD = 'if let Some(id) = selected {\n                return self.rx_data(cycles, pdm2pcm, |offset| sources.sample(id, offset, cpu_hz));\n            }'
+FALLBACK_NEW = 'return self.rx_data(cycles, pdm2pcm, |offset| selected.map_or([0; 2], |id| sources.sample(id, offset, cpu_hz)));'
+runner.CASES.append(('unmatched receiver falls back', RX, FALLBACK_OLD, FALLBACK_NEW, BUS_PCM, INSPECT))
+runner.CASES.append(('unmatched receiver falls back (unit)', RX, FALLBACK_OLD, FALLBACK_NEW, UNIT, 'lowest_matching_source_wins_and_unmatched_receivers_keep_controller_input'))
+runner.CASES.append(('inspection reads attached bank', RX, 'self.rx.as_ref()?.sources.as_deref()', 'None', BUS_PCM, INSPECT))
 
 if __name__ == '__main__':
     rows = runner.run()
