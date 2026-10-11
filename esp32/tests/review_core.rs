@@ -31,15 +31,18 @@ fn clock_fraction_and_lact_follow_frequency_changes() {
 
 #[test]
 fn clock_conversion_bounds_stop_and_peripheral_deadlines() {
-    let mut m = esp32::machine([0; 6], 4 << 20);
-    m.bus.load_bytes(0x4008_0000, &[0x06, 0xff, 0xff]).unwrap();
-    m.cores[0].pc = 0x4008_0000;
-    m.cores[0].ps = 0;
-    m.bus.write32(0x3ff0_003c, 0).unwrap();
-    m.bus.write32(0x3ff4_8070, 1 << 27).unwrap();
-    m.max_cycles = 9;
-    assert!(matches!(m.run(100), esp32::Stop::Halted));
-    assert_eq!((m.bus.cycles, m.cores[0].ccount), (9, 3));
+    for code in [&[0x06, 0xff, 0xff][..], &[0x00, 0x70, 0x00, 0x06, 0xff, 0xff][..]] {
+        let mut m = esp32::machine([0; 6], 4 << 20);
+        m.bus.load_bytes(0x4008_0000, code).unwrap();
+        m.cores[0].pc = 0x4008_0000;
+        m.cores[0].ps = 0;
+        m.quantum = 1;
+        m.bus.write32(0x3ff0_003c, 0).unwrap();
+        m.bus.write32(0x3ff4_8070, 1 << 27).unwrap();
+        m.max_cycles = 9;
+        assert!(matches!(m.run(100), esp32::Stop::Halted));
+        assert_eq!((m.bus.cycles, m.cores[0].ccount), (9, 3));
+    }
 
     let mut bus = esp32::bus::SocBus::new(4 << 20, [0; 6]);
     bus.write32(0x3ff0_003c, 1).unwrap();

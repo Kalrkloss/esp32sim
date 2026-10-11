@@ -1,20 +1,35 @@
 {
-  "upstream_base": "ff64902a",
-  "validated_source": "59de42dc167d861c14103754ec242061dcf51b32",
-  "source_unchanged_by_following_documentation": true,
+  "upstream_base": "2b992d2d",
+  "validated_source": "affe080946c59a7bfd33a17c16725372307a41e1",
+  "test_followup": "review_core rerun after strengthening idle-bound coverage",
   "clippy_native": "pass",
   "clippy_wasm": "pass",
   "test_ci": {
-    "passed": 740,
+    "passed": 807,
     "failed": 0,
     "ignored": 0
   },
   "test_plain": {
-    "passed": 718,
+    "passed": 779,
     "failed": 0,
-    "ignored": 36
+    "ignored": 46
   },
   "wasm_scenarios": 8,
   "privacy": "pass",
-  "goldens": "unchanged"
+  "mutations": {
+    "killed": 33,
+    "total": 33
+  },
+  "goldens": "hello-classic console/report intentionally re-pinned; non-classic unchanged",
+  "reset_times_before_seconds": [
+    7.351,
+    14.702,
+    22.052
+  ],
+  "reset_times_after_seconds": [
+    11.043,
+    22.086
+  ],
+  "flash_16mb_boots": 3,
+  "cpu_benchmark_run": false
 }
