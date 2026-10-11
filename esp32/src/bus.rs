@@ -193,7 +193,7 @@ impl SocBus {
         (0x6000_0000..0x6004_0000).contains(&addr)
             .then(|| addr - 0x6000_0000 + 0x3ff4_0000)
     }
-    pub(crate) fn is_periph(addr: u32) -> bool {
+    fn is_periph(addr: u32) -> bool {
         (PERIPH_BASE..PERIPH_END).contains(&addr) || Self::ahb_to_apb(addr).is_some()
     }
     fn mmu_slot(addr: u32) -> Option<(usize, usize)> {
@@ -306,16 +306,13 @@ impl SocBus {
         Some(u32::from_le_bytes(bytes))
     }
     pub(crate) fn dma_write_word(&mut self, addr: u32, value: u32) -> bool {
-        for (i, byte) in value.to_le_bytes().into_iter().enumerate() {
-            let Some((mem, off, true)) = self.memory(addr.wrapping_add(i as u32)) else {
-                return false;
-            };
-            let Some(dst) = mem.get_mut(off) else {
-                return false;
-            };
-            *dst = byte;
-            self.written(addr.wrapping_add(i as u32), 1);
-        }
+        value.to_le_bytes().into_iter().enumerate().all(|(i, byte)| self.dma_write_byte(addr.wrapping_add(i as u32), byte))
+    }
+    pub(crate) fn dma_write_byte(&mut self, addr: u32, value: u8) -> bool {
+        let Some((mem, off, true)) = self.memory(addr) else { return false };
+        let Some(dst) = mem.get_mut(off) else { return false };
+        *dst = value;
+        self.written(addr, 1);
         true
     }
     fn dma_desc_word(&mut self, addr: u32) -> Result<u32, Fault> { self.dma_read_word(addr).ok_or(Fault::Unmapped) }

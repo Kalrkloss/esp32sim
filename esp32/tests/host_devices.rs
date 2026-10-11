@@ -170,8 +170,10 @@ fn i2s_native_dma_packs_pcm_and_raises_eof() {
     assert_eq!(b.read32(base + 0x3c), Ok(0x3ffb_0100));
     assert_ne!(b.read32(base + 0x10).unwrap() & (1 << 9), 0);
     assert_eq!(b.read32(0x3ffb_0100).unwrap() >> 31, 0);
-    assert_eq!(b.read32(base + 0xc).unwrap() & (1 << 13), 0);
+    // IN_DONE (bit 8) and IN_SUC_EOF (bit 9) raw; no IN_DSCR_ERR or IN_DSCR_EMPTY.
+    assert_eq!(b.read32(base + 0xc).unwrap() & ((1 << 8) | (1 << 9) | (1 << 13) | (1 << 15)), (1 << 8) | (1 << 9));
 }
+/// 16-bit stereo at 8 kHz: one 4-byte frame per 30,000 CPU cycles.
 fn receiver(b: &mut SocBus, port: usize, size: u32, buffer: u32) -> (u32, u32) {
     let base = [0x3ff4_f000, 0x3ff6_d000][port];
     let desc = 0x3ffb_0100 + port as u32 * 12;
@@ -186,25 +188,23 @@ fn receiver(b: &mut SocBus, port: usize, size: u32, buffer: u32) -> (u32, u32) {
 }
 
 #[test]
-fn i2s_clock_gate_partial_dma_faults_interrupts_and_code_invalidation() {
+fn i2s_clock_gate_partial_dma_faults_and_interrupts() {
     for port in 0..2 {
         let mut b = bus();
-        let (base, desc) = receiver(&mut b, port, 8, 0x4008_0100);
+        let (base, desc) = receiver(&mut b, port, 8, 0x3ffb_0300);
         b.i2s_input(port).unwrap().push(&[[1, 2], [3, 4]]);
         b.tick(30_000);
-        assert_eq!(b.read32(0x4008_0100), Ok(0));
+        assert_eq!(b.read32(0x3ffb_0300), Ok(0));
         b.write32(0x3ff0_00c0, 1 << [4, 21][port]).unwrap();
         b.write32(0x3ff0_0104 + 4 * (32 + port as u32), 7).unwrap();
-        let page = b.code_page(0x4008_0100) as usize;
         b.tick(30_000);
-        assert_eq!(b.read32(0x4008_0100), Ok(1 | 2 << 16));
-        assert!(b.page_versions()[page] > 0);
+        assert_eq!(b.read32(0x3ffb_0300), Ok(1 | 2 << 16));
         assert_ne!(b.read32(desc).unwrap() & (1 << 31), 0);
         assert_eq!(b.periph.cpu_lines(0) & (1 << 7), 0);
         b.irq_dirty = false;
         b.tick(30_000);
         assert!(b.irq_dirty);
-        assert_eq!(b.read32(0x4008_0104), Ok(3 | 4 << 16));
+        assert_eq!(b.read32(0x3ffb_0304), Ok(3 | 4 << 16));
         assert_ne!(b.periph.cpu_lines(0) & (1 << 7), 0);
         b.write32(base + 0x18, 1 << 9).unwrap();
         assert_eq!(b.periph.cpu_lines(0) & (1 << 7), 0);
@@ -267,24 +267,98 @@ fn i2s_pin_source_checks_all_wires_and_survives_reboot() {
     }
 }
 
-
+/// IDF links its RX descriptors into a circle and sets owner = 1 once, at allocation
+/// (esp_driver_i2s/i2s_common.c:534,551); it never enables CHECK_OWNER. Two descriptors of
+/// one frame each must keep receiving pass after pass while their owner bits read 0.
 #[test]
-fn i2s_rejects_unowned_empty_and_unwritable_descriptors() {
-    for (address, control) in [(0x3ffb_0100, 4u32), (0x3ffb_0100, 1 << 31), (0x3ff9_1000, (1 << 31) | 4)] {
+fn i2s_two_descriptor_ring_keeps_running_after_owner_writeback() {
+    for port in 0..2 {
         let mut b = bus();
-        let (base, _) = receiver(&mut b, 0, 4, 0x3ffb_0200);
-        b.write32(0x3ff0_00c0, 1 << 4).unwrap();
-        b.load_bytes(address, &control.to_le_bytes()).unwrap();
-        b.load_bytes(address + 4, &0x3ffb_0200u32.to_le_bytes()).unwrap();
-        b.load_bytes(address + 8, &0u32.to_le_bytes()).unwrap();
-        b.write32(base + 0x34, (1 << 29) | (address & 0xfffff)).unwrap();
-        b.i2s_input(0).unwrap().push(&[[7, 8]]);
+        let (base, first) = receiver(&mut b, port, 4, 0x3ffb_0200);
+        let second = first + 0x40;
+        let eof = 1 << 30;
+        for (desc, buf, next) in [(first, 0x3ffb_0200, second), (second, 0x3ffb_0204, first)] {
+            for (off, v) in [(0, (1 << 31) | eof | (4 << 12) | 4), (4, buf), (8, next)] { b.write32(desc + off, v).unwrap(); }
+        }
+        b.write32(0x3ff0_00c0, 1 << [4, 21][port]).unwrap();
+        b.i2s_input(port).unwrap().push(&[[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]]);
+        for pass in 0..6u32 {
+            b.tick(30_000);
+            let (desc, buf) = if pass % 2 == 0 { (first, 0x3ffb_0200) } else { (second, 0x3ffb_0204) };
+            let n = 2 * pass + 1;
+            assert_eq!(b.read32(buf), Ok(n | (n + 1) << 16), "pass {pass}");
+            assert_eq!(b.read32(desc), Ok(eof | (4 << 12) | 4), "pass {pass}: owner cleared, length 4");
+            assert_eq!(b.read32(base + 0x3c), Ok(desc));
+            assert_eq!(b.read32(base + 0xc).unwrap() & ((1 << 9) | (1 << 13) | (1 << 15)), 1 << 9, "pass {pass}");
+            b.write32(base + 0x18, u32::MAX).unwrap();
+        }
+        // With LC_CONF CHECK_OWNER (bit 12) set, the CPU-owned descriptor stops the ring.
+        b.write32(base + 0x60, 1 << 12).unwrap();
+        b.i2s_input(port).unwrap().push(&[[13, 14]]);
         b.tick(30_000);
-        assert_eq!(b.read32(base + 0x10).unwrap(), 1 << 13);
-        assert_eq!(b.read32(address), Ok(control));
+        assert_eq!(b.read32(base + 0xc).unwrap() & ((1 << 9) | (1 << 13)), 1 << 13);
+        assert_eq!(b.read32(0x3ffb_0200), Ok(9 | 10 << 16));
     }
 }
 
+#[test]
+fn i2s_rejects_empty_unowned_with_check_owner_and_non_dram_descriptors() {
+    const CHECK: u32 = 1 << 12;
+    // (descriptor, control, LC_CONF, buffer): owner checked only with CHECK_OWNER; size 0;
+    // DROM, IRAM and RTC descriptors; IRAM, DROM and RTC buffers; DRAM's last word straddling.
+    for (address, control, lc_conf, buffer) in [
+        (0x3ffb_0100, 4u32, CHECK, 0x3ffb_0200),
+        (0x3ffb_0100, 1 << 31, 0, 0x3ffb_0200u32),
+        (0x3ff9_1000, (1 << 31) | 4, 0, 0x3ffb_0200),
+        (0x4008_0100, (1 << 31) | 4, 0, 0x3ffb_0200),
+        (0x3ff8_0100, (1 << 31) | 4, 0, 0x3ffb_0200),
+        (0x3ffb_0100, (1 << 31) | 4, 0, 0x4008_0200),
+        (0x3ffb_0100, (1 << 31) | 4, 0, 0x3ff9_1000),
+        (0x3ffb_0100, (1 << 31) | 4, 0, 0x3ff8_0200),
+        (0x3ffb_0100, (1 << 31) | 4, 0, 0x3fff_fffe),
+    ] {
+        let mut b = bus();
+        let (base, _) = receiver(&mut b, 0, 4, 0x3ffb_0200);
+        b.write32(0x3ff0_00c0, 1 << 4).unwrap();
+        b.write32(base + 0x60, (1 << 8) | lc_conf).unwrap();
+        b.load_bytes(address, &control.to_le_bytes()).unwrap();
+        b.load_bytes(address + 4, &buffer.to_le_bytes()).unwrap();
+        b.load_bytes(address + 8, &0u32.to_le_bytes()).unwrap();
+        b.load_bytes(buffer, &[0xa5; 2]).unwrap();
+        b.write32(base + 0x34, (1 << 29) | (address & 0xfffff)).unwrap();
+        b.i2s_input(0).unwrap().push(&[[7, 8]]);
+        b.tick(30_000);
+        assert_eq!(b.read32(base + 0x10).unwrap(), 1 << 13, "{address:#x} {buffer:#x}");
+        assert_eq!(b.read32(address), Ok(control), "{address:#x} {buffer:#x}");
+        assert_eq!((b.read8(buffer), b.read8(buffer + 1)), (Ok(0xa5), Ok(0xa5)), "{address:#x} {buffer:#x}");
+    }
+    // Owned bit clear and CHECK_OWNER at its reset value 0: IDF's ring descriptors are accepted.
+    let mut b = bus();
+    let (base, desc) = receiver(&mut b, 0, 4, 0x3ffb_0200);
+    b.write32(desc, 4).unwrap();
+    b.write32(0x3ff0_00c0, 1 << 4).unwrap();
+    assert_eq!(b.read32(base + 0x60), Ok(1 << 8));
+    b.i2s_input(0).unwrap().push(&[[7, 8]]);
+    b.tick(30_000);
+    assert_eq!(b.read32(0x3ffb_0200), Ok(7 | 8 << 16));
+    assert_eq!(b.read32(base + 0x10).unwrap(), 1 << 9);
+}
+
+/// I2S_INLINK_ADDR holds 20 bits under 0x3FF0_0000, so offset 0x40000 names UART0's FIFO.
+/// The descriptor read must not pop UART input and the writeback must not transmit.
+#[test]
+fn i2s_inlink_offset_into_registers_does_not_touch_uart_fifo() {
+    let mut b = bus();
+    let (base, _) = receiver(&mut b, 0, 4, 0x3ffb_0200);
+    b.write32(0x3ff0_00c0, 1 << 4).unwrap();
+    b.periph.uart[0].0.host_input(b"abcd");
+    b.write32(base + 0x34, (1 << 29) | 0x40000).unwrap();
+    b.i2s_input(0).unwrap().push(&[[7, 8]]);
+    b.tick(30_000);
+    assert_eq!(b.read32(base + 0x10).unwrap(), 1 << 13);
+    assert_eq!(b.periph.uart[0].0.rx_pending(), 4);
+    assert!(b.periph.uart[0].0.tx_out.is_empty());
+}
 #[test]
 fn controller_pcm_queue_survives_classic_reset_without_a_source_bank() {
     let mut b = bus();
@@ -342,6 +416,8 @@ fn i2s_eof_words_span_descriptors_and_reject_unrepresentable_counts() {
         receiver(&mut b, port, 4, 0x3ffb_0200);
         b.tick(60_000);
         assert_eq!(b.read32(base + 0x10), Ok((1 << 9) | (1 << 13)));
+        // The second frame finds no descriptor left: IN_DSCR_EMPTY (bit 15) is raw-only here.
+        assert_ne!(b.read32(base + 0xc).unwrap() & (1 << 15), 0);
         for words in [0, u32::MAX] {
             b.write32(base + 0x18, u32::MAX).unwrap();
             receiver(&mut b, port, 4, 0x3ffb_0200);
