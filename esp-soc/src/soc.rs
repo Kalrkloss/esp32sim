@@ -110,6 +110,10 @@ pub trait SocBus: Bus {
     /// At most 64 frames may await delivery; a full queue returns an error without changing it.
     fn receive_ethernet_frame(&mut self, _frame: &[u8]) -> Result<(), String> { Err("this chip has no Ethernet transport".into()) }
     fn cycles(&self) -> u64;
+    /// Convert a positive bus-reference interval to CPU clocks, rounding up to
+    /// the first CPU boundary at/after it. Fixed-clock chips compile to identity.
+    #[inline]
+    fn cpu_cycles_for_bus(&self, cycles: u64) -> u64 { cycles }
     /// CPU cycles from the current device horizon to the next transition that may wake a core.
     fn next_deadline(&self) -> Option<u64> { None }
     fn irq_dirty(&mut self) -> &mut bool;
