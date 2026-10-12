@@ -1,10 +1,11 @@
 # EX214: I2S receive input
 
-Base: upstream main `fe3a9c08`. This branch ports controller-bound stereo PCM input
-onto main's camera/crypto GDMA receive path. It retains the existing C3 GDMA adapter;
-there is exactly one register-layout translation. EX212 owns the existing scatter
-semantics. EX214 adds another producer and moves that walker into `esp-periph` so
-all three chips use it.
+Original correctness base: upstream main `fe3a9c08`. EX214, merged in #201,
+ports controller-bound stereo PCM input onto main's camera/crypto GDMA receive path.
+It retains the existing C3 GDMA adapter; there is exactly one register-layout
+translation. EX212 owns the existing scatter semantics. EX214 adds another producer
+and moves that walker into `esp-periph` so all three chips use it. The later CPU
+comparison below measures merged head `baf9845b` against `eec7b2c9`.
 
 S3 controllers 0 and 1 and C3/C6 controller 0 accept 16-bit host frames. Standard
 RX packs mono/stereo 16-bit words or left-aligned 24/32-bit samples. 24-bit samples
@@ -57,8 +58,10 @@ production WASM demo commands and exit statuses. Workspace runs use an empty
 path. `CARGO_HOME` and `RUSTUP_HOME` retain access to the installed Rust 1.99.0
 toolchain. No local firmware or private fixture is used.
 
-Focused contracts live in `cli/tests/i2s_rx.rs` and
-`esp-periph/src/i2s/rx.rs` and `esp-periph/tests/i2s_rx_contracts.rs`. Run the removal checks with:
+Focused contracts live in `cli/tests/i2s_rx.rs`, `esp-periph/src/i2s/rx.rs`
+and `esp-periph/tests/i2s_rx_contracts.rs`. After #202, `PcmInput` aliases
+`PcmSource` in `esp-periph/src/i2s/sources.rs`; the four controller-input
+mutations target that file and its `queue.frames` storage directly. Run the removal checks with:
 
 ```sh
 python3 docs/evidence/i2s-rx-input/mutations.py
@@ -68,6 +71,23 @@ python3 docs/evidence/i2s-rx-input/mutations.py
 clean source snapshot and restores each file before starting the next mutation.
 All 46 mutations fail an assertion, rather than merely failing compilation.
 Existing golden files remain byte-identical; none were regenerated.
+
+Docs follow-up verification on merged main `ff64902a` plus this receipt/runner
+update (Rust 1.99.0):
+
+| Command | Result |
+| --- | --- |
+| `cargo +1.99.0 clippy --workspace --all-targets -- -D warnings` | PASS |
+| `python3 docs/evidence/i2s-rx-input/mutations.py` | 46/46 applied and killed by test failures |
+| `python3 docs/evidence/audio-sources-adc-stream/mutations.py` | 48/48 applied and killed by test failures |
+| `cargo +1.99.0 test -p esp-periph --lib --test i2s_rx_contracts` | 60 unit + 3 contract tests passed |
+| `cargo +1.99.0 test -p esp32sim --test i2s_rx --test pcm_sources --test adc_stream` | 5 I2S RX + 3 PCM source + 2 ADC stream tests passed |
+| `node tools/check-evidence-privacy.mjs` | PASS |
+
+Both regenerated mutation JSON files are unchanged. The full-workspace/WASM
+results in `checks.json` are the original qualification, not rerun for this
+docs-only follow-up. No new CPU benchmarks were run; the measurements below
+are the recorded runs of the identified revisions.
 
 ## Shared GDMA descriptor reader
 
@@ -90,7 +110,69 @@ and DMA users. Other DMA code reuses it instead of adding a second reader or bud
 
 ## CPU comparison
 
-Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 954f2a68 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none. Pocket Tank and I2S TX workloads were not timed. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
+### Merged head baf9845b against main eec7b2c9
+
+Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Baseline eec7b2c9 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
+
+Measured head `baf9845be9250eed8d78f4b297347d25349d9bb2` (branch `i2s-rx-input`, merged in #201) against main `eec7b2c9`. User CPU seconds; B denotes the branch and M the baseline.
+
+| Workload | Main median (range) | PR median (range) | Change | PR slower in N/7 | Instructions | max load |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| C6 hello | 3.0929 (3.0479–4.8467) | 3.0769 (3.0404–3.1138) | -0.52% | 2/7 | 4800000000 | 4.57 |
+| Pocket Tank | 35.1833 (34.9038–36.1175) | 35.2277 (34.7446–38.7771) | +0.13% | 3/7 | 10073833665 | 5.37 |
+| S3 hello | 24.2008 (24.1281–24.4281) | 24.2654 (24.1591–25.0882) | +0.27% | 5/7 | 1789819657 | 5.36 |
+
+#### C6 hello
+
+Status: PASS. Flags: —.
+
+| Pair | Attempt | Order | Main s | PR s | Main load before/after/peak | PR load before/after/peak | Result |
+| --- | ---: | --- | ---: | ---: | --- | --- | --- |
+| warmup | 1 | B→M | 3.090139 | 3.157381 | 4.19/4.01/4.19 | 4.19/4.19/4.19 | accepted |
+| 1 | 2 | M→B | 3.047933 | 3.040404 | 4.01/4.01/4.01 | 4.01/4.01/4.01 | accepted |
+| 2 | 3 | B→M | 3.064688 | 3.094078 | 4.01/4.01/4.01 | 4.01/4.01/4.01 | accepted |
+| 3 | 4 | M→B | 3.066563 | 3.076993 | 4.01/4.01/4.01 | 4.01/4.01/4.01 | accepted |
+| 4 | 5 | B→M | 4.846669 | 3.113836 | 4.01/4.57/4.57 | 4.01/4.01/4.01 | accepted |
+| 5 | 6 | M→B | 3.279577 | 3.055250 | 4.57/4.52/4.57 | 4.52/4.52/4.52 | accepted |
+| 6 | 7 | B→M | 3.109558 | 3.076877 | 4.32/4.29/4.32 | 4.52/4.32/4.52 | accepted |
+| 7 | 8 | M→B | 3.092871 | 3.071213 | 4.29/4.29/4.29 | 4.29/4.19/4.29 | accepted |
+
+#### Pocket Tank
+
+Status: PASS. Flags: —.
+
+| Pair | Attempt | Order | Main s | PR s | Main load before/after/peak | PR load before/after/peak | Result |
+| --- | ---: | --- | ---: | ---: | --- | --- | --- |
+| warmup | 1 | B→M | 39.072783 | 35.405438 | 4.17/6.16/7.92 | 4.19/4.17/4.33 | discarded: load >7 |
+| warmup | 2 | B→M | 35.307844 | 35.225801 | 5.05/4.76/5.05 | 4.81/5.05/5.37 | accepted |
+| 1 | 3 | M→B | 35.183316 | 36.523128 | 4.76/4.87/4.87 | 4.87/4.60/5.15 | accepted |
+| 2 | 4 | B→M | 36.117539 | 35.269917 | 4.39/4.51/4.74 | 4.60/4.39/4.84 | accepted |
+| 3 | 5 | M→B | 35.681648 | 35.227679 | 4.51/4.23/4.51 | 4.23/4.49/4.53 | accepted |
+| 4 | 6 | B→M | 36.016530 | 38.777127 | 4.78/5.26/5.26 | 4.49/4.78/5.11 | accepted |
+| 5 | 7 | M→B | 34.903791 | 34.744562 | 4.53/4.09/4.53 | 4.09/3.88/4.09 | accepted |
+| 6 | 8 | B→M | 35.053234 | 34.808503 | 3.76/3.84/3.84 | 3.88/3.76/3.88 | accepted |
+| 7 | 9 | M→B | 34.906288 | 35.074352 | 3.84/4.35/4.40 | 4.35/4.44/4.57 | accepted |
+
+#### S3 hello
+
+Status: PASS. Flags: —.
+
+| Pair | Attempt | Order | Main s | PR s | Main load before/after/peak | PR load before/after/peak | Result |
+| --- | ---: | --- | ---: | ---: | --- | --- | --- |
+| warmup | 1 | B→M | 24.206321 | 24.370651 | 4.57/4.48/4.57 | 4.44/4.57/4.57 | accepted |
+| 1 | 2 | M→B | 24.200792 | 24.265441 | 4.48/4.18/4.48 | 4.18/3.95/4.23 | accepted |
+| 2 | 3 | B→M | 24.133667 | 24.201382 | 4.17/4.57/4.62 | 3.95/4.17/4.27 | accepted |
+| 3 | 4 | M→B | 24.128088 | 24.380274 | 4.57/4.63/4.64 | 4.63/4.19/4.63 | accepted |
+| 4 | 5 | B→M | 24.172214 | 24.159122 | 4.25/4.44/4.69 | 4.19/4.25/4.42 | accepted |
+| 5 | 6 | M→B | 24.267293 | 24.334166 | 4.44/4.48/4.66 | 4.48/4.16/4.60 | accepted |
+| 6 | 7 | B→M | 24.428119 | 25.088182 | 4.94/5.36/5.36 | 4.16/4.94/4.94 | accepted |
+| 7 | 8 | M→B | 24.302456 | 24.194735 | 4.93/4.62/4.93 | 4.62/4.65/4.70 | accepted |
+
+Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above. Only the tables are retained in this receipt; raw output files and per-second load series are not committed. I2S TX was not timed.
+
+### Earlier run: c4ffbf4d against main 954f2a68
+
+Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 954f2a68 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none. Pocket Tank and I2S TX workloads were not timed in this earlier run. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
 Measured on `schematik-engineering/esp32sim@c4ffbf4dc0460a24e2a3c220240a4fd4821f6868` (branch `i2s-rx-input`) against main `954f2a68`. The branch was then rebased onto `fe3a9c08` without changing its own diff. User CPU seconds.
 
@@ -100,7 +182,7 @@ Measured on `schematik-engineering/esp32sim@c4ffbf4dc0460a24e2a3c220240a4fd4821f
 | S3 hello | 24.9721 (24.7991–25.3546) | 24.9517 (24.7022–26.6243) | -0.08% | 3/7 | 1789819657 | 2.47 |
 | C3 hello | 2.4401 (2.4295–2.4881) | 2.4553 (2.4103–2.4856) | +0.62% | 4/7 | 4800000000 | 1.89 |
 
-### C6 hello
+#### C6 hello
 
 Status: PASS. Flags: —.
 
@@ -115,7 +197,7 @@ Status: PASS. Flags: —.
 | 6 | 7 | B→M | 3.251333 | 3.298689 | 2.44/2.44/2.44 | 2.39/2.44/2.44 | accepted |
 | 7 | 8 | M→B | 3.230994 | 3.287996 | 2.44/2.33/2.44 | 2.33/2.30/2.33 | accepted |
 
-### S3 hello
+#### S3 hello
 
 Status: PASS. Flags: —.
 
@@ -130,7 +212,7 @@ Status: PASS. Flags: —.
 | 6 | 7 | B→M | 25.354633 | 24.702150 | 1.69/1.66/1.69 | 1.86/1.69/1.86 | accepted |
 | 7 | 8 | M→B | 25.220010 | 24.951730 | 1.66/1.57/1.66 | 1.57/1.89/1.89 | accepted |
 
-### C3 hello
+#### C3 hello
 
 Status: PASS. Flags: —.
 

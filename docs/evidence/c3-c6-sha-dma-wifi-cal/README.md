@@ -243,14 +243,26 @@ The central load-gated run of `schematik-engineering/esp32sim@3d9eee3c`
 (branch `c3-c6-sha-dma-wifi-cal`) against parent
 `schematik-engineering/esp32sim@baf9845b` found C6 hello **1.37% slower in
 7/7 pairs**, 3.0448 → 3.0866 median user CPU seconds. Guest instruction counts
-and console hashes matched. This is a flagged idle cost, not a pass or a
-proven layout-only timing effect. C3 was −0.89% (1/7 slower), S3 +0.09%
+and console hashes matched. This historical result flagged an idle cost, not a pass or a
+proven layout-only timing effect; the merged-head remeasurement below resolves it. C3 was −0.89% (1/7 slower), S3 +0.09%
 (5/7), and Pocket Tank −0.36% (4/7). The samples and conditions are retained
 in [cpu-parent.md](cpu-parent.md).
 
 The size-neutral cold-device allocation below restores the parent's hot
-layout and execution-loop code. **The fix is pending central remeasurement.**
-No CPU benchmark was run for the layout fix.
+layout and execution-loop code. **The maintainer closed the C6 idle-path check
+after measuring merged #203.** Maintainer `joakimeriksson` compared main before #203
+(`ff64902a`) with main after #203 (`a175e357`) in seven alternating, load-gated
+pairs, using user CPU time and identical guest instructions and console SHA-256:
+
+| Workload | Before median | After median | Change | After slower |
+| --- | ---: | ---: | ---: | ---: |
+| C6 hello | 3.50 s | 3.51 s | +0.3% | 3/7 |
+
+These are the maintainer's reported values, not a new measurement here; raw
+pair samples are not retained in this receipt. He confirmed that both his
+earlier +1.2% (6/7) on `3d9eee3c` and the +1.37% (7/7) in
+[cpu-parent.md](cpu-parent.md) are gone. The earlier 7/7 flag is resolved;
+its historical measurements remain below and in that receipt.
 
 ### Historical pre-restack measurement
 
@@ -386,7 +398,8 @@ four distinct changed hot functions.
 
 The layout-induced differences are removed. The complete MMIO/interrupt path
 is **not** instruction-identical to main ff64902a, and disassembly alone does not prove
-that the 7/7 C6 CPU regression is cured. Central remeasurement is pending.
+that the 7/7 C6 CPU regression is cured. The maintainer's separate
+`ff64902a` → `a175e357` measurement above resolves that flag.
 
 ## Limits and evidence curation
 
@@ -400,5 +413,6 @@ Retained evidence contains source-relative commands, public versions, hashes,
 known-answer vectors and test verdicts. Build logs, absolute build paths and
 ELF debug information are not retained. The binary strings were checked for
 host paths before inclusion. Redaction removes no measured values; the CPU
-tables above hold every timing sample. No private captures or private firmware are
+historical tables above hold their timing samples; the maintainer's merged-head
+comparison is retained as reported summary values only. No private captures or private firmware are
 needed to reproduce these tests.
