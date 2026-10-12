@@ -1,6 +1,6 @@
 # EX230: classic ESP32 core
 
-Base: upstream main `2b992d2d` (merged #196 and #203). The classic chip uses the shared hooks merged in
+Base: upstream main `f1569101` (merged #205). The classic chip uses the shared hooks merged in
 #183, including the LX6-only UR 234-236 gate. The shared bus trait adds an inline identity
 conversion for fixed-clock chips; classic overrides it for CPU-clock deadlines. Timer stepping and
 alarm-gap logic are shared through `#[inline(always)]` `Timer` helpers; S3/C3/C6 keep 54-bit
@@ -13,7 +13,7 @@ invalidation, DPORT routing, UART, GPIO/IO_MUX, eFuse, flash and boot SHA-256,
 RTC control and TIMG including LACT. TIMG edge sources are 58 and 62.
 The APP MMU table is stored but execution currently uses the PRO mapping.
 Bus time uses a stable 240 MHz reference; the selected CPU runs at 40 MHz XTAL
-or 80/160/240 MHz PLL. APB remains 80 MHz and RTC slow 150 kHz.
+or 80/160/240 MHz PLL. APB is 40 MHz on XTAL and 80 MHz on PLL; RTC slow is 150 kHz.
 No PSRAM, DFP arithmetic or hardware timing validation is claimed. LACT sleep
 stepping and timer-group watchdog execution remain outside the model.
 Board callbacks and matrix peripheral signals belong to the peripherals part;
@@ -39,8 +39,8 @@ Direct app boot is rejected.
    `rtc_cntl_reg.h:863-881`, and
    `components/hal/esp32/include/hal/clk_tree_ll.h:543-626`.
    `components/freertos/Kconfig:486-489,526-528` selects the classic CCOUNT
-   tick source; `components/xtensa/include/xtensa_timer.h:128-138` documents
-   XT_CLOCK_FREQ/configCPU_CLOCK_HZ.
+   tick source; the operative `_xt_tick_divisor = esp_clk_cpu_freq() / XT_TICK_PER_SEC`
+   definition is `components/freertos/FreeRTOS-Kernel/portable/xtensa/xtensa_init.c:51-54`.
    Before the clock fix, resets occurred at **7.351, 14.702, 22.052 s**.
    After it, resets occur at **11.043 and 22.086 s** in the 25-second run.
    The stock fixture actually delays for each count **10 through 0** (eleven
@@ -59,11 +59,28 @@ Direct app boot is rejected.
    sleep wake events remain unmodeled. IDF v5.5.4
    `components/soc/esp32/register/soc/rtc_cntl_reg.h:505-523`.
 
+6. **XTAL APB:** derive divider 6 (40 MHz) on SOC_CLK_SEL=0 and divider 3
+   (80 MHz) on PLL. APB phase is retained across source changes; timer deadlines
+   use the same divider. `xtal_apb_lact_prescaler_counts_real_milliseconds`
+   reproduces the probe: XTAL with LACT divider 20 counted **4000 before, 2000
+   after per emulated millisecond**. PLL with divider 40 remains 2000 per ms
+   (80 MHz APB), including a PLL→XTAL transition. A separate phase/deadline
+   regression covers short batches and both selectors.
+   IDF v5.5.4 `components/esp_hw_support/port/esp32/rtc_clk.c:373-389`
+   sets APB=CPU and LACT prescale `cpu_freq / LACT_TICKS_PER_US`;
+   `components/esp_hw_support/include/esp_private/systimer.h:26` defines
+   two LACT ticks per microsecond, hence prescaler 20 at 40 MHz.
+
 The shared core's CCOUNT reset behavior is deliberately unchanged. Clock
 switches take effect at the existing scheduling-round boundary, not at an
 individually priced instruction. APLL, RC clock calibration, XTAL division and
 strict cost-model timing are not qualified here; unsupported CPU selectors use
-40 MHz. #207–#212 wait for #199 and #205 before their next restack/re-pin.
+40 MHz CPU, with RC_FAST/APLL APB still approximated as 80 MHz.
+Reverse deadline conversion rounds up to the next CPU boundary, so a stop bound
+can overshoot by up to 5 reference ticks on XTAL (about 21 ns), a cosmetic limit.
+Clock state after a non-SW reset (RTC +0x70 retained, DPORT rebuilt) is unverified
+against hardware; no fixture exercises it. #199 and #205 are merged; restack/re-pin
+the remaining classic stack in order #207 → #212 after #206.
 
 ## Inputs and reproduction
 
@@ -88,14 +105,15 @@ The workspace test runs use an empty HOME, with RUSTUP_HOME pointing to the
 installed toolchain. ESP32SIM_ROM_DIR is the only firmware input environment
 variable for the ignored-test run; the plain run has no firmware variables.
 The classic golden pins console, exceptions and interrupt totals/per-source
-counts. It does not pin cycle-derived instruction counts. Only the two classic
-hello goldens are intentionally re-pinned for corrected CPU time. Non-classic
-goldens and JIT implementation files are unchanged.
+counts. It does not pin cycle-derived instruction counts. The earlier CPU-time correction intentionally re-pinned the two classic
+hello goldens. This APB follow-up changes no golden bytes: the hello fixture
+never enters the XTAL phase. All golden files are byte-identical to reviewed
+`schematik-engineering/esp32sim@9580363f`. JIT implementation files are unchanged.
 
 ## Results
 
-Rust 1.99.0 on the 2b992d2d-based source: both Clippy targets pass with warnings
-denied; 807 CI-mode workspace tests and 779 plain tests
+Rust 1.99.0 on the f1569101-based source: both Clippy targets pass with warnings
+denied; 848 CI-mode workspace tests and 820 plain tests
 (46 ignored) pass with empty HOME. All eight production WASM scenarios
 and evidence privacy pass. The corrected classic goldens pass; all non-classic
 goldens remain byte-identical. The validated revision is in [checks.json](checks.json).
@@ -107,7 +125,7 @@ not hardware equivalence claims.
 ## Mutation checks
 
 [Mutation table](mutations.json): each row names the changed expression and
-the test that fails. All 33 mutations (17 original, 16 review-fix mutations)
+the test that fails. All 36 mutations (17 original, 16 prior review-fix mutations, 3 APB mutations)
 are killed by assertions, not compile errors. Reproduce each with
 `cargo +1.99.0 test --release -p esp32 --lib TEST`, or
 `cargo +1.99.0 test --release -p esp32 --test review_core TEST` when the row
@@ -128,6 +146,20 @@ Completion timing and ROM compatibility behavior are inferred, not measured
 on hardware. This fixture does not establish an IDF 4.4 firmware contract.
 
 ## CPU comparison
+
+Maintainer-measured re-review of `schematik-engineering/esp32sim@9580363f`
+(branch `esp32-classic-2-core`) against main `2b992d2d`: user CPU, seven alternating
+load-gated pairs, identical instructions and hashes, no flag. These measurements
+were supplied by the maintainer; no new CPU benchmark was run for this APB follow-up.
+
+| Workload | Change | PR slower in N/7 |
+| --- | ---: | ---: |
+| C3 hello | 0.0% | 3/7 |
+| C6 hello | 0.0% | 3/7 |
+| S3 hello | −0.2% | 4/7 |
+| Pocket Tank | +0.4% | 5/7 |
+
+The older measured samples below remain historical, not current-head timings.
 
 Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 954f2a68 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
@@ -222,10 +254,22 @@ path result is unchanged.
 
 ## Current static code-generation check
 
-Release binaries at main `2b992d2d` and source `702fd117` were disassembled
-and compared with `asmcmp.py` and the hot-path selector (addresses, relocation
-pages and symbol aliases normalized). All **115 selected S3/C3/C6 hot functions
-match**, with zero differences or missing functions. The earlier GPIO index
+Release binaries at main `f1569101` and
+`schematik-engineering/esp32sim@0c1e324b` (branch `esp32-classic-2-core-apb`)
+were disassembled and compared with the committed [asmcmp.py](asmcmp.py) and
+[hot-path selector](hot.py) (addresses, relocation pages and symbol aliases
+normalized). All **119 selected S3/C3/C6 hot functions match**, with zero
+differences or missing functions. The same selector previously selected 115
+on main `2b992d2d`; the new base emits four additional selected functions.
+[Artifact hashes](disassembly.json) identify the current comparison.
+
+```sh
+cargo +1.99.0 build --release -p esp32sim --bins
+xcrun llvm-objdump -d --demangle --no-show-raw-insn target/release/esp32sim > candidate.dis
+# Repeat on main f1569101 with a separate or clean target directory, producing main.dis.
+python3 docs/evidence/classic-core/hot.py main.dis candidate.dis
+# hot functions: same=119 diff=0 missing=0
+``` The earlier GPIO index
 `lsr`/`ubfx` difference above is historical: explicitly inlining the shared
 GPIO write into its layout adapters restores identical fixed-chip code.
 No S3/C3/C6 chip source or shared CCOUNT reset behavior changed.

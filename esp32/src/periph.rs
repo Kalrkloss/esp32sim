@@ -593,7 +593,7 @@ impl Peripherals {
     }
     /// Reference ticks per APB tick. IDF v5.5.4
     /// components/esp_hw_support/port/esp32/rtc_clk.c:373-389 sets APB=CPU
-    /// on 40 MHz XTAL; components/esp_timer/include/esp_private/systimer.h:26
+    /// on 40 MHz XTAL; components/esp_hw_support/include/esp_private/systimer.h:26
     /// uses LACT prescaler 20 there (40 on 80 MHz PLL APB).
     /// RC_FAST/APLL remain approximated as 40 MHz CPU with 80 MHz APB.
     fn apb_divider(&self) -> u64 {
