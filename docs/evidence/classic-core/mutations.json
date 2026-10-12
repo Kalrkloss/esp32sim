@@ -212,5 +212,24 @@
     "target": "review_core",
     "test": "clock_conversion_bounds_stop_and_peripheral_deadlines",
     "killed": true
+  },
+  {
+    "file": "esp32/src/periph.rs",
+    "mutation": "== 0 { 6 } else { 3 } -> == 0 { 3 } else { 3 }",
+    "test": "xtal_apb_lact_prescaler_counts_real_milliseconds",
+    "killed": true,
+    "target": "review_core"
+  },
+  {
+    "file": "esp32/src/periph.rs",
+    "mutation": "self.apb_phase = phase % 6; -> self.apb_phase = 0;",
+    "test": "apb_phase_and_deadlines_follow_xtal_pll_switches",
+    "killed": true
+  },
+  {
+    "file": "esp32/src/periph.rs",
+    "mutation": "t.saturating_sub(1).saturating_mul(self.apb_divider()) -> t.saturating_sub(1).saturating_mul(3)",
+    "test": "apb_phase_and_deadlines_follow_xtal_pll_switches",
+    "killed": true
   }
 ]

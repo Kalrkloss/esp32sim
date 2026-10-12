@@ -484,10 +484,12 @@ pub struct Peripherals {
     pub timg: [ClassicTimer; 2],
     pub misc: Misc,
     pub spi_exec: bool,
-    clock: ClockTree<2>,
+    clock: ClockTree<1>,
+    // Sixth-tick APB phase survives changes of the selected clock source.
+    apb_phase: u64,
 }
 
-device_set! { Peripherals; clock: (clock) CPU_HZ, [(ClockDomain::Apb, 3), (ClockDomain::RtcSlow, 1600)];
+device_set! { Peripherals; clock: (clock) CPU_HZ, [(ClockDomain::RtcSlow, 1600)];
     0x00 "DPORT" (dport) => [SRC_FROM_CPU0, SRC_FROM_CPU0 + 1, SRC_FROM_CPU0 + 2, SRC_FROM_CPU0 + 3];
     0x03 "SHA" (sha) => [];
     0x40 "UART0" (uart[0]) => [SRC_UART0];
@@ -542,6 +544,7 @@ impl Peripherals {
             misc: Misc::new(),
             spi_exec: false,
             clock: Self::new_clock(),
+            apb_phase: 0,
         };
         for uart in &mut p.uart { uart.write(0x20, 1 << 27); }
         p
@@ -582,7 +585,19 @@ impl Peripherals {
     }
     pub fn tick(&mut self, cycles: u64) {
         Dispatch::tick(self, cycles);
-
+        let phase = self.apb_phase + cycles * (6 / self.apb_divider());
+        self.apb_phase = phase % 6;
+        let ticks = phase / 6;
+        for uart in &mut self.uart { uart.tick(ticks); }
+        for timer in &mut self.timg { timer.tick(ticks); }
+    }
+    /// Reference ticks per APB tick. IDF v5.5.4
+    /// components/esp_hw_support/port/esp32/rtc_clk.c:373-389 sets APB=CPU
+    /// on 40 MHz XTAL; components/esp_timer/include/esp_private/systimer.h:26
+    /// uses LACT prescaler 20 there (40 on 80 MHz PLL APB).
+    /// RC_FAST/APLL remain approximated as 40 MHz CPU with 80 MHz APB.
+    fn apb_divider(&self) -> u64 {
+        if (self.rtc.0.ram.read(0x70) >> 27) & 3 == 0 { 6 } else { 3 }
     }
     /// Half reference ticks per CPU clock. IDF v5.5.4 clk_tree_ll.h:543-626,
     /// dport_reg.h:154-174 and rtc_cntl_reg.h:863-881: XTAL=40 MHz;
@@ -608,13 +623,39 @@ impl Peripherals {
         self.dport.cpu_lines(core, &self.source_status(core))
     }
     pub fn cycles_until_timer(&self) -> u32 {
-        Dispatch::cycles_until_deadline(self)
+        let mut best = self.rtc.next_deadline().map_or(u64::MAX, |t| t.saturating_sub(1) * 1600);
+        for timer in &self.timg {
+            if let Some(t) = timer.next_deadline() {
+                best = best.min(t.saturating_sub(1).saturating_mul(self.apb_divider()));
+            }
+        }
+        best.min(u64::from(u32::MAX)) as u32
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn apb_phase_and_deadlines_follow_xtal_pll_switches() {
+        let mut p = Peripherals::new([0; 6]);
+        p.write32(0x3ff5_f000, (1 << 31) | (1 << 30) | (1 << 11) | (1 << 10) | (2 << 13));
+        p.write32(0x3ff5_f010, 10);
+        p.write32(0x3ff5_f098, 1);
+        assert_eq!(p.cycles_until_timer(), 114, "XTAL: (20 APB ticks - 1) * 6");
+        p.write32(0x3ff4_8070, 1 << 27);
+        assert_eq!(p.cycles_until_timer(), 57, "PLL: (20 APB ticks - 1) * 3");
+        p.tick(1);
+        p.write32(0x3ff4_8070, 0);
+        p.tick(3);
+        assert_eq!(p.apb_phase, 5);
+        p.tick(1);
+        assert_eq!(p.apb_phase, 0);
+        p.tick(6);
+        p.write32(0x3ff5_f00c, 1);
+        assert_eq!(p.read32(0x3ff5_f004), 1, "two APB ticks across a source switch");
+    }
+
     #[test]
     fn classic_spi_and_gpio_offsets_reach_shared_models() {
         let mut p = Peripherals::new([0; 6]);
@@ -703,6 +744,7 @@ mod tests {
     #[test]
     fn dport_routes_gpio_uart_timers_and_watchdogs() {
         let mut p = Peripherals::new([0; 6]);
+        p.write32(0x3ff4_8070, 1 << 27);
 
         p.write32(0x3ff0_0104 + 4 * SRC_GPIO as u32, 7);
         p.write32(0x3ff4_9048, (2 << 12) | (1 << 9) | (1 << 8));
@@ -735,6 +777,7 @@ mod tests {
     #[test]
     fn classic_lact_counts_and_raises_its_interrupt() {
         let mut p = Peripherals::new([0; 6]);
+        p.write32(0x3ff4_8070, 1 << 27);
         let base = 0x3ff5_f000;
         p.write32(base + 0x84, 8);
         p.write32(base + 0x98, 1 << 3);
@@ -801,6 +844,7 @@ mod tests {
     fn timer_edges_use_idf_sources_58_and_62_on_both_cores() {
         for (group, source, base) in [(0, 58, 0x3ff5_f000), (1, 62, 0x3ff6_0000)] {
             let mut p = Peripherals::new([0; 6]);
+            p.write32(0x3ff4_8070, 1 << 27);
             for (core, map) in [(0, 0x3ff0_0104), (1, 0x3ff0_0218)] {
                 p.write32(map + source * 4, 10);
                 p.write32(map + (source - 1) * 4, 11);
