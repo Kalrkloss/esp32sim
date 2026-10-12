@@ -1,6 +1,6 @@
-//! Finite GDMA OUT gathers (crypto DMA). Descriptors are read only through the shared
+//! Finite GDMA OUT gathers. Descriptors are read only through the shared
 //! `DescriptorWalk`; this file adds the OUT-side bookkeeping, not a second reader.
-use super::{DescriptorWalk, DmaDescriptorFault, GdmaOutCh, GDMA_DESCRIPTOR_STEP_BUDGET};
+use super::{DescriptorWalk, DmaDescriptorFault, DmaDescriptorWord, GdmaOutCh, GDMA_DESCRIPTOR_STEP_BUDGET};
 use emu_core::Fault;
 
 /// Memory behind an OUT gather: descriptor words, buffer bytes and DW0 write-back.
@@ -56,11 +56,22 @@ pub fn gather_out(memory: &mut impl OutMemory, limit: usize, out: &mut Vec<u8>) 
     let start = out.len();
     while desc != 0 && out.len() - start < limit {
         if !visited.insert(desc) { return Err(DmaDescriptorFault::Cycle { descriptor: desc }); }
+        // Descriptors are word structures (hal/include/hal/dma_types.h:23-32).
+        if desc & 3 != 0 { return Err(DmaDescriptorFault::Read { descriptor: desc, word: DmaDescriptorWord::Control, fault: Fault::Misaligned }); }
         let (control, d) = walk.read_with(desc, |address| memory.word(address))?;
+        // LENGTH counts valid bytes of a SIZE-byte buffer; more is a malformed descriptor.
+        if d.length > d.size { return Err(DmaDescriptorFault::BufferRead { descriptor: desc, address: d.buf, fault: Fault::Prohibited }); }
         if memory.out_channel().conf1 & (1 << 12) != 0 && !d.owner_dma { return Err(DmaDescriptorFault::NotOwned { descriptor: desc }); }
         let take = (d.length as usize).min(limit - (out.len() - start));
         memory.append(d.buf, take, out).map_err(|(address, fault)| DmaDescriptorFault::BufferRead { descriptor: desc, address, fault })?;
-        memory.writeback(desc, control & !(1 << 31)).map_err(|fault| DmaDescriptorFault::Writeback { descriptor: desc, fault })?;
+        // OUT_AUTO_WRBACK (OUT_CONF0 bit 2) returns the descriptor to the CPU; without it the
+        // owner bit stays as written. IDF v5.5.4 soc/esp32s3/register/soc/gdma_reg.h:585-591,
+        // the C3/C6 headers at the same field. IDF v5.5.5's RMT TX driver sets it
+        // (esp_driver_rmt/src/rmt_tx.c:42-46); its crypto GDMA applies no strategy and PARLIO
+        // clears it (esp_driver_parlio/src/parlio_tx.c:169-173), so those keep the owner bit.
+        if memory.out_channel().conf0 & (1 << 2) != 0 {
+            memory.writeback(desc, control & !(1 << 31)).map_err(|fault| DmaDescriptorFault::Writeback { descriptor: desc, fault })?;
+        }
         memory.out_channel().int_raw |= 1;
         if d.eof {
             memory.out_channel().int_raw |= 1 << 1;
@@ -111,7 +122,7 @@ mod tests {
         let words = [(1u32 << 31) | (4 << 12) | 4, 0x1030, 0x100c, (1 << 31) | (1 << 30) | (4 << 12) | 4, 0x1040, 0];
         for (i, w) in words.iter().enumerate() { bytes[i * 4..i * 4 + 4].copy_from_slice(&w.to_le_bytes()); }
         bytes[0x30..0x34].copy_from_slice(&[1, 2, 3, 4]);
-        let mut channel = GdmaOutCh { desc: 0x1000, conf1: 1 << 12, ..Default::default() };
+        let mut channel = GdmaOutCh { desc: 0x1000, conf0: 1 << 2, conf1: 1 << 12, ..Default::default() };
         let mut memory = SramOut { base: 0x1000, bytes: &mut bytes, channel: &mut channel };
         let mut out = Vec::new();
         let fault = gather_out(&mut memory, usize::MAX, &mut out).unwrap_err();
@@ -126,5 +137,30 @@ mod tests {
         let mut channel = GdmaOutCh { desc: 0x1000 + 56, ..Default::default() };
         let mut memory = SramOut { base: 0x1000, bytes: &mut bytes, channel: &mut channel };
         assert!(matches!(gather_out(&mut memory, 4, &mut Vec::new()), Err(DmaDescriptorFault::Read { descriptor: 0x1038, .. })));
+    }
+
+    #[test]
+    fn writeback_gate_alignment_and_length_rules() {
+        let words = [(1u32 << 31) | (1 << 30) | (4 << 12) | 4, 0x1030, 0];
+        let image = |control: u32| {
+            let mut bytes = vec![0u8; 64];
+            for (i, w) in [control, words[1], words[2]].iter().enumerate() { bytes[i * 4..i * 4 + 4].copy_from_slice(&w.to_le_bytes()); }
+            bytes
+        };
+        // Without OUT_AUTO_WRBACK the owner bit is left as written.
+        let mut bytes = image(words[0]);
+        let mut channel = GdmaOutCh { desc: 0x1000, conf1: 1 << 12, ..Default::default() };
+        assert_eq!(gather_out(&mut SramOut { base: 0x1000, bytes: &mut bytes, channel: &mut channel }, 64, &mut Vec::new()), Ok(0));
+        assert_eq!(u32::from_le_bytes(bytes[0..4].try_into().unwrap()), words[0]);
+        // A misaligned descriptor address and LENGTH > SIZE are descriptor errors.
+        let mut channel = GdmaOutCh { desc: 0x1002, ..Default::default() };
+        assert!(matches!(gather_out(&mut SramOut { base: 0x1000, bytes: &mut bytes, channel: &mut channel }, 64, &mut Vec::new()),
+            Err(DmaDescriptorFault::Read { descriptor: 0x1002, fault: Fault::Misaligned, .. })));
+        let mut bytes = image((1 << 31) | (1 << 30) | (5 << 12) | 4);
+        let mut channel = GdmaOutCh { desc: 0x1000, ..Default::default() };
+        let mut out = Vec::new();
+        assert!(matches!(gather_out(&mut SramOut { base: 0x1000, bytes: &mut bytes, channel: &mut channel }, 64, &mut out),
+            Err(DmaDescriptorFault::BufferRead { descriptor: 0x1000, .. })));
+        assert!(out.is_empty());
     }
 }

@@ -4,6 +4,8 @@ use std::collections::HashSet;
 
 pub(super) const SPI2_DMA_DESCRIPTOR_STEP_BUDGET: usize = 1024;
 use esp_periph::gdma::GDMA_DESCRIPTOR_STEP_BUDGET;
+// 4096 RGB pixels plus the RMT end marker.
+const RMT_DMA_SYMBOL_LIMIT: usize = 24 * 4096 + 1;
 
 /// Which end of a memory-to-memory copy faulted.
 pub(super) enum M2mFault { Source, Destination }
@@ -24,6 +26,69 @@ pub(super) struct Spi2DmaCompletion {
 
 
 impl SocBus {
+    /// IDF v5.5.4 components/soc/esp32s3/include/soc/gdma_channel.h:21: trigger 9.
+    /// Error bit: register/soc/rmt_reg.h:1650-1656. GDMA writeback/owner:
+    /// register/soc/gdma_reg.h:585-618; OUT interrupts:649-678.
+    /// Descriptor fields: components/hal/include/hal/dma_types.h:23-32.
+    /// Stage a finite RMT DMA transaction on register writes. No idle tick pump.
+    /// Descriptor reads reuse the existing bounded walker and unpriced bus access.
+    /// With CH3 DMA_ACCESS_EN set, CH3 CONF0 and writes to a running trigger-9 GDMA OUT
+    /// channel stage the transaction.
+    #[cold]
+    #[inline(never)]
+    pub(super) fn rmt_dma_write(&mut self, a: u32, v: u32) {
+        let stage = match a >> 12 {
+            0x60016 => a & 0xfff == 0x2c,
+            0x6003f => {
+                let channel = ((a & 0xfff) / crate::periph::GDMA_CH_STRIDE) as usize;
+                let Some(c) = self.periph.gdma.out.get(channel) else { return; };
+                let off = (a & 0xfff) % crate::periph::GDMA_CH_STRIDE;
+                // IDF v5.5.4 soc/esp32s3/register/soc/gdma_reg.h:
+                // OUT_RST (OUT_CONF0 bit 0), OUTLINK_START bit 21, RESTART bit 22.
+                // Reset self-clears in GDMA, so inspect the written value. A fresh
+                // START owns its new link; only continuation keeps the saved node.
+                if c.peri_sel == 9 && ((off == 0x60 && v & 1 != 0) || (off == 0x80 && v & (1 << 21) != 0)) {
+                    self.periph.rmt.clear_dma_resume();
+                }
+                c.running && c.peri_sel == 9
+            }
+            _ => false,
+        };
+        if stage { self.stage_rmt_dma(); }
+    }
+    /// Stage TX3 symbols through the shared OUT gather, one SUC_EOF node at a time.
+    /// IDF v5.5.5 components/esp_driver_rmt/src/rmt_tx.c:79-95,693-701 and 1105-1132 feed long
+    /// frames through a two-node ring (SUC_EOF on both nodes) refilled from the OUT_EOF callback
+    /// and continued with gdma_append (OUT_LINK RESTART). Staging is instantaneous, so it reaches
+    /// a node the callback has not refilled yet, where real hardware is still held back by the
+    /// RMT FIFO: such a CPU-owned node waits for the next append instead of faulting, and
+    /// RESTART resumes after the last staged node.
+    fn stage_rmt_dma(&mut self) {
+        let Some(ch) = self.periph.gdma.out_channel_for(9) else { return; };
+        let resume = self.periph.rmt.dma_resume();
+        if resume != 0 { self.periph.gdma.out[ch].desc = resume; }
+        let limit = RMT_DMA_SYMBOL_LIMIT.saturating_sub(self.periph.rmt.dma_fifo_len()) * 4;
+        // Ask for one byte more than fits: `RmtDmaOut` accepts whole symbols only, so a chain
+        // longer than the queue's room fails as a misaligned length instead of being cut.
+        let mut bytes = Vec::new();
+        match esp_periph::gdma::gather_out(&mut RmtDmaOut { bus: self, channel: ch }, limit + 1, &mut bytes) {
+            Ok(next) => {
+                self.periph.rmt.dma_fifo().extend(bytes.as_chunks::<4>().0.iter().map(|&word| u32::from_le_bytes(word)));
+                self.periph.rmt.set_dma_resume(next);
+                let c = &mut self.periph.gdma.out[ch];
+                c.desc = next;
+                if next == 0 { c.running = false; c.int_raw |= 1 << 3; }   // OUT_TOTAL_EOF
+            }
+            Err(DmaDescriptorFault::NotOwned { descriptor }) if resume != 0 && descriptor == resume && bytes.is_empty() => {}
+            _ => {
+                self.fail_dma_out(ch);
+                self.periph.rmt.int_raw |= 1 << 28;
+                self.periph.rmt.clear_dma_fifo();
+            }
+        }
+        self.irq_dirty = true;
+    }
+
     pub(super) fn complete_spi2_dma(&mut self) {
         if let Some((deadline, _)) = &self.spi2_scheduled {
             if self.cycles < *deadline { return; }
@@ -658,5 +723,21 @@ impl esp_periph::gdma::OutMemory for CryptoDmaOut<'_> {
     fn out_channel(&mut self) -> &mut esp_periph::GdmaOutCh { &mut self.bus.periph.gdma.out[self.channel] }
     fn word(&mut self, address: u32) -> Result<u32, Fault> { self.bus.read32_unpriced(address) }
     fn append(&mut self, address: u32, count: usize, out: &mut Vec<u8>) -> Result<(), (u32, Fault)> { self.bus.append_mapped_bytes(address, count, out) }
+    fn writeback(&mut self, address: u32, value: u32) -> Result<(), Fault> { self.bus.write32_unpriced(address, value) }
+}
+
+/// RMT DMA memory: symbol buffers are word arrays in RAM. Descriptors in MMIO and misaligned
+/// buffers or lengths are rejected; everything else is the crypto adapter's bus access.
+struct RmtDmaOut<'a> { bus: &'a mut SocBus, channel: usize }
+impl esp_periph::gdma::OutMemory for RmtDmaOut<'_> {
+    fn out_channel(&mut self) -> &mut esp_periph::GdmaOutCh { &mut self.bus.periph.gdma.out[self.channel] }
+    fn word(&mut self, address: u32) -> Result<u32, Fault> {
+        if SocBus::is_periph(address) { return Err(Fault::Prohibited); }
+        self.bus.read32_unpriced(address)
+    }
+    fn append(&mut self, address: u32, count: usize, out: &mut Vec<u8>) -> Result<(), (u32, Fault)> {
+        if address & 3 != 0 || count & 3 != 0 { return Err((address, Fault::Misaligned)); }
+        self.bus.append_mapped_bytes(address, count, out)
+    }
     fn writeback(&mut self, address: u32, value: u32) -> Result<(), Fault> { self.bus.write32_unpriced(address, value) }
 }

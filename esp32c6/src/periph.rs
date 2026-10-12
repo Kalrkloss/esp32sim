@@ -35,6 +35,8 @@ pub mod src {
     pub const TG1_T0: usize = 54; pub const TG1_T1: usize = 55; pub const TG1_WDT: usize = 56;
     pub const SYSTIMER_T0: usize = 57; pub const SYSTIMER_T1: usize = 58; pub const SYSTIMER_T2: usize = 59;
     pub const MCPWM0: usize = 61;
+    // IDF v5.5.4 components/soc/esp32c6/include/soc/interrupts.h:83-85.
+    pub const PARLIO: usize = 63;
     pub const DMA_IN_CH0: usize = 66; pub const DMA_OUT_CH0: usize = 69; pub const GPSPI2: usize = 72;
     pub const AES: usize = 73; pub const SHA: usize = 74; pub const RSA: usize = 75; pub const ECC: usize = 76;
     pub const COUNT: usize = 77;
@@ -254,7 +256,7 @@ pub struct GdmaC6 { pub gdma: Gdma, ram: RegRam }
 impl Default for GdmaC6 { fn default() -> Self { Self::new() } }
 impl GdmaC6 {
     pub fn new() -> Self { let mut g = Gdma::new(); g.addr_base = 0x4080_0000; GdmaC6 { gdma: g, ram: RegRam::new() } }
-    fn map(off: u32) -> Option<u32> {
+    pub(crate) fn map(off: u32) -> Option<u32> {
         // the shared (S3) layout per channel: IN conf0 0x00, conf1 0x04, [int 0x08..0x14], fifo 0x18, pop 0x1c,
         // link 0x20, state 0x24, suc_eof 0x28, err_eof 0x2c, dscr 0x30, bf0 0x34, bf1 0x38, pri 0x44, peri_sel 0x48;
         // OUT the same at +0x60. The C6 orders a channel block conf0, conf1, fifo, push, link, state, eof, eof_bfr, dscr, bf0, bf1, pri, peri_sel.
@@ -329,12 +331,13 @@ pub fn efuse_c6(mac: [u8; 6], rev_major: u32, rev_minor: u32, pkg: u32, blk_majo
     e
 }
 
-/// Cold devices share one allocation so unused ECC does not grow the hot bus.
+/// Cold devices share one allocation so unused ECC/PARLIO do not grow the hot bus.
 /// I2S stays at offset zero: its existing data path keeps the same indirection.
 #[repr(C)]
 pub struct OptionalPeripherals {
     pub i2s0: esp_periph::I2s,
     pub ecc: crate::ecc::Ecc,
+    pub parlio: crate::parlio::Parlio,
 }
 
 pub struct Peripherals {
@@ -392,6 +395,7 @@ device_set! { Peripherals; inline always; clock: (clock) CPU_HZ, [(ClockDomain::
     0x02 "SPI0" (spi0) => [];
     0x03 "SPI1" (spi1) => [];
     0x06 "RMT" (rmt) => [src::RMT];
+    0x15 "PARL_IO" optional (optional.parlio) => [src::PARLIO];
     0x07 "LEDC" optional (ledc) => [src::LEDC];
     0x08 "TIMG0" (timg[0]) => [src::TG0_T0];
     0x09 "TIMG1" (timg[1]) => [src::TG1_T0];
@@ -459,7 +463,7 @@ impl Peripherals {
             intmtx: IntMatrix::new(), intc: Intc::new(), cache: Cache::new(), lpsys: LpSys::new(), pcr: Pcr::new(), ana_mst: AnaMst::new(), assist_debug: AssistDebug::new(),
             rng: Rng::new(), cpu_sub: RegRam::new(),
             misc: Misc::new(), spi_exec: false, clock: Self::new_clock(),
-            optional: Box::new(OptionalPeripherals { i2s0: esp_periph::I2s::new(CPU_HZ), ecc: Default::default() }), work_pending: false,
+            optional: Box::new(OptionalPeripherals { i2s0: esp_periph::I2s::new(CPU_HZ), ecc: Default::default(), parlio: crate::parlio::Parlio::new() }), work_pending: false,
             last_status: [0; 4],
         }
     }
@@ -568,5 +572,15 @@ impl Peripherals {
         self.last_status = st;
         self.intc.lines.update(&self.intmtx.map, &st);
         changed
+    }
+}
+
+#[cfg(test)]
+mod parlio_layout_tests {
+    use super::*;
+    #[test]
+    fn parlio_storage_shares_the_cold_i2s_allocation() {
+        assert_eq!(std::mem::offset_of!(OptionalPeripherals, i2s0), 0);
+        assert!(std::mem::offset_of!(OptionalPeripherals, parlio) >= size_of::<esp_periph::I2s>());
     }
 }

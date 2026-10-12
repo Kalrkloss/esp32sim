@@ -1402,3 +1402,192 @@ fn output_irq_cache_tracks_resolved_input_not_output_latch() {
     esp_soc::SocBus::gpio_release_input(&mut bus, 4);
     assert!(bus.irq_dirty);
 }
+
+#[test]
+fn unrelated_gdma_channel_does_not_stage_rmt() {
+    let mut bus = dma_bus();
+    bus.periph.gdma.out[0].peri_sel = 9;
+    bus.write32(FIRST_DESC, (1 << 31) | (1 << 30) | (4 << 12) | 4).unwrap();
+    bus.write32(FIRST_DESC + 4, FIRST_DESC + 64).unwrap();
+    bus.write32(FIRST_DESC + 8, 0).unwrap();
+    bus.write32(FIRST_DESC + 64, 0).unwrap();
+    bus.write32(PERIPH_BASE + 0x3f074, u32::MAX).unwrap();
+    assert!(bus.periph.gdma.out[0].running, "DMA_ACCESS_EN clear: GDMA writes do not stage");
+    bus.periph.rmt.write(0x2c, 1 << 25);
+    bus.write32(PERIPH_BASE + 0x3f000 + crate::periph::GDMA_CH_STRIDE + 0x74, u32::MAX).unwrap();
+    bus.write32(0x6001_6028, 0).unwrap();
+    assert_eq!(bus.periph.rmt.dma_fifo_len(), 0);
+    assert!(bus.periph.gdma.out[0].running, "only CH3 CONF0 and the selected channel stage");
+    bus.write32(PERIPH_BASE + 0x3f074, u32::MAX).unwrap();
+    assert_eq!(bus.periph.rmt.dma_fifo_len(), 1);
+    assert!(!bus.periph.gdma.out[0].running);
+}
+
+#[test]
+fn rmt_dma_stages_symbols_and_returns_descriptors_without_a_tick_pump() {
+    for auto in [0, 4] {
+    let mut bus = dma_bus();
+    let data = FIRST_DESC + 64;
+    bus.periph.gdma.out[0].peri_sel = 9;
+    bus.periph.gdma.out[0].conf0 = auto;
+    bus.periph.gdma.out[0].conf1 = 1 << 12;
+    bus.write32(FIRST_DESC, (1 << 31) | (8 << 12) | 8).unwrap();
+    bus.write32(FIRST_DESC + 4, data).unwrap();
+    bus.write32(FIRST_DESC + 8, FIRST_DESC + 16).unwrap();
+    bus.write32(FIRST_DESC + 16, (1 << 31) | (1 << 30) | (4 << 12) | 4).unwrap();
+    bus.write32(FIRST_DESC + 20, data + 8).unwrap();
+    bus.write32(FIRST_DESC + 24, 0).unwrap();
+    bus.write32(data, 0x8000 | 35 | (15 << 16)).unwrap();
+    bus.write32(data + 4, 0x8000 | 10 | (40 << 16)).unwrap();
+    bus.write32(data + 8, 0).unwrap();
+    bus.write32(0x6001_602c, (1 << 25) | (2 << 8) | 1).unwrap();
+    assert_eq!(bus.periph.rmt.dma_fifo_len(), 3);
+    assert_eq!(bus.periph.gdma.out[0].int_raw & 15, 11);
+    assert_eq!(bus.periph.gdma.out[0].eof_desc, FIRST_DESC + 16);
+    assert!(!bus.periph.gdma.out[0].running);
+    assert_eq!(bus.read32(FIRST_DESC).unwrap() >> 31, u32::from(auto == 0));
+    bus.periph.rmt.tick(1);
+    assert!(bus.periph.rmt.done.is_empty());
+    bus.periph.rmt.tick(600);
+    assert_eq!(bus.periph.rmt.done, vec![(3, vec![true, false])]);
+    assert_eq!(bus.periph.rmt.int_raw & (1 << 3), 1 << 3);
+    assert!(!bus.periph.rmt.is_running());
+}
+}
+
+#[test]
+fn rmt_dma_rejects_malformed_chains_and_bounds_cycles() {
+    for case in 0..9 {
+        let mut bus = dma_bus();
+        let data = FIRST_DESC + 64;
+        bus.periph.gdma.out[0].peri_sel = 9;
+        bus.periph.gdma.out[0].conf1 = 1 << 12;
+        let word = match case { 0 => 4 | (4 << 12), 1 => (1 << 31) | 3 | (4 << 12),
+            2 => (1 << 31) | 3 | (3 << 12), 5 => 1 << 31, _ => (1 << 31) | 4 | (4 << 12) };
+        bus.write32(FIRST_DESC, word).unwrap();
+        bus.write32(FIRST_DESC + 4, match case { 3 => data + 1, 4 => 0xffff_fffc, _ => data }).unwrap();
+        bus.write32(FIRST_DESC + 8, if case == 5 { FIRST_DESC } else { 0 }).unwrap();
+        if case == 6 { bus.periph.gdma.out[0].desc = 0x6001_602c; }
+        if case == 7 { bus.periph.rmt.dma_fifo().resize(24 * 4096 + 1, 1); }
+        if case == 8 {
+            // OUT_CONF0/CONF1/INT_RAW read as an owned EOF descriptor with a RAM buffer.
+            let c = &mut bus.periph.gdma.out[0];
+            c.desc = 0x6003_f060; c.conf0 = (3 << 30) | (4 << 12) | 4; c.conf1 = 0x3fc9_1140;
+        }
+        bus.write32(0x6001_602c, 1 << 25).unwrap();
+        assert!(!bus.periph.gdma.out[0].running, "case {case}");
+        assert_eq!(bus.periph.gdma.out[0].int_raw & 4, 4, "case {case}");
+        assert_eq!(bus.periph.rmt.int_raw & (1 << 28), 1 << 28);
+        assert_eq!(bus.periph.rmt.dma_fifo_len(), 0);
+    }
+}
+
+/// IDF v5.5.5 esp_driver_rmt/src/rmt_tx.c DMA mode: two ring nodes, SUC_EOF on both,
+/// owner check and automatic write-back (rmt_tx.c:42-46, 79-95), refilled from the OUT_EOF
+/// callback and continued with gdma_append (1105-1132); the last node's link is cut
+/// (rmt_tx_mark_eof, 602-649). Two ping-pong halves of two symbols carry a four-half frame.
+#[test]
+fn rmt_dma_follows_the_idf_ping_pong_ring() {
+    const OUT_LINK: u32 = 0x6003_f080;
+    const OUT_INT_CLR: u32 = 0x6003_f074;
+    let (n0, n1) = (FIRST_DESC, FIRST_DESC + 16);
+    let (b0, b1) = (FIRST_DESC + 64, FIRST_DESC + 72);
+    let one = 0x8000 | 35 | (15 << 16);
+    let zero = 0x8000 | 10 | (40 << 16);
+    let mut bus = dma_bus();
+    let fill = |bus: &mut SocBus, node: u32, buf: u32, symbols: [u32; 2], next: u32| {
+        bus.write32(buf, symbols[0]).unwrap();
+        bus.write32(buf + 4, symbols[1]).unwrap();
+        bus.write32(node, (1 << 31) | (1 << 30) | (8 << 12) | 8).unwrap();
+        bus.write32(node + 4, buf).unwrap();
+        bus.write32(node + 8, next).unwrap();
+    };
+    let c = &mut bus.periph.gdma.out[0];
+    c.running = false; c.peri_sel = 9; c.conf0 = 1 << 2; c.conf1 = 1 << 12; c.int_ena = 1 << 1;
+    bus.write32(0x6001_602c, 1 << 25).unwrap();        // rmt_ll_tx_enable_dma
+    fill(&mut bus, n0, b0, [one, zero], n1);
+    fill(&mut bus, n1, b1, [one, one], n0);
+    bus.write32(OUT_LINK, (n0 & 0xf_ffff) | (1 << 21)).unwrap();   // gdma_start
+    assert_eq!((bus.periph.rmt.dma_fifo_len(), bus.periph.gdma.out[0].eof_desc), (2, n0));
+    bus.write32(0x6001_602c, (1 << 25) | 1).unwrap();             // tx_start
+    assert_eq!(bus.periph.rmt.dma_fifo_len(), 4, "the second node is ready too");
+    let mut halves = [([zero, zero], n1), ([one, 0], 0)].into_iter();
+    let mut refill = n0;
+    while bus.periph.gdma.out[0].running {
+        bus.write32(OUT_INT_CLR, 1 << 1).unwrap();                 // GDMA ISR clears, then the callback
+        let Some((symbols, next)) = halves.next() else { break };
+        assert_eq!(bus.read32(refill).unwrap() >> 31, 0, "consumed node returned to the CPU");
+        let buf = if refill == n0 { b0 } else { b1 };
+        fill(&mut bus, refill, buf, symbols, next);
+        bus.write32(OUT_LINK, (n0 & 0xf_ffff) | (1 << 22)).unwrap(); // gdma_append: RESTART
+        refill = if refill == n0 { n1 } else { n0 };
+    }
+    bus.write32(OUT_INT_CLR, 1 << 1).unwrap();
+    assert!(!bus.periph.gdma.out[0].running);
+    assert_eq!(bus.periph.gdma.out[0].int_raw & (1 << 2), 0, "no descriptor error");
+    assert_eq!(bus.periph.rmt.dma_fifo_len(), 8);
+    bus.periph.rmt.tick(10_000);
+    assert_eq!(bus.periph.rmt.done, vec![(3, vec![true, false, true, true, false, false, true])]);
+}
+
+#[test]
+fn rmt_dma_fresh_start_discards_ring_resume_with_or_without_reset() {
+    const OUT_CONF0: u32 = 0x6003_f060;
+    const OUT_LINK: u32 = 0x6003_f080;
+    let (n0, n1, b0, b1) = (FIRST_DESC, FIRST_DESC + 16, FIRST_DESC + 64, FIRST_DESC + 68);
+    let control = (1 << 31) | (1 << 30) | (4 << 12) | 4;
+    for reset in [true, false] {
+        let mut bus = dma_bus();
+        for (node, buf, next, symbol) in [(n0, b0, n1, 0x8000 | 35 | (15 << 16)), (n1, b1, n0, 0x8000 | 10 | (40 << 16))] {
+            bus.write32(node, control).unwrap();
+            bus.write32(node + 4, buf).unwrap();
+            bus.write32(node + 8, next).unwrap();
+            bus.write32(buf, symbol).unwrap();
+        }
+        let c = &mut bus.periph.gdma.out[0];
+        c.running = false; c.peri_sel = 9; c.conf0 = 1 << 2; c.conf1 = 1 << 12;
+        bus.write32(0x6001_602c, 1 << 25).unwrap();
+        bus.write32(OUT_LINK, (n0 & 0xf_ffff) | (1 << 21)).unwrap();
+        assert_eq!(bus.periph.gdma.out[0].eof_desc, n0);
+        assert_eq!(bus.periph.rmt.dma_resume(), n1);
+        // Hand the first node back to DMA and relink it without disabling RMT DMA.
+        bus.write32(n0, control).unwrap();
+        if reset {
+            bus.write32(OUT_CONF0, (1 << 2) | 1).unwrap();
+            assert_eq!(bus.periph.rmt.dma_resume(), 0, "OUT_RST clears continuation even before START");
+        }
+        bus.write32(OUT_LINK, (n0 & 0xf_ffff) | (1 << 21)).unwrap();
+        assert_eq!(bus.periph.gdma.out[0].eof_desc, n0, "START uses its new link, not the stale resume node");
+        assert_eq!(bus.periph.rmt.dma_resume(), n1);
+        assert_eq!(bus.periph.rmt.dma_fifo_len(), 2);
+        assert!(bus.periph.rmt.dma_fifo().iter().all(|&symbol| symbol == 0x8000 | 35 | (15 << 16)));
+    }
+}
+
+#[test]
+fn rmt_dma_ring_waits_for_a_cpu_owned_node_and_resumes_after_restart() {
+    const OUT_LINK: u32 = 0x6003_f080;
+    let (n0, n1, buf) = (FIRST_DESC, FIRST_DESC + 16, FIRST_DESC + 64);
+    let mut bus = dma_bus();
+    for (node, control, next) in [(n0, (1 << 31) | (1 << 30) | (4 << 12) | 4, n1), (n1, (1 << 30) | (4 << 12) | 4, n0)] {
+        bus.write32(node, control).unwrap();
+        bus.write32(node + 4, buf).unwrap();
+        bus.write32(node + 8, next).unwrap();
+    }
+    bus.write32(buf, 0x8000 | 35 | (15 << 16)).unwrap();
+    let c = &mut bus.periph.gdma.out[0];
+    c.running = false; c.peri_sel = 9; c.conf0 = 1 << 2; c.conf1 = 1 << 12;
+    bus.write32(0x6001_602c, 1 << 25).unwrap();
+    bus.write32(OUT_LINK, (n0 & 0xf_ffff) | (1 << 21)).unwrap();
+    assert_eq!(bus.periph.rmt.dma_fifo_len(), 1);
+    // Node 1 still belongs to the CPU: the channel waits without a descriptor error.
+    bus.write32(OUT_LINK, (n0 & 0xf_ffff) | (1 << 22)).unwrap();
+    assert!(bus.periph.gdma.out[0].running);
+    assert_eq!((bus.periph.gdma.out[0].int_raw & (1 << 2), bus.periph.rmt.dma_fifo_len()), (0, 1));
+    bus.write32(n1, (1 << 31) | (1 << 30) | (4 << 12) | 4).unwrap();
+    bus.write32(n1 + 8, 0).unwrap();
+    bus.write32(OUT_LINK, (n0 & 0xf_ffff) | (1 << 22)).unwrap();
+    assert_eq!(bus.periph.rmt.dma_fifo_len(), 2);
+    assert_eq!(bus.periph.gdma.out[0].eof_desc, n1);
+    assert!(!bus.periph.gdma.out[0].running);
+}

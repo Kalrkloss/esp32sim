@@ -12,6 +12,7 @@ fn fixture() -> SocBus {
         bus.write32(desc + 8, next).unwrap();
     }
     bus.write32(SELECT, 7).unwrap();
+    bus.write32(CONF1 - 4, 1 << 2).unwrap(); // OUT_AUTO_WRBACK, so the owner handback is observable
     bus.write32(CONF1, 1 << 12).unwrap();
     bus.write32(SHA, 2).unwrap();
     bus.write32(SHA + 0xc, 1).unwrap();

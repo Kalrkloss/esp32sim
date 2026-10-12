@@ -146,6 +146,7 @@ impl SocBus {
         let old_drive = (self.periph.gpio.enable, self.periph.gpio.out);
         self.periph.write32(a, v);
         if self.periph.sha.dma_pending { self.sha_dma_write(a); }
+        if matches!(a >> 12, 0x60015 | 0x60080) || a == PERIPH_BASE + 0x960ac { self.parlio_dma_write(a); }
         if old_drive != (self.periph.gpio.enable, self.periph.gpio.out) {
             self.deliver_gpio_output();
         }
@@ -304,53 +305,47 @@ impl SocBus {
         self.irq_dirty = true;
     }
 
+    /// Finite SRAM-backed OUT transfers for SPI2, AES and PARLIO through the shared gather:
+    /// one transaction per start, so the channel stops after it with OUT_TOTAL_EOF, or with
+    /// OUT_DSCR_ERR on a descriptor fault. `out` keeps what was gathered before a fault.
+    /// GDMA fields: IDF v5.5.4 soc/esp32c6/register/soc/gdma_reg.h:1665-1716.
+    fn gather_dma_out(&mut self, ch: usize, limit: usize, out: &mut Vec<u8>) -> bool {
+        let mut memory = esp_periph::gdma::SramOut { base: SRAM_LOW, bytes: &mut self.sram, channel: &mut self.periph.gdma.gdma.out[ch] };
+        let result = esp_periph::gdma::gather_out(&mut memory, limit, out);
+        let c = &mut self.periph.gdma.gdma.out[ch];
+        c.running = false; c.buf_pos = 0;
+        match result {
+            Ok(next) => { c.desc = next; c.int_raw |= 1 << 3; }
+            Err(_) => c.int_raw |= 1 << 2,
+        }
+        self.irq_dirty = true;
+        result.is_ok()
+    }
+
     fn spi2_dma_tx(&mut self) {
         let Some(bits) = self.periph.spi2.dma_tx_pending else { return };
         let want = (bits as usize).div_ceil(8);
         let Some(ch) = self.periph.gdma.gdma.out_channel_for(0) else { return };   // not started yet: the round's end retries
+        // A malformed chain still completes the transfer with the bytes gathered before the
+        // fault, as before the shared gather; GDMA additionally reports OUT_DSCR_ERR.
         let mut data = Vec::with_capacity(want);
-        let (mut desc, mut last) = (self.periph.gdma.gdma.out[ch].desc, self.periph.gdma.gdma.out[ch].desc);
-        let mut guard = 0;
-        while desc != 0 && data.len() < want && guard < 4096 {
-            guard += 1;
-            let d = read_desc(&|a| self.sram32(a), desc);
-            let n = (d.length as usize).min(want - data.len());
-            let o = d.buf.wrapping_sub(SRAM_LOW) as usize;
-            if o.checked_add(n).is_some_and(|end| end <= self.sram.len()) { data.extend_from_slice(&self.sram[o..o + n]); } else { break; }
-            last = desc;
-            if d.eof { break; }
-            desc = d.next;
-        }
-        let c = &mut self.periph.gdma.gdma.out[ch];
-        c.running = false; c.desc = 0; c.eof_desc = last;
-        c.int_raw |= (1 << 0) | (1 << 1) | (1 << 3);                 // OUT_DONE, OUT_EOF, OUT_TOTAL_EOF
+        self.gather_dma_out(ch, want, &mut data);
         self.periph.spi2.complete_dma_tx(&data);
     }
 
     /// AES through GDMA (peripheral 6), which is the only way ESP-IDF's driver uses the block on
     /// this chip: the OUT chain is the input, the cipher is the shared model's, the result goes
     /// into the IN chain, each descriptor written back with its length, SUC_EOF on the last and
-    /// the owner handed to the CPU. All of it happens in the round that set the trigger. A chain
-    /// that leaves SRAM, or an IN chain too short for the result, ends the transform where it is:
-    /// the driver sees the AES done with what was delivered.
+    /// the owner handed to the CPU. All of it happens in the round that set the trigger.
+    /// A chain that leaves SRAM or is otherwise malformed ends the input where it is: the driver
+    /// sees the AES done with what was delivered (as before), and GDMA reports OUT_DSCR_ERR.
+    /// A short IN chain receives the result that fits.
     fn aes_dma_step(&mut self) {
         self.periph.aes.dma_pending = false;
         let (out_ch, in_ch) = { let g = &self.periph.gdma.gdma; (g.out_channel_for(6), g.in_channel_for(6)) };
         if let (Some(out_ch), Some(in_ch)) = (out_ch, in_ch) {
             let mut input = Vec::new();
-            let (mut desc, mut last) = (self.periph.gdma.gdma.out[out_ch].desc, 0);
-            for _ in 0..4096 {
-                if desc == 0 { break; }
-                let d = read_desc(&|a| self.sram32(a), desc);
-                let Some(bytes) = self.sram_bytes(d.buf, d.length as usize) else { break };
-                input.extend_from_slice(bytes);
-                last = desc;
-                if d.eof { break; }
-                desc = d.next;
-            }
-            let c = &mut self.periph.gdma.gdma.out[out_ch];
-            c.running = false; c.desc = 0; c.eof_desc = last;
-            c.int_raw |= (1 << 0) | (1 << 1) | (1 << 3);                 // OUT_DONE, OUT_EOF, OUT_TOTAL_EOF
+            self.gather_dma_out(out_ch, usize::MAX, &mut input);
 
             let output = self.periph.aes.transform_blocks(&input);
             let (mut desc, mut pos, mut last) = (self.periph.gdma.gdma.inp[in_ch].desc, 0usize, 0);
@@ -397,7 +392,17 @@ impl SocBus {
             };
             self.periph.spi2.finish_transfer(transfer, &rx);
         }
-        if !self.periph.rmt.rmt.done.is_empty() { for (ch, bits) in std::mem::take(&mut self.periph.rmt.rmt.done) { let pin = self.periph.gpio.pin_for_signal(RMT_SIG_OUT0 + ch as u32).unwrap_or(u8::MAX); self.board.rmt_frame(pin, &bits); } self.irq_dirty = true; }
+        if !self.periph.rmt.rmt.done.is_empty() { self.deliver_rmt_frames(); }
+    }
+
+    /// Every routed pin of a completed transmitter receives its frame (mirrored strips).
+    #[cold]
+    #[inline(never)]
+    fn deliver_rmt_frames(&mut self) {
+        for (ch, bits) in std::mem::take(&mut self.periph.rmt.rmt.done) {
+            for pin in esp_soc::pins::ChipPins::C6.routes(&self.periph.gpio, &self.periph.io_mux).output_pins(RMT_SIG_OUT0 + ch as u32) { self.board.rmt_frame(pin, &bits); }
+        }
+        self.irq_dirty = true;
     }
 
     /// Execute a pending SPI1 command against the flash image.
@@ -433,6 +438,53 @@ impl SocBus {
             }
         }
         Ok(())
+    }
+
+    /// IDF v5.5.4 components/soc/esp32c6/include/soc/gdma_channel.h:17: trigger 9.
+    /// GDMA controls: register/soc/gdma_reg.h:1665-1716; interrupts:699-732.
+    /// Descriptor fields: components/hal/include/hal/dma_types.h:23-32.
+    /// PARLIO, PCR PARL_CLK_TX_CONF and writes to a running trigger-9 GDMA OUT channel
+    /// stage the transaction; everything else stays off the write path.
+    #[cold]
+    #[inline(never)]
+    fn parlio_dma_write(&mut self, a: u32) {
+        if a >> 12 == 0x60080 {
+            let Some(off) = crate::periph::GdmaC6::map(a & 0xfff) else { return };
+            let channel = (off / esp_periph::GDMA_CH_STRIDE) as usize;
+            if !self.periph.gdma.gdma.out.get(channel).is_some_and(|c| c.running && c.peri_sel == 9) { return; }
+        }
+        self.stage_parlio_dma();
+    }
+
+    /// Stage finite PARLIO DMA transfers at MMIO boundaries, including clock-off prefill.
+    fn stage_parlio_dma(&mut self) {
+        if let Some(ch) = self.periph.gdma.gdma.out_channel_for(9) {
+            let limit = 65535usize.saturating_sub(self.periph.optional.parlio.tx().fifo.len());
+            let mut data = Vec::new();
+            match self.gather_dma_out(ch, limit + 1, &mut data) {
+                true if data.len() <= limit => self.periph.optional.parlio.tx().fifo.extend(data),
+                _ => {
+                    let c = &mut self.periph.gdma.gdma.out[ch];
+                    c.running = false; c.int_raw = (c.int_raw & !8) | 4;
+                    self.periph.optional.parlio.tx().fifo.clear();
+                }
+            }
+            self.irq_dirty = true;
+        }
+        // PCR PARL_CLK_TX_CONF (clock and TX reset) is applied here, never at the PCR write,
+        // so IDF start-up clock writes do not allocate an unused transmitter.
+        let clock = self.periph.pcr.read(0xac);
+        let Some(tx) = self.periph.optional.parlio.tx.as_mut() else { return };
+        tx.set_clock(clock);
+        tx.complete();
+        if let Some(frame) = tx.done.take() {
+            // IDF v5.5.4 components/soc/esp32c6/include/soc/gpio_sig_map.h:84: DATA0=47.
+            let routes = esp_soc::pins::ChipPins::C6.routes(&self.periph.gpio, &self.periph.io_mux);
+            let pins = (0..tx.width()).flat_map(|lane| routes.output_pins(47 + u32::from(lane)).map(move |pin| (pin, lane)));
+            esp_soc::devices::ws2812::parallel_output(&mut *self.board, pins, &frame, tx.clock_hz);
+            esp_periph::Dispatch::refresh_optional(&mut self.periph, 0x15);
+            self.irq_dirty = true;
+        }
     }
 
     /// Run the SPI1 controller if the guest just kicked it, advance device time, deliver what
@@ -558,4 +610,225 @@ impl Bus for SocBus {
     /// a peripheral write may have moved a line: the core's run stops so the machine re-derives it
     #[inline(always)]
     fn block_break(&self) -> bool { self.irq_dirty }
+}
+
+#[cfg(test)]
+mod parlio_dma_tests {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    type Frames = Arc<Mutex<Vec<(u8, Vec<bool>)>>>;
+    struct Board(Frames);
+    impl esp_soc::BoardModel for Board {
+        fn name(&self) -> &'static str { "parlio-test" }
+        fn rmt_frame(&mut self, pin: u8, bits: &[bool]) { self.0.lock().unwrap().push((pin, bits.to_vec())); }
+    }
+    #[test]
+    fn unused_parlio_has_no_storage_clock_or_active_tick_entry() {
+        use esp_periph::Device;
+        let mut bus = SocBus::new(1024, [0; 6]);
+        assert_eq!(size_of::<crate::parlio::Parlio>(), size_of::<usize>());
+        assert_eq!(size_of::<Box<crate::periph::OptionalPeripherals>>(), size_of::<usize>());
+        // IDF start-up may configure the PARLIO TX clock long before PARLIO is used.
+        bus.write32(0x6009_60ac, (1 << 18) | (1 << 16) | 74).unwrap();
+        bus.write32(0x6009_60ac, (1 << 18) | (1 << 19)).unwrap();
+        for _ in 0..8 {
+            bus.write32(0x6009_1008, 1).unwrap();
+            bus.tick(64);
+            bus.periph.refresh_lines();
+            assert!(bus.periph.optional.parlio.tx.is_none());
+            assert_eq!(bus.periph.optional.parlio.clock(), None);
+            assert!(bus.periph.misc.active_optional.is_empty());
+            assert_eq!(bus.periph.source_status()[1] & (1 << 31), 0);
+        }
+        bus.periph.write32(0x6001_5008, (1 << 19) | (1 << 2));
+        assert!(bus.periph.optional.parlio.tx.is_some());
+        assert!(bus.periph.optional.parlio.tx().running());
+        assert_eq!(bus.periph.optional.parlio.clock(), None);
+        bus.periph.tick(64);
+        assert!(bus.periph.misc.active_optional.is_empty());
+    }
+
+    #[test]
+    fn unrelated_gdma_channel_does_not_allocate_or_stage_parlio() {
+        let mut bus = SocBus::new(1024, [0; 6]);
+        let desc = SRAM_LOW + 32;
+        for (addr, word) in [(desc, (1 << 31) | (1 << 30) | (1 << 12) | 1),
+            (desc + 4, SRAM_LOW + 64), (desc + 8, 0)] {
+            bus.write32(addr, word).unwrap();
+        }
+        let c = &mut bus.periph.gdma.gdma.out[0];
+        c.running = true; c.desc = desc; c.peri_sel = 9;
+        bus.write32(0x6008_004c, u32::MAX).unwrap();
+        assert!(bus.periph.optional.parlio.tx.is_none());
+        assert!(bus.periph.gdma.gdma.out[0].running);
+        bus.write32(0x6008_003c, u32::MAX).unwrap();
+        assert_eq!(bus.periph.optional.parlio.tx().fifo.len(), 1);
+        assert!(!bus.periph.gdma.gdma.out[0].running);
+    }
+
+    #[test]
+    fn parlio_start_write_completes_staged_payload() {
+        let mut bus = SocBus::new(1024, [0; 6]);
+        let frames = Frames::default();
+        bus.board = Box::new(Board(frames.clone()));
+        bus.write32(0x6009_0014, 1 << 12).unwrap();
+        bus.write32(0x6009_1564, 47).unwrap();
+        bus.write32(0x6009_60ac, (1 << 18) | (1 << 16) | 74).unwrap();
+        let desc = SRAM_LOW + 32;
+        let data = SRAM_LOW + 64;
+        bus.write32(desc, (1 << 31) | (1 << 30) | (24 << 12) | 24).unwrap();
+        bus.write32(desc + 4, data).unwrap();
+        bus.write32(desc + 8, 0).unwrap();
+        for i in 0..24 { bus.write8(data + i, 0b00_00_10_11).unwrap(); }
+        let c = &mut bus.periph.gdma.gdma.out[0];
+        c.running = true; c.desc = desc; c.peri_sel = 9; c.conf1 = 1 << 12;
+        bus.write32(0x6008_003c, u32::MAX).unwrap();
+        assert_eq!(bus.periph.optional.parlio.tx().fifo.len(), 24);
+        assert!(frames.lock().unwrap().is_empty());
+        bus.write32(0x6001_5008, (24 << 2) | (1 << 19) | (3 << 27)).unwrap();
+        assert_eq!(*frames.lock().unwrap(), [(4, vec![false; 24])]);
+    }
+
+    #[test]
+    fn shared_gather_preserves_spi_payload_and_aes_ciphertext() {
+        for trigger in [0, 6] {
+            for auto in [0, 4] {
+                let mut bus = SocBus::new(1024, [0; 6]);
+                let desc = SRAM_LOW + 32;
+                let input = SRAM_LOW + 128;
+                let dest = SRAM_LOW + 160;
+                for (addr, word) in [(desc, (1 << 31) | (1 << 30) | (16 << 12) | 16),
+                    (desc + 4, input), (desc + 8, 0), (desc + 16, (1 << 31) | 16),
+                    (desc + 20, dest), (desc + 24, 0)] {
+                    assert!(bus.sram_store(addr, &word.to_le_bytes()));
+                }
+                assert!(bus.sram_store(input, &[0; 16]));
+                let c = &mut bus.periph.gdma.gdma.out[0];
+                c.running = true; c.desc = desc; c.peri_sel = trigger;
+                c.conf0 = auto; c.conf1 = 1 << 12;
+                bus.irq_dirty = false;
+                if trigger == 0 {
+                    for (reg, value) in [(0x30, 1 << 28), (0x10, 1 << 27), (0x1c, 127), (0, 1 << 24)] {
+                        bus.periph.spi2.write(reg, value);
+                    }
+                    bus.spi2_dma_tx();
+                    assert_eq!(bus.periph.spi2.take_transfer().unwrap().tx, [0; 16]);
+                } else {
+                    let c = &mut bus.periph.gdma.gdma.inp[0];
+                    c.running = true; c.desc = desc + 16; c.peri_sel = 6;
+                    bus.aes_dma_step();
+                    assert_eq!(bus.sram_bytes(dest, 16).unwrap(),
+                        &[0x66, 0xe9, 0x4b, 0xd4, 0xef, 0x8a, 0x2c, 0x3b, 0x88, 0x4c, 0xfa, 0x59, 0xca, 0x34, 0x2b, 0x2e]);
+                    assert_eq!(bus.periph.aes.state, 2);
+                }
+                assert!(bus.irq_dirty);
+                assert_eq!(bus.sram32(desc) >> 31, u32::from(auto == 0));
+                let c = &bus.periph.gdma.gdma.out[0];
+                assert!(!c.running);
+                assert_eq!((c.int_raw & 15, c.eof_desc), (11, desc));
+            }
+        }
+    }
+
+    #[test]
+    fn malformed_out_chain_still_completes_spi_and_aes_with_gathered_bytes() {
+        for trigger in [0, 6] {
+            let mut bus = SocBus::new(1024, [0; 6]);
+            let desc = SRAM_LOW + 32;
+            let input = SRAM_LOW + 128;
+            // 16 good bytes, then a descriptor whose buffer leaves SRAM.
+            for (addr, word) in [(desc, (1 << 31) | (16 << 12) | 16), (desc + 4, input), (desc + 8, desc + 16),
+                (desc + 16, (1 << 31) | (1 << 30) | (16 << 12) | 16), (desc + 20, 0x5000_0000), (desc + 24, 0),
+                (desc + 32, (1 << 31) | 32), (desc + 36, SRAM_LOW + 192), (desc + 40, 0)] {
+                assert!(bus.sram_store(addr, &word.to_le_bytes()));
+            }
+            assert!(bus.sram_store(input, &[7; 16]));
+            let c = &mut bus.periph.gdma.gdma.out[0];
+            c.running = true; c.desc = desc; c.peri_sel = trigger; c.conf0 = 4; c.conf1 = 1 << 12;
+            if trigger == 0 {
+                for (reg, value) in [(0x30, 1 << 28), (0x10, 1 << 27), (0x1c, 255), (0, 1 << 24)] {
+                    bus.periph.spi2.write(reg, value);
+                }
+                bus.spi2_dma_tx();
+                assert_eq!(bus.periph.spi2.take_transfer().unwrap().tx[..16], [7; 16]);
+            } else {
+                let c = &mut bus.periph.gdma.gdma.inp[0];
+                c.running = true; c.desc = desc + 32; c.peri_sel = 6;
+                bus.aes_dma_step();
+                assert_eq!(bus.periph.aes.state, 2);
+            }
+            let c = &bus.periph.gdma.gdma.out[0];
+            assert!(!c.running);
+            assert_eq!(c.int_raw & 12, 4, "OUT_DSCR_ERR, no OUT_TOTAL_EOF");
+        }
+    }
+
+    #[test]
+    fn pcr_tx_reset_clears_an_allocated_transmitter() {
+        let mut bus = SocBus::new(1024, [0; 6]);
+        bus.periph.optional.parlio.tx().fifo.extend([1, 2, 3]);
+        bus.write32(0x6009_60ac, 1 << 18).unwrap();
+        assert_eq!(bus.periph.optional.parlio.tx().fifo.len(), 3);
+        bus.write32(0x6009_60ac, (1 << 18) | (1 << 19)).unwrap();
+        assert!(bus.periph.optional.parlio.tx().fifo.is_empty());
+    }
+
+    #[test]
+    fn parlio_clock_off_prefill_mirrored_lanes_and_eof() {
+        for auto in [0, 4] {
+        let mut bus = SocBus::new(1024, [0; 6]);
+        let frames = Frames::default();
+        bus.board = Box::new(Board(frames.clone()));
+        for (pin, signal) in [(4, 47), (5, 48), (6, 47)] {
+            bus.write32(0x6009_0004 + pin * 4, 1 << 12).unwrap();
+            bus.write32(0x6009_1554 + pin * 4, signal).unwrap();
+        }
+        let desc = SRAM_LOW + 32;
+        let data = SRAM_LOW + 64;
+        bus.write32(desc, (1 << 31) | (12 << 12) | 12).unwrap();
+        bus.write32(desc + 4, data).unwrap(); bus.write32(desc + 8, desc + 16).unwrap();
+        bus.write32(desc + 16, (1 << 31) | (1 << 30) | (12 << 12) | 12).unwrap();
+        bus.write32(desc + 20, data + 12).unwrap(); bus.write32(desc + 24, 0).unwrap();
+        for i in 0..24 { bus.write8(data + i, 0b00_00_10_11).unwrap(); }
+        let c = &mut bus.periph.gdma.gdma.out[0];
+        c.running = true; c.desc = desc; c.peri_sel = 9; c.conf0 = auto; c.conf1 = 1 << 12;
+        bus.write32(0x6009_60ac, 0).unwrap();
+        assert_eq!(bus.read32(0x6001_5010).unwrap(), 1 << 31);
+        assert_eq!(bus.periph.gdma.gdma.out[0].int_raw & 15, 11);
+        assert!(!bus.periph.gdma.gdma.out[0].running);
+        assert_eq!(bus.read32(desc).unwrap() >> 31, u32::from(auto == 0));
+        bus.write32(0x6001_5014, 4).unwrap();
+        bus.write32(0x6001_5008, (24 << 2) | (1 << 19) | (3 << 27)).unwrap();
+        assert!(frames.lock().unwrap().is_empty());
+        bus.write32(0x6009_60ac, (1 << 18) | (1 << 16) | 74).unwrap();
+        assert_eq!(*frames.lock().unwrap(), [(4, vec![false; 24]), (6, vec![false; 24]), (5, vec![true; 24])]);
+        assert_eq!(bus.periph.source_status()[1] & (1 << 31), 1 << 31);
+        bus.periph.intmtx.map[63] = 3;
+        bus.periph.refresh_lines();
+        assert_eq!(bus.periph.intc.lines.level, 1 << 3);
+        bus.write32(0x6001_5020, 4).unwrap();
+        assert_eq!(bus.periph.source_status()[1] & (1 << 31), 0);
+        bus.periph.refresh_lines();
+        assert_eq!(bus.periph.intc.lines.level, 0);
+        assert!(bus.periph.misc.active_optional.is_empty());
+    }
+    }
+    #[test]
+    fn parlio_bad_descriptor_never_publishes_data() {
+        for case in 0..6 {
+            let mut bus = SocBus::new(1024, [0; 6]);
+            let desc = SRAM_LOW + 32;
+            let data = SRAM_LOW + 64;
+            bus.write32(desc, match case { 0 => 4 | (4 << 12), 1 => (1 << 31) | 3 | (4 << 12), 3 => 1 << 31, _ => (1 << 31) | 4 | (4 << 12) }).unwrap();
+            bus.write32(desc + 4, if case == 2 { 0xffff_fffc } else { data }).unwrap();
+            bus.write32(desc + 8, if case == 3 { desc } else { 0 }).unwrap();
+            let c = &mut bus.periph.gdma.gdma.out[0];
+            c.running = true; c.desc = if case == 4 { desc + 1 } else { desc }; c.peri_sel = 9; c.conf1 = 1 << 12;
+            if case == 5 { bus.periph.optional.parlio.tx().fifo.resize(65535, 1); }
+            bus.stage_parlio_dma();
+            assert!(bus.periph.optional.parlio.tx().fifo.is_empty());
+            assert_eq!(bus.periph.gdma.gdma.out[0].int_raw & 4, 4, "case {case}");
+            assert!(!bus.periph.gdma.gdma.out[0].running);
+        }
+    }
 }

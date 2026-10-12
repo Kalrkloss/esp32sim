@@ -593,9 +593,10 @@ fn crypto_descriptor_writeback_preserves_mmio_side_effects() {
     let mut bus = bus_with_out(7, 64, 0);
     let channel = &mut bus.periph.gdma.out[0];
     // Existing S3 DMA accesses use the bus even for register-backed descriptors.
-    // Returning ownership to OUT_CONF0 must retain its OUT_RST side effect.
+    // Returning ownership to OUT_CONF0 must retain its OUT_RST side effect. OUT_CONF0 reads
+    // back as the descriptor word: OUT_AUTO_WRBACK (bit 2) and SIZE >= LENGTH.
     channel.desc = 0x6003_f060;
-    channel.conf0 = (3 << 30) | (64 << 12) | 1;
+    channel.conf0 = (3 << 30) | (64 << 12) | 64 | (1 << 2) | 1;
     channel.conf1 = INPUT;
     bus.periph.sha.block_num = 1;
     bus.sha_dma_step();
