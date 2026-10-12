@@ -1,6 +1,6 @@
 # EX219: LED routing and DMA output
 
-Base: upstream main `2b992d2d` (#201/#202/#203/#196 merged).
+Base: upstream main `7cc7ab99` (#201/#202/#203/#196/#199/#218 merged).
 Branch: `led-rmt-parlio-fixes`; no unmerged parent dependency.
 Related EX205 provides CPU-fed
 compact RMT and board pin transport. This change adds mirrored peripheral routes, S3 TX3 DMA
@@ -89,33 +89,45 @@ description.
 
 ## Idle path
 
-Current comparison: upstream main `2b992d2d` versus the reset/START-fixed
-`led-rmt-parlio-fixes` source, Rust 1.99.0, AArch64 release binaries.
+Current comparison: upstream main `7cc7ab99` versus
+`schematik-engineering/esp32sim@a62ef416` (`led-rmt-parlio-fixes`),
+Rust 1.99.0, AArch64 release binaries.
 Commands: `cargo +1.99.0 build --release --bins` and
 `llvm-objdump -d --demangle --no-show-raw-insn`; [asmcmp.py](asmcmp.py)
 normalizes instruction/branch addresses, alignment nops, adrp page offsets
 and equivalent call-target aliases, retaining register/field immediates.
-[Current structured results](rebase-2b.json) record every selected function and
-layout record. Historical comparisons against `ff64902a` and `15655505` remain
-in [asm.json](asm.json) and [layout.json](layout.json), under their original revisions.
+[Current structured results](rebase-7cc.json) record selected functions and
+all layout records. [Previous-base results](rebase-2b.json), and historical
+comparisons against `ff64902a` and `15655505` in [asm.json](asm.json) and
+[layout.json](layout.json), retain their original revisions.
 
-Across all three binaries, 68 selected emitted function comparisons give
-59 identical and 9 differing bodies. All compared emitted Machine run/step
-bodies match. Inlined functions have no independent body and are checked via
-their emitted callers. The differing bodies below are not claimed identical
-or used as a performance estimate; counts are normalized static instructions.
+Of the previous selection's 68 symbols, 67 are emitted in both current builds:
+58 bodies are identical and the same nine functional bodies differ as against
+`2b992d2d`. The historical C3 BLE `next_deadline` symbol is absent from both
+builds and is not counted as a body comparison. All emitted Machine run/step
+bodies match. Inlined functions (including `devices` and Peripherals write
+dispatch) have no independent body and are checked through emitted callers.
+The differing bodies below are not claimed identical or used as a performance
+estimate; counts are normalized static instructions. Parentheses retain the
+previous `2b992d2d` comparison.
 
 | Chip / function | Main | Head | Difference |
 | --- | ---: | ---: | --- |
-| S3 `write32` | 307 | 315 | DMA_ACCESS_EN gate and cold staging call now pass the written value for self-clearing reset/START handling. |
-| S3 `periph_write_inner` | 1663 | 1663 | RMT dispatch calls RmtDma::write rather than Rmt::write. |
-| S3 `tick_impl` | 3743 | 3683 | RmtDma tick and completed-frame fanout; register allocation/block placement. |
-| S3 `write32_access::<false>` | 194 | 199 | DMA gate/staging hook with the written value. |
-| C3 `tick_with_pins` | 521 | 448 | Completed-frame test and cold route fanout replace first-match delivery. |
-| C6 `tick` | 2036 | 1980 | Cold RMT frame fanout; register allocation/block placement. |
-| C6 `periph_write` | 1747 | 1822 | PARLIO dispatch/address-gated staging and shared cold allocation. |
-| C6 `tick_optional` | 227 | 229 | PARLIO dispatch arm/cold-field offsets; PARLIO never joins the active list. |
-| C6 `read32` | 677 | 683 | PARLIO read dispatch and cold-field references. |
+| S3 `write32` | 307 | 315 | DMA_ACCESS_EN gate and cold staging call passing the reset/START value; previously 307/315. |
+| S3 `periph_write_inner` | 1742 | 1742 | Only RMT dispatch changes from Rmt::write to RmtDma::write; previously 1663/1663. |
+| S3 `tick_impl` | 3742 | 3686 | RmtDma tick and cold frame fanout; register allocation/block placement; previously 3743/3683. |
+| S3 `write32_access::<false>` | 194 | 199 | DMA staging gate/hook; previously 194/199. |
+| C3 `tick_with_pins` | 542 | 475 | Completed-frame test and cold route fanout; keeps main's I2C board advance before devices, pins_active() refresh and drain afterwards; previously 521/448. |
+| C6 `tick` | 2042 | 1983 | Cold frame fanout and block placement, preserving main's I2C board order; previously 2036/1980. |
+| C6 `periph_write` | 1799 | 1872 | PARLIO dispatch/address-gated staging and shared cold allocation; previously 1747/1822. |
+| C6 `tick_optional` | 274 | 277 | PARLIO dispatch arm/cold offsets; no active-list entry; previously 227/229. |
+| C6 `read32` | 696 | 702 | PARLIO read dispatch and cold references; previously 677/683. |
+
+The only non-identical Rust replay hunks are in C3 `tick_with_pins`: the first
+commit's context now uses main's `pins_active()`; the cold-split commit leaves
+main's `advance_board` predicate/advance, `pins_active()` and
+`drain_board_inputs` in place while moving RMT fanout into `deliver_rmt_frames`.
+All other Rust commits replay identically. No #199 I2C behavior is replaced.
 
 Every one of 185 Peripherals/SocBus size/offset records matches main across
 S3/C3/C6. Reproduce with `CARGO_TARGET_DIR=<build-dir> python3 layout_probe.py
@@ -170,7 +182,7 @@ No hardware verification is claimed.
 ## Verification
 
 `checks.json` records the final required command results on Rust 1.99.0:
-800 CI-policy tests pass; 774 plain tests pass with 44 ignored. Both
+817 CI-policy tests pass; 791 plain tests pass with 44 ignored. Both
 workspace invocations use an empty HOME. The ignored-inclusive invocation sets
 only ESP32SIM_ROM_DIR among emulator variables, to the checkout's `web/wasm/fw`;
 the plain invocation has no emulator variables. CARGO_HOME and RUSTUP_HOME retain
@@ -213,6 +225,10 @@ inlining `OptionalPeripherals` fails `cold_devices_do_not_grow_the_native_hot_bu
 on its actual-field size assertion, rather than a compilation failure.
 `python3 docs/evidence/led-rmt-parlio-fixes/layout_mutate.py` runs baseline,
 mutation and restored-source tests; the restored source passes both tests.
+The merged #199 [I2C mutation script](../i2c-addressing-timing/mutate.py)
+also kills all 44 mutations on this source, including C3 board advancement,
+edge draining, pin activity and S3/C6 board-before-peripheral ordering.
+Its existing [mutation table](../i2c-addressing-timing/mutations.json) is unchanged.
 
 ## Limits
 

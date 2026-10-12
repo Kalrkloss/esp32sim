@@ -25,7 +25,7 @@
   },
   {
     "path": "esp32c6/src/bus.rs",
-    "sha256": "dc23204d455e24a61248ed965ca0c807c19b9d57c0bdc2bed0aa4d973b99406f"
+    "sha256": "372f1e8161c4687f8657b7379bb587033e96a08e7b8a807c6867780b6ea622a4"
   },
   {
     "path": "esp-soc/src/devices/ws2812.rs",
@@ -37,11 +37,11 @@
   },
   {
     "path": "esp32c6/src/periph.rs",
-    "sha256": "99bdccdc32e54adf4ae36eed2b562ecd932d370bafd03a97132dde0f607f2e61"
+    "sha256": "f8da65060a64b2d006c3fb6443cbdecbe37af9c3ba5a20bca99ad8f2731bff46"
   },
   {
     "path": "esp32s3/src/bus.rs",
-    "sha256": "03b9eecacab8d3f006c426569df8622f7a5bc14465255fe0d62a2eb7a6965582"
+    "sha256": "db56924f04a0e02e3864c01d0f4b5e84313997e51d6d7288941d1cb0e149fd2b"
   },
   {
     "path": "esp32s3/src/bus/dma.rs",
@@ -49,7 +49,7 @@
   },
   {
     "path": "esp32c3/src/bus.rs",
-    "sha256": "f9d9161e622b871df76deb292b4e2619b2f5b04e202610fa9116a235ff0ce951"
+    "sha256": "e892b24f0adeeb1eba1e38692cbf92adab65c259469600e33bae439b6238ef00"
   },
   {
     "path": "esp32c6/tests/layout.rs",
