@@ -692,6 +692,8 @@ mod tests {
     #[test]
     fn classic_adc_samples_host_waveform_at_bus_time() {
         let mut b = SocBus::new(4 << 20, [0; 6]);
+        b.write32(0x3ff4_8070, 1 << 27).unwrap();
+        b.write32(0x3ff0_003c, 2).unwrap(); // PLL 240 MHz: CPU and bus reference agree
         esp_soc::SocBus::analog_set(&mut b, 34, esp_periph::AnalogSource::Wave {
             samples: std::sync::Arc::new(vec![1.650, 0.800]),
             rate_hz: 10.0,
