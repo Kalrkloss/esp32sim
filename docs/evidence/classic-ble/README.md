@@ -1,6 +1,6 @@
 # EX228: classic ESP32 shared VHCI adapter
 
-Base: PR #210, branch `esp32-classic-6-analog-bb`, `schematik-engineering/esp32sim@68ae35eabb2600aa80295148252986b06ee6d239`, on upstream main `bb2b33d5`.
+Base: PR #210, branch `esp32-classic-6-analog-bb`, `schematik-engineering/esp32sim@41003479ff9a6084d48685046b8c1d8b4ba96e5f`, on upstream main `bb2b33d5`.
 
 BLE state is appended to SocBus. Disabled BLE uses the existing empty function
 hook list and adds no tick work. The controller remains the existing boxed
