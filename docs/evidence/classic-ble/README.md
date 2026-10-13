@@ -1,6 +1,6 @@
 # EX228: classic ESP32 shared VHCI adapter
 
-Base: PR #210, branch `esp32-classic-6-analog-bb`, `schematik-engineering/esp32sim@41003479ff9a6084d48685046b8c1d8b4ba96e5f`, on upstream main `bb2b33d5`.
+Base: PR #210, branch `esp32-classic-6-analog-bb`, `schematik-engineering/esp32sim@79922f4729e83340d89cf93fab66c5dd9686ea15`, on upstream main `bb2b33d5`.
 
 BLE state is appended to SocBus. Disabled BLE uses the existing empty function
 hook list and adds no tick work. The controller remains the existing boxed
@@ -74,4 +74,4 @@ copied into classic. The extent mutation runs against that S3 test.
 
 BLE code and ROM trampolines replay unchanged.
 
-Rust 1.99.0: both Clippy targets pass; empty-HOME CI-policy 302 passed/1 failed/0 ignored; plain 302 passed/1 failed/1 ignored; production WASM build, eight demos and privacy pass. `checks.json` identifies the exercised source revision; subsequent receipt changes are documentation only.
+Rust 1.99.0: both Clippy targets pass; empty-HOME CI-policy 925 passed/0 failed/0 ignored; plain 897 passed/0 failed/46 ignored; production WASM build, eight demos and privacy pass. `checks.json` identifies the exercised source revision; subsequent receipt changes are documentation only.
