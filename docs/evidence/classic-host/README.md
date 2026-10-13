@@ -1,10 +1,6 @@
 # EX229: classic host input and I2S receive
 
-Base: branch `esp32-classic-ble-ff` (#211),
-`schematik-engineering/esp32sim@0d134fabc9009ebf26b6a6e20cc47992bf077399`, on upstream main `ff64902a`.
-#201 and #202 are included in main. The shared `DescriptorWalk` integration
-is owned by #207; this part adds only classic RX and its regression tests.
-No prerequisite merge commit is included.
+Base: PR #211, branch `esp32-classic-ble-bb`, `schematik-engineering/esp32sim@16b73588e7d1769e3fa7e85b75e5a2745e9db559`, on upstream main `bb2b33d5`.
 
 Classic UART APB/AHB routing, matrix input, GPIO feedback/release, physical SPI,
 raw ADC observations and Ethernet relay already come from EX230 and EX224-EX228.
@@ -68,32 +64,25 @@ shared queue advances lazily on RX access or `attach_pcm_sources()`; there is no
 per-tick source scan. An inline DPORT clock/channel gate guards receive work.
 No per-tick work is added to S3/C3/C6.
 
-Static check (no timing): fat-LTO release `esp32sim` binaries (`cargo +1.99.0 build
---release -p esp32sim --bins`) of upstream main `ff64902a` and branch
-`esp32-classic-host-ff` at `schematik-engineering/esp32sim@d7b3109a0125ad55bebe19a4b05b2f5ddfef43f8`
-were disassembled with `llvm-objdump -d --demangle --no-show-raw-insn`.
-The comparison normalises addresses, alignment `nop`s, adrp page offsets and
-linker-chosen aliases whose target bodies have the same shape. Of 113 selected
-S3/C3/C6 hot functions, 104 match and nine differ; none are missing. Binary hashes
-and the complete differing-function list are in [codegen.json](codegen.json).
+Static check (no timing): Rust 1.99.0 fat-LTO release `esp32sim` binaries
+from upstream main `bb2b33d5` and this rebased stack were compared using the
+committed EX230 `asmcmp.py` and `hot.py` selector. Of 119 selected S3/C3/C6
+hot functions, 111 match, eight differ and none are missing; hashes and
+source revisions are in [codegen.json](codegen.json).
 
-- C3/C6 `i2s_receive` and S3 `dma_i2s_port` materialise the explicit BCLK/WS
-  indices needed for classic's non-adjacent signals. These changes execute only
-  in active RX paths; the other chips retain their original signal values.
-- `Gpio::write` uses `ubfx` instead of `lsr` for a register index, at the same
-  instruction count. `I2c::write` reorders its END arm and merges equivalent
-  bounds-panic sites from the macro expansion. `RtcCntl::write` has the inherited
-  classic-stack register-write code-generation differences.
-- The three `apply_due_script_events` functions have the inherited classic touch
-  event variant in the dispatch enum; this changes dispatch code when script
-  events are applied, not the no-event execution loop.
+- C3/C6 `i2s_receive` and S3 `dma_i2s_port` materialize the explicit BCLK/WS
+  signal indices for classic's non-adjacent matrix signals. Only active RX
+  executes this work; the other chips retain their original signal values.
+- Shared I2C tick loses six instructions in bounds-panic tails because the
+  macro expansion folds their source sites; normal byte stepping and the
+  idle entry match. `RtcCntl::write` has inherited classic-stack codegen
+  differences (five fewer instructions).
+- The three `apply_due_script_events` functions include the classic touch
+  event variant. Their no-event execution loops do not change.
 
-`Machine::run`/`run_modeled`/`run_unmodeled`/`step_core`, the selected bus tick,
-deadline and MMIO-dispatch functions, shared GDMA receive/scatter, interrupt
-refresh and the other selected peripheral tick paths match main. The nine
-exceptions are the same functions documented on the pre-rebase stack; this is
-not a claim that every MMIO or active-device instruction matches main, and no
-new CPU timing was collected.
+Selected run/step, bus tick/deadline/MMIO dispatch, shared GDMA, interrupt
+refresh and other peripheral tick paths match. This is not a claim that
+all active-device instructions match, and no new CPU timing was collected.
 
 ## Sources and limits
 
@@ -128,10 +117,7 @@ Clippy targets with warnings denied, empty-HOME CI-mode
 release workspace tests, production WASM build and the eight required scenarios,
 and evidence privacy.
 
-Rust 1.99.0 on the ff64902a-based source: both Clippy targets pass with warnings
-denied; 829 CI-mode workspace tests and 807 plain tests
-(36 ignored) pass with empty HOME. All eight production WASM scenarios
-and evidence privacy pass. Classic and existing goldens remain byte-identical.
+
 
 [Mutation table](mutations.json): 32 single replacements, all killed by assertion
 failures. For each row, apply the replacement, run
@@ -156,7 +142,7 @@ Not re-measured on this head. An earlier head of branch `esp32-classic-host`,
 `schematik-engineering/esp32sim@bcd4df7e`, was measured against main `2f9443a9`.
 It predates the rebase onto `eec7b2c9`, the updated #201/#202 and the Oct 11
 review commits. Classic code is unused in these workloads. The static check above
-covers the ff64902a-based source without making a new timing claim.
+covers the bb2b33d5-based source without making a new timing claim.
 
 Rust 1.99.0; cargo +1.99.0 build --release --bins; separate target directories. Main 2f9443a9 built once; each candidate fetched from origin immediately before its build. Sequential child user CPU via getrusage, including startup. One warmup B→M, then seven measured pairs M→B, B→M alternating. Before every attempt wait for 1-minute load <5 (15-second polling); monitor every second and discard/retry the entire pair if peak >7. Exact total/per-core instructions and console SHA-256 across all attempts. S3 hello: 3000 emulated seconds, board none; C3/C6: 30 seconds, board none; Pocket Tank: 30 seconds, waveshare-amoled18-v2. Ranges are min–max; change is ratio of medians. Flags: slower ≥6/7 or non-overlapping ranges. No per-second load series retained.
 
@@ -231,3 +217,10 @@ Status: PASS. Flags: —.
 | 7 | 8 | M→B | 2.369542 | 2.431076 | 3.53/3.40/3.53 | 3.40/3.40/3.40 | accepted |
 
 Max load in summary includes accepted warmup and measured pairs; discarded attempts appear above.
+
+
+## Rebase qualification on bb2b33d5
+
+Classic I2S CONF reset bits are plain R/W in IDF v5.5.4 i2s_reg.h, so read(8) retains their written values. An assertion test pins all four bits. IN_DSCR_ERR on inlink end with samples left is inferred, as well as IN_DSCR_EMPTY/stop behavior; no silicon claim is made. Moving DramDma::reaches into the bus and sharing it with SPI/Wi-Fi is a possible follow-up, not included here.
+
+Rust 1.99.0: both Clippy targets pass; empty-HOME CI-policy 306 passed/1 failed/0 ignored; plain 306 passed/1 failed/1 ignored; production WASM build, eight demos and privacy pass. `checks.json` identifies the exercised source revision; subsequent receipt changes are documentation only.

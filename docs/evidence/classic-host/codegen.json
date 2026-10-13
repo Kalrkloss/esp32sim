@@ -1,61 +1,26 @@
 {
-  "main": "mikroverk/esp32sim@ff64902ab01f91f7e57e00d213412a11cc1999fc",
-  "branch": "esp32-classic-host-ff",
-  "head": "schematik-engineering/esp32sim@d7b3109a0125ad55bebe19a4b05b2f5ddfef43f8",
-  "build": "cargo +1.99.0 build --release -p esp32sim --bins",
-  "disassembly": "llvm-objdump -d --demangle --no-show-raw-insn",
-  "comparator": "asmcmp.py with host-r1/hot.py selection and alias normalisation",
-  "same": 104,
-  "different": 9,
+  "base": {
+    "commit": "bb2b33d5734452cafaa2cc63ac7cb909d12096a8",
+    "binary_sha256": "07fa61d614911cf1cd5529fd5be27122bd9e4499f45c3590fe9b71ecba549636",
+    "disassembly_sha256": "7721a3cf878f267c6cb98fbe917778903bac520af4769268ac65a7d1b008a2bd"
+  },
+  "candidate": {
+    "commit": "444ca4000c119150558fded052c67fef7c1953e7",
+    "binary_sha256": "b8b2c0fc231653e4ba277f25216855bc84ea835bb8c0a6b51aaa3d5a163283ee",
+    "disassembly_sha256": "e92cf361cd3a9e362b0f27dbf1db92830987af441b6f4d17d40e1d80f42d4847"
+  },
+  "selected": 119,
+  "same": 111,
+  "different": 8,
   "missing": 0,
   "differences": [
-    {
-      "function": "<esp32c3::bus::SocBus>::i2s_receive",
-      "main_instructions": 42,
-      "branch_instructions": 45
-    },
-    {
-      "function": "<esp32c6::bus::SocBus>::i2s_receive",
-      "main_instructions": 42,
-      "branch_instructions": 45
-    },
-    {
-      "function": "<esp32s3::bus::SocBus>::dma_i2s_port",
-      "main_instructions": 620,
-      "branch_instructions": 631
-    },
-    {
-      "function": "<esp_periph::gpio::Gpio>::write",
-      "main_instructions": 245,
-      "branch_instructions": 245
-    },
-    {
-      "function": "<esp_periph::i2c::I2c>::write",
-      "main_instructions": 420,
-      "branch_instructions": 411
-    },
-    {
-      "function": "<esp_periph::rtc_cntl::RtcCntl>::write",
-      "main_instructions": 344,
-      "branch_instructions": 339
-    },
-    {
-      "function": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::apply_due_script_events",
-      "main_instructions": 426,
-      "branch_instructions": 417
-    },
-    {
-      "function": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::apply_due_script_events",
-      "main_instructions": 540,
-      "branch_instructions": 529
-    },
-    {
-      "function": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::apply_due_script_events",
-      "main_instructions": 424,
-      "branch_instructions": 415
-    }
+    "DIFF 42 45 <esp32c3::bus::SocBus>::i2s_receive",
+    "DIFF 42 45 <esp32c6::bus::SocBus>::i2s_receive",
+    "DIFF 620 631 <esp32s3::bus::SocBus>::dma_i2s_port",
+    "DIFF 322 316 <esp_periph::i2c::I2c>::tick",
+    "DIFF 344 339 <esp_periph::rtc_cntl::RtcCntl>::write",
+    "DIFF 422 413 <esp_soc::machine::Machine<esp32c3::soc::C3>>::apply_due_script_events",
+    "DIFF 540 529 <esp_soc::machine::Machine<esp32c6::soc::C6>>::apply_due_script_events"
   ],
-  "main_binary_sha256": "c42402e3e0810a5d1b5e3abe54f8741394d24ef28b864d010a89d682c28e8109",
-  "branch_binary_sha256": "80adf4e50bed142b29c3b53fade2a500a156faa10a23efa7643666a244245cd2",
-  "timing_run": false
+  "method": "committed classic-core asmcmp.py plus hot.py; Rust 1.99.0 release fat-LTO; no timing"
 }
