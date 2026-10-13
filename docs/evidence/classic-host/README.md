@@ -223,4 +223,10 @@ Max load in summary includes accepted warmup and measured pairs; discarded attem
 
 Classic I2S CONF reset bits are plain R/W in IDF v5.5.4 i2s_reg.h, so read(8) retains their written values. An assertion test pins all four bits. IN_DSCR_ERR on inlink end with samples left is inferred, as well as IN_DSCR_EMPTY/stop behavior; no silicon claim is made. Moving DramDma::reaches into the bus and sharing it with SPI/Wi-Fi is a possible follow-up, not included here.
 
+The host I2S and raw-ADC fixtures now advance explicit 240 MHz bus-reference
+ticks through the core's `cpu_cycles_for_bus` conversion, including after reset.
+Their sample, interrupt and descriptor expectations are unchanged; reset-time
+XTAL CPU clocks are no longer mistaken for reference ticks. The runtime I2S
+step receives elapsed reference ticks from the corrected classic bus.
+
 Rust 1.99.0: both Clippy targets pass; empty-HOME CI-policy 938 passed/0 failed/0 ignored; plain 910 passed/0 failed/46 ignored; production WASM build, eight demos and privacy pass. `checks.json` identifies the exercised source revision; subsequent receipt changes are documentation only.
