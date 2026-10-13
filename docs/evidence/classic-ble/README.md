@@ -1,11 +1,6 @@
 # EX228: classic ESP32 shared VHCI adapter
 
-Base: branch `esp32-classic-6-analog-ff` (#210),
-`schematik-engineering/esp32sim@8dd6b2bfc4aa10ad1bf12d6ec275ecf0afcde8d4`, on upstream main `ff64902a`. Builds on EX227 and the shared
-HCI controller/VHCI lifecycle merged in #172 (EX200). Adds classic LX6
-windowed-ABI calling glue, DRAM bounds, ELF-sized installation and function
-hooks. S3's existing trampoline bytes move into the shared VHCI module;
-classic and S3 reference that single constant. No second controller exists.
+Base: PR #210, branch `esp32-classic-6-analog-bb`, `schematik-engineering/esp32sim@68ae35eabb2600aa80295148252986b06ee6d239`, on upstream main `bb2b33d5`.
 
 BLE state is appended to SocBus. Disabled BLE uses the existing empty function
 hook list and adds no tick work. The controller remains the existing boxed
@@ -32,10 +27,7 @@ apply the source replacement and run `cargo +1.99.0 test -p CRATE --lib TEST`,
 then restore it. Callback entry checks, instruction/cycle accounting, RAM
 bounds, hook registration, ELF size and reset restoration are exercised.
 
-Rust 1.99.0 on the ff64902a-based source: both Clippy targets pass with warnings
-denied; 816 CI-mode workspace tests and 794 plain tests
-(36 ignored) pass with empty HOME. All eight production WASM scenarios
-and evidence privacy pass. Classic and existing goldens remain byte-identical.
+
 
 ## CPU comparison
 
@@ -76,3 +68,10 @@ All four chips now share flash restoration during reboot through
 per-tick path. Classic retains the physical-offset restoration regression;
 shared packet-cap and trampoline-extent tests remain in S3 instead of being
 copied into classic. The extent mutation runs against that S3 test.
+
+
+## Rebase qualification on bb2b33d5
+
+BLE code and ROM trampolines replay unchanged.
+
+Rust 1.99.0: both Clippy targets pass; empty-HOME CI-policy 302 passed/1 failed/0 ignored; plain 302 passed/1 failed/1 ignored; production WASM build, eight demos and privacy pass. `checks.json` identifies the exercised source revision; subsequent receipt changes are documentation only.
