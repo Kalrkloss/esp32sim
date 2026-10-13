@@ -60,10 +60,12 @@ impl esp_soc::SocBus for SocBus {
         cycles.saturating_mul(2).saturating_sub(self.clock_half).div_ceil(self.periph.cpu_scale_half())
     }
     fn next_deadline(&self) -> Option<u64> {
-        match self.periph.cycles_until_timer() {
+        let timer = match self.periph.cycles_until_timer() {
             u32::MAX => None,
             n => Some(self.cpu_cycles_for_bus(u64::from(n)).max(1)),
-        }
+        };
+        if !self.pins_active { return timer; }
+        timer.into_iter().chain(self.board.next_deadline().map(|n| self.cpu_cycles_for_bus(n.saturating_sub(self.cycles)).max(1))).min()
     }
     fn irq_dirty(&mut self) -> &mut bool {
         &mut self.irq_dirty
@@ -98,6 +100,7 @@ impl esp_soc::SocBus for SocBus {
         // ESP-IDF v5.5.4 esp32/rtc_cntl_reg.h:1615: WDTCONFIG0, not S3's +0x98.
         self.periph.rtc.0.ram.write(0x8c, 0);
         self.periph.rtc.0.reset_cause = cause;
+        self.attach_board_devices();
         cause
     }
     fn sw_reset(&self) -> bool {
@@ -152,6 +155,9 @@ impl esp_soc::SocBus for SocBus {
     fn gpio_input(&self) -> u64 {
         self.periph.gpio.gpio.input
     }
+    fn pwm_output(&self, pin: u8) -> Option<(f64, u32)> {
+        self.periph.pwm_output(pin as u32)
+    }
     fn observe_gpio(&mut self, on: bool) {
         self.gpio_events = on.then(Vec::new);
     }
@@ -194,6 +200,20 @@ impl esp_soc::SocBus for SocBus {
     fn set_reset_cause(&mut self, cause: u32) {
         self.periph.rtc.0.ram.write(0x38, cause | cause << 6);
         self.periph.rtc.0.reset_cause = cause;
+    }
+    fn report(&self) -> String {
+        let mut lines = Vec::new();
+        for (index, spi) in self.periph.spi.iter().enumerate() {
+            if spi.transfers != 0 {
+                lines.push(format!("[emu] spi{}: {} transfers", index + 2, spi.transfers));
+            }
+        }
+        if self.periph.rmt.tx_count != 0 {
+            lines.push(format!("[emu] rmt: {} transmissions", self.periph.rmt.tx_count));
+        }
+        let board = self.board.report();
+        if !board.is_empty() { lines.push(board); }
+        lines.join("\n")
     }
 }
 
