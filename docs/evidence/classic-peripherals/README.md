@@ -1,10 +1,6 @@
 # EX224: classic ESP32 peripheral adapters
 
-Base: branch `esp32-classic-2-core-ff` (#206),
-`schematik-engineering/esp32sim@7e05c86401acef840643021e771b44b2a5a3fa99`, on upstream main `ff64902a`. Adds I2C0/1, sixteen LEDC
-channels, SPI2/3 and eight RMT channels. Board callbacks are gated while no board is attached;
-LED output uses the existing BoardModel/Ws2812Chain path. I2S RX belongs
-to EX229. No MCPWM implementation is added for classic in this part.
+Base: upstream main `bb2b33d5` (#199/#205/#206 merged).
 
 The shared I2C engine is specialized by command count. Existing chips retain
 exactly eight slots and no runtime layout field; classic has sixteen slots
@@ -65,8 +61,7 @@ No hardware or IDF 4.4 validation is claimed.
 
 Use the full EX230 command set on this branch, including both Clippy targets,
 empty-HOME workspace runs with ROM-only inputs and with no firmware variables,
-all eight production WASM scenarios, and evidence privacy. No goldens are
-regenerated. No JIT implementation changes.
+all eight production WASM scenarios, and evidence privacy. Classic hello goldens match upstream main byte-for-byte; no regeneration is needed. No JIT implementation changes.
 
 [Mutation table](mutations.json) records 32 mutations killed by assertion
 failures. Apply each single replacement and run
@@ -75,10 +70,7 @@ rows naming an integration target, then restore it. The LEDC shadow test
 isolates channel updates from timer updates; neither missing latch gate is
 hidden by the other one.
 
-Rust 1.99.0 on the ff64902a-based source: both Clippy targets pass with warnings
-denied; 776 CI-mode workspace tests and 754 plain tests
-(36 ignored) pass with empty HOME. All eight production WASM scenarios
-and evidence privacy pass. Classic and existing goldens remain byte-identical.
+
 
 ## CPU comparison
 
@@ -106,3 +98,14 @@ expansion, so three merge and the END arm moves; `Ledc::output`, the host PWM qu
 
 Only source expressions, test names and outcomes are retained. No private
 firmware, captures or machine identifiers are included.
+
+
+## Rebase qualification on bb2b33d5
+
+The timed modern I2C engine retains #199 runtime addressing, multicast and byte deadlines; the sixteen-slot classic specialization retains synchronous transactions and its classic opcodes. #205 RMT DMA and gather paths remain intact; the inline WS2812 decoder is shared. Classic timer, LEDC and RMT stepping uses the corrected APB accumulator, and board deadlines convert bus time back to CPU clocks. Tests that assumed PLL timing now explicitly select PLL. Classic hello goldens are identical to main, including the 11.043-second reset; no peripheral addition changes that fixture.
+
+Separate commit `schematik-engineering/esp32sim@3c6d2135` (Address classic core follow-up notes) drops the no-op UART tick, retains RC_FAST APB:CPU 1:1 with a mutation-sensitive test, and adds the clock-model note in docs/esp32.md. RC_FAST frequency is still approximated as 40 MHz. The 32 peripheral mutations are assertion-killed; the slot-budget mutation now targets the scheduled engine boundary.
+
+Release comparison against bb2b33d5: 118 selected S3/C3/C6 hot functions identical, one different, none missing. I2C tick loses six instructions exclusively in bounds-panic tails because macro expansion merges their source locations; the idle entry and normal scheduled byte path are identical. This is not a CPU measurement.
+
+Rust 1.99.0: both Clippy targets pass; empty-HOME CI-policy 885 passed/0 failed/0 ignored; plain 857 passed/0 failed/46 ignored; production WASM build, eight demos and privacy pass. `checks.json` identifies the exercised source revision; subsequent receipt changes are documentation only.
