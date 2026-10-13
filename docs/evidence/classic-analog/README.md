@@ -94,4 +94,6 @@ local and its existing raw-code assertions remain unchanged.
 
 Analog code replays unchanged, retaining main voltage/raw input semantics. The cosmetic RTCCNTL+0x8xx debug block name remains a possible follow-up.
 
-Rust 1.99.0: both Clippy targets pass; empty-HOME CI-policy 295 passed/1 failed/0 ignored; plain 295 passed/1 failed/1 ignored; production WASM build, eight demos and privacy pass. `checks.json` identifies the exercised source revision; subsequent receipt changes are documentation only.
+Rust 1.99.0: both Clippy targets pass; empty-HOME CI-policy 918 passed/0 failed/0 ignored; plain 890 passed/0 failed/46 ignored; production WASM build, eight demos and privacy pass. `checks.json` identifies the exercised source revision; subsequent receipt changes are documentation only.
+
+The ADC waveform test now explicitly selects PLL 240 MHz so raw CPU clocks match bus-reference time; reset-time XTAL no longer satisfies that assumption. Runtime ADC behavior and waveform expectations are unchanged.
