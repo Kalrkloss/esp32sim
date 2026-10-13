@@ -30,11 +30,12 @@ shared S3-layout model:
   `0x3FFA_E000..0x4000_0000` (`SOC_DMA_LOW`/`SOC_DMA_HIGH`,
   `components/soc/esp32/include/soc/soc.h:203-205`). Registers, ROM, IRAM, RTC
   memory and flash fault without being accessed. `I2S_INLINK_ADDR` is 20 bits
-  under `0x3FF0_0000` (`i2s_reg.h:763-765`), so offset `0x40000` names the UART0
+  under `0x3FF0_0000` (`i2s_reg.h:763-768`), so offset `0x40000` names the UART0
   FIFO. It now raises IN_DSCR_ERR and leaves the FIFO alone.
 - **Resets.** `I2S_CONF_REG` bit 1 `RX_RESET` and bit 3 `RX_FIFO_RESET` map onto
   the shared RX reset bits. Bit 0 `TX_RESET` and bit 2 `TX_FIFO_RESET`
-  (`i2s_reg.h:105-125`) do not touch the receiver. Bit 5 `RX_START` and bit 7
+  (`i2s_reg.h:105-128`) do not touch the receiver. All four reset bits are
+  plain R/W and read back their written values. Bit 5 `RX_START` and bit 7
   `RX_SLAVE_MOD` map as before.
 - **Slot selection.** `RX_CHAN_MOD` (`I2S_CONF_CHAN_REG` bits 4:3,
   `i2s_reg.h:692-695`) 1 or 2 selects one slot. `RX_MSB_RIGHT` (CONF bit 17,
@@ -51,9 +52,10 @@ shared S3-layout model:
   RX_24_FILL_EN for 24-bit RX.
 - **Interrupts.** The shared channel's IN_DONE, IN_SUC_EOF, IN_DSCR_ERR and
   IN_DSCR_EMPTY become classic INT_RAW bits 8, 9, 13 and 15
-  (`i2s_reg.h:137-181`). IN_SUC_EOF also latches `I2S_IN_EOF_DES_ADDR_REG`
+  (`i2s_reg.h:142-184`). IN_SUC_EOF also latches `I2S_IN_EOF_DES_ADDR_REG`
   (+0x3c). IN_DSCR_EMPTY uses the shared channel's condition: samples remain
-  after the inlink ended. That this matches the classic bit's meaning is inferred.
+  after the inlink ended. That this matches the classic bit's meaning, including
+  raising IN_DSCR_ERR when samples remain at inlink end, is inferred.
 - **EOF.** `RXEOF_NUM` (+0x24, reset 64, `i2s_reg.h:676-682`) counts words
   (`i2s_ll.h:639-643`). Byte counts above `u32::MAX` raise IN_DSCR_ERR instead of
   wrapping.
@@ -110,7 +112,9 @@ external slave clocking, ADC-to-I2S capture, serial edge timing, classic I2S TX,
 (a restart reloads `INLINK_ADDR`). Routing follows the shared matrix contract and
 does not validate IO_MUX/pad enable. A route that matches no source slot reads the
 per-controller input, as #202 specifies. Host source and queued PCM state survive
-reset. No hardware microphone or audio-fidelity claim is made. The inherited
+reset. No hardware microphone or audio-fidelity claim is made. A possible follow-up is
+to share `DramDma::reaches` with classic SPI and Wi-Fi; their current DMA reach
+rules are unchanged here. The inherited
 classic fixture/ROM hashes are in [EX230](../classic-core/README.md). I2S tests
 generate their PCM samples and descriptors in memory; no firmware, external input
 or private capture is involved.

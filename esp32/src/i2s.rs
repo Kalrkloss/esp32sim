@@ -1,6 +1,6 @@
 //! Classic I2S RX register adapter and native descriptor DMA.
 //! ESP-IDF v5.5.4 components/soc/esp32/register/soc/i2s_reg.h: CONF bits 21-125,
-//! interrupt bits 137-181, RXEOF_NUM 676-682, CONF_CHAN 692-695, IN_LINK 738-765,
+//! interrupt _S defines 142-184, RXEOF_NUM 676-682, CONF_CHAN 692-695, INLINK_ADDR 763-768,
 //! LC_CONF 856-868, clocks 1340-1390. include/soc/gpio_sig_map.h:69-72,299,309-312,343
 //! supplies the GPIO matrix signals; dport_reg.h:947,965 defines the clock gates.
 //! Samples are packed at DMA boundaries; no bit-level clock model is claimed.
@@ -78,7 +78,8 @@ impl Device for ClassicI2s {
     fn read(&mut self, off: u32) -> u32 {
         match off {
             0xc | 0x10 | 0x14 => self.inner.read(off),
-            8 => self.ram.read(off) & !15,
+            // IDF v5.5.4 i2s_reg.h:105-128: all four reset bits are plain R/W.
+            8 => self.ram.read(off),
             0xbc => 1,
             _ => self.ram.read(off),
         }
@@ -210,6 +211,7 @@ mod tests {
             let mut i = receiver(16, 1 << 5);
             assert!(i.inner.rx_data(30_000, false, |_| [1, 2]).is_empty());
             i.write(8, (1 << 5) | reset);
+            assert_eq!(i.read(8), (1 << 5) | reset, "reset bit {reset:#x} remains readable");
             i.write(8, 1 << 5);
             assert_eq!(i.inner.rx_data(1_000, false, |_| [1, 2]).is_empty(), restarts, "reset bit {reset:#x}");
         }
