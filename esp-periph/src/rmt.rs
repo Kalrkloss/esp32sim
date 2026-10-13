@@ -156,10 +156,7 @@ impl Rmt {
                 c.end_pending = true;
                 continue;
             }
-            // decode WS2812 bit: compare high vs low durations
-            let high = if l0 { d0 } else { 0 } + if l1 { d1 } else { 0 };
-            let low = if !l0 { d0 } else { 0 } + if !l1 { d1 } else { 0 };
-            c.bits.push(high > low);
+            c.bits.push(ws2812_bit!(d0, l0, d1, l1));
             c.acc_cycles -= (d0 + d1) * cycles_per_tick;
             c.rd += 1;
             c.since_thr += 1;

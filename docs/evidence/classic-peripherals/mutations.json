@@ -36,7 +36,7 @@
   },
   {
     "file": "esp-periph/src/i2c.rs",
-    "mutation": "for i in 0..$n { -> for i in 0..8 {",
+    "mutation": "usize::from(self.command_index) >= $n -> usize::from(self.command_index) >= 8",
     "test": "classic_executes_sixteen_slots_and_old_stop_opcode",
     "crate": "esp-periph",
     "killed": true
