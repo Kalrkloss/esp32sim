@@ -732,6 +732,8 @@ mod tests {
     #[test]
     fn classic_rmt_clock_gate_deadline_reset_and_dport_source_47() {
         let mut b = SocBus::new(4 << 20, [0; 6]);
+        b.write32(0x3ff4_8070, 1 << 27).unwrap();
+        b.write32(0x3ff0_003c, 2).unwrap(); // PLL 240 MHz: three CPU clocks/APB tick
         let rmt = 0x3ff5_6000;
         b.write32(0x3ff4_9048, (2 << 12) | (1 << 9)).unwrap();
         b.write32(0x3ff4_4540, 87).unwrap();

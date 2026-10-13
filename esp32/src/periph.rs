@@ -753,6 +753,8 @@ impl Peripherals {
         let ticks = phase / 6;
         for uart in &mut self.uart { uart.tick(ticks); }
         for timer in &mut self.timg { timer.tick(ticks); }
+        self.ledc.tick(ticks);
+        self.rmt.tick(ticks);
         self.sync_ledc_outputs();
         self.sync_rmt_outputs();
     }
@@ -791,6 +793,11 @@ impl Peripherals {
         let mut best = self.rtc.next_deadline().map_or(u64::MAX, |t| t.saturating_sub(1) * 1600);
         for timer in &self.timg {
             if let Some(t) = timer.next_deadline() {
+                best = best.min(t.saturating_sub(1).saturating_mul(self.apb_divider()));
+            }
+        }
+        for device in [&self.ledc as &dyn Device, &self.rmt as &dyn Device] {
+            if let Some(t) = device.next_deadline() {
                 best = best.min(t.saturating_sub(1).saturating_mul(self.apb_divider()));
             }
         }
@@ -1031,6 +1038,7 @@ mod tests {
     #[test]
     fn classic_ledc_routes_pwm_and_interrupt_through_gpio_and_dport() {
         let mut p = Peripherals::new([0; 6]);
+        p.write32(0x3ff4_8070, 1 << 27); // PLL: APB 80 MHz
         p.write32(0x3ff0_00c0, 1 << 11);
         p.write32(0x3ff0_0104 + 4 * SRC_LEDC as u32, 12);
         p.write32(0x3ff5_9140, 8 | (16000 << 5) | (1 << 25));
