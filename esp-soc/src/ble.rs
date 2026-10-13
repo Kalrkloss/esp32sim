@@ -20,6 +20,13 @@ pub trait HciController {
     fn next_deadline(&self) -> Option<u64>;
 }
 
+/// Put back the flash bytes a controller adapter patched (VHCI on classic/S3/C3, NimBLE on C6).
+pub fn restore_patched_flash(saved: &mut Option<(usize, Vec<u8>)>, flash: &mut [u8]) {
+    if let Some((off, original)) = saved.take() {
+        flash[off..off + original.len()].copy_from_slice(&original);
+    }
+}
+
 /// Packet-level link boundary. A replacement controller bridges its radio/link to these queues.
 pub type Link = std::rc::Rc<std::cell::RefCell<LinkQueues>>;
 #[derive(Default)]
