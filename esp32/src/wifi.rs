@@ -34,8 +34,9 @@ pub struct WifiMac {
 impl WifiMac {
 
     /// DPORT_WIFIMAC_RST clears the MAC registers only. The access point, network, relay queues
-    /// and frame counts belong to the host side, as on S3/C3/C6, whose MAC resets leave
-    /// StationLink alone; a guest reboot applies `StationLink::surviving_reboot` instead.
+    /// and frame counts belong to the host side. S3/C3/C6 leave both MAC registers
+    /// and StationLink alone on MAC reset; register clearing here is classic-only.
+    /// A guest reset applies `StationLink::surviving_reboot` instead.
     pub fn reset(&mut self) {
         let link = std::mem::take(&mut self.link);
         let log = self.log;

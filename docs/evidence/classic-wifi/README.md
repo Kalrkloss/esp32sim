@@ -60,7 +60,8 @@ Branch `esp32-classic-5-wifi` at
 `schematik-engineering/esp32sim@ca069cf2b6a50647bdcc414c9ac53c01e50f08e3`
 against parent #208, branch `esp32-classic-4-crypto` at
 `schematik-engineering/esp32sim@cb5d1fa6440cedb46e769ab372cb1a2130296b4b`.
-These measurements identify the old revisions, not the ff64902a rebase.
+These measurements used the old classic clock model. They identify the old
+revisions, not the bb2b33d5 rebase or corrected-clock tips.
 Rust 1.99.0 release binaries; child user CPU seconds including startup; one warmup
 and seven alternating pairs, load below 5 before each attempt and peak below 7.
 Console SHA-256 and instruction counts matched across attempts.
