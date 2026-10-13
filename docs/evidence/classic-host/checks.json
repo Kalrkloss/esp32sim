@@ -1,6 +1,6 @@
 {
   "source_revision": "444ca4000c119150558fded052c67fef7c1953e7",
-  "base": "16b73588e7d1769e3fa7e85b75e5a2745e9db559",
+  "base": "c222b5c45d43c8869d861064e2c2cb2b128065f7",
   "toolchain": "1.99.0",
   "clippy-native": {
     "exit_code": 0

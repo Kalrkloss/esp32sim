@@ -1,6 +1,6 @@
 # EX229: classic host input and I2S receive
 
-Base: PR #211, branch `esp32-classic-ble-bb`, `schematik-engineering/esp32sim@16b73588e7d1769e3fa7e85b75e5a2745e9db559`, on upstream main `bb2b33d5`.
+Base: PR #211, branch `esp32-classic-ble-bb`, `schematik-engineering/esp32sim@c222b5c45d43c8869d861064e2c2cb2b128065f7`, on upstream main `bb2b33d5`.
 
 Classic UART APB/AHB routing, matrix input, GPIO feedback/release, physical SPI,
 raw ADC observations and Ethernet relay already come from EX230 and EX224-EX228.
