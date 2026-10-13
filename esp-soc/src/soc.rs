@@ -159,6 +159,10 @@ pub trait SocBus: Bus {
     fn adc_set_raw(&mut self, _pin: u8, _raw: u16) -> bool { false }
     /// Completed conversions for an ADC pad, or None for an unsupported pin. Generation wraps at u64::MAX.
     fn adc_observation(&self, _pin: u8) -> Option<esp_periph::AdcObservation> { None }
+    /// Touch or release a capacitive GPIO pad, separate from the board touch panel.
+    fn set_touch_input(&mut self, _pin: u8, _touched: bool) {}
+    /// True for a GPIO with a capacitive touch pad; the script rejects `touchpad` elsewhere.
+    fn has_touch_pad(&self, _pin: u8) -> bool { false }
     /// Deliver host touch at the bus's current time horizon.
     fn touch_input(&mut self, x: u16, y: u16, down: bool) { self.board().touch(x, y, down); }
     fn gpio_input(&self) -> u64;

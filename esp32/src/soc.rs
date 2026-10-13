@@ -100,6 +100,7 @@ impl esp_soc::SocBus for SocBus {
     fn reboot(&mut self, mac: [u8; 6]) -> u32 {
         let cause = self.periph.rtc.0.reset_cause;
         let old = std::mem::replace(&mut self.periph, Peripherals::new(mac));
+        self.periph.restore_rtc_analog(old.adc);
         self.periph.gpio.restore_inputs(&old.gpio);
         self.periph.spi0.0.jedec = old.spi0.0.jedec;
         self.periph.spi1.0.jedec = old.spi1.0.jedec;
@@ -169,6 +170,11 @@ impl esp_soc::SocBus for SocBus {
     fn gpio_input(&self) -> u64 {
         self.periph.gpio.gpio.input
     }
+    fn adc_set_raw(&mut self, pin: u8, raw: u16) -> bool { crate::adc::valid_pin(pin) && self.periph.adc.analog.set_raw(pin, raw) }
+    fn adc_observation(&self, pin: u8) -> Option<esp_periph::AdcObservation> { crate::adc::valid_pin(pin).then(|| self.periph.adc.analog.observation(pin)) }
+    fn analog_set(&mut self, pin: u8, src: esp_periph::AnalogSource) { self.periph.adc.analog.set(pin, src); }
+    fn set_touch_input(&mut self, pin: u8, touched: bool) { self.periph.adc.set_touch_input(pin, touched); }
+    fn has_touch_pad(&self, pin: u8) -> bool { crate::adc::touch_pin(pin) }
     fn pwm_output(&self, pin: u8) -> Option<(f64, u32)> {
         self.periph.pwm_output(pin as u32)
     }
@@ -217,6 +223,7 @@ impl esp_soc::SocBus for SocBus {
     }
     fn report(&self) -> String {
         let mut lines = Vec::new();
+        for (pin, millivolts) in self.periph.adc.dac_outputs() { lines.push(format!("[dac] GPIO{pin}: {millivolts} mV")); }
         for (index, spi) in self.periph.spi.iter().enumerate() {
             if spi.transfers != 0 {
                 lines.push(format!("[emu] spi{}: {} transfers", index + 2, spi.transfers));
