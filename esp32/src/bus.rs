@@ -306,16 +306,13 @@ impl SocBus {
         Some(u32::from_le_bytes(bytes))
     }
     pub(crate) fn dma_write_word(&mut self, addr: u32, value: u32) -> bool {
-        for (i, byte) in value.to_le_bytes().into_iter().enumerate() {
-            let Some((mem, off, true)) = self.memory(addr.wrapping_add(i as u32)) else {
-                return false;
-            };
-            let Some(dst) = mem.get_mut(off) else {
-                return false;
-            };
-            *dst = byte;
-            self.written(addr.wrapping_add(i as u32), 1);
-        }
+        value.to_le_bytes().into_iter().enumerate().all(|(i, byte)| self.dma_write_byte(addr.wrapping_add(i as u32), byte))
+    }
+    pub(crate) fn dma_write_byte(&mut self, addr: u32, value: u8) -> bool {
+        let Some((mem, off, true)) = self.memory(addr) else { return false };
+        let Some(dst) = mem.get_mut(off) else { return false };
+        *dst = value;
+        self.written(addr, 1);
         true
     }
     fn dma_desc_word(&mut self, addr: u32) -> Result<u32, Fault> { self.dma_read_word(addr).ok_or(Fault::Unmapped) }
@@ -515,6 +512,7 @@ impl Bus for SocBus {
             for input in self.board.uart_rx(self.cycles) { self.periph.uart_pin_input(&input); self.irq_dirty = true; }
         }
         self.periph.tick(elapsed);
+        self.i2s_step(elapsed);
         self.flush_rmt();
         self.flush_gpio();
 

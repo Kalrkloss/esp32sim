@@ -63,3 +63,12 @@ Classic `--ble` uses the shared VHCI/HCI controller with an ELF containing
 controller symbols and function sizes. It installs a guest FreeRTOS task
 using the same windowed-Xtensa trampoline as S3. This is a virtual controller,
 with the shared one-link, MTU-23 and no-pairing limits; see EX228.
+
+Classic I2S0/1 RX accepts per-controller PCM (`i2s_input`) and pin-routed
+sources (`attach_pcm_sources`) through the shared host API from #201/#202; a
+route that matches no source slot reads the per-controller input. Standard
+16/24/32-bit RX uses native DMA into internal DRAM; 24-bit samples occupy 32-bit
+words, as IDF allocates them on classic. The descriptor owner check follows
+LC_CONF CHECK_OWNER (off at reset, as IDF leaves it). APLL, slave clocks and
+bit-level I2S timing are not modeled. An inline DPORT clock/channel gate guards
+receive work. See EX229 for checks and limits.
