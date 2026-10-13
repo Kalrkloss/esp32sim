@@ -1,6 +1,6 @@
 # EX225: classic ESP32 crypto adapters
 
-Base: PR #207, branch `esp32-classic-3-peripherals-bb`, `schematik-engineering/esp32sim@2662eef297426afacf33f4bb61fdde5364313922`, on upstream main `bb2b33d5`.
+Base: PR #207, branch `esp32-classic-3-peripherals-bb`, `schematik-engineering/esp32sim@05085004604d48933226f9076ddcf4084cb984b4`, on upstream main `bb2b33d5`.
 
 ## Rebased validation
 
