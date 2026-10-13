@@ -154,6 +154,13 @@ fn inactive_board_skips_tick_and_mmio_callbacks() {
     assert_eq!(b.next_deadline(), None);
 }
 
+// Advance 240 MHz bus-reference ticks even when reset selects 40 MHz XTAL.
+// The core clock conversion is part of #206; PCM/ADC source rates use bus time.
+fn tick_reference(b: &mut SocBus, ticks: u32) {
+    let cpu = b.cpu_cycles_for_bus(u64::from(ticks));
+    b.tick(u32::try_from(cpu).unwrap());
+}
+
 #[test]
 fn i2s_native_dma_packs_pcm_and_raises_eof() {
     let mut b = bus(); let base = 0x3ff4_f000;
@@ -165,7 +172,7 @@ fn i2s_native_dma_packs_pcm_and_raises_eof() {
     b.write32(base + 0x14, 1 << 9).unwrap();
     b.write32(base + 0x24, 2).unwrap();
     b.write32(base + 0x34, (1 << 29) | 0xb0100).unwrap(); b.write32(base + 8, 1 << 5).unwrap();
-    b.tick(60_000);
+    tick_reference(&mut b, 60_000);
     assert_eq!(b.read32(0x3ffb_0200), Ok(123 | ((-456i16 as u16 as u32) << 16)));
     assert_eq!(b.read32(base + 0x3c), Ok(0x3ffb_0100));
     assert_ne!(b.read32(base + 0x10).unwrap() & (1 << 9), 0);
@@ -173,7 +180,7 @@ fn i2s_native_dma_packs_pcm_and_raises_eof() {
     // IN_DONE (bit 8) and IN_SUC_EOF (bit 9) raw; no IN_DSCR_ERR or IN_DSCR_EMPTY.
     assert_eq!(b.read32(base + 0xc).unwrap() & ((1 << 8) | (1 << 9) | (1 << 13) | (1 << 15)), (1 << 8) | (1 << 9));
 }
-/// 16-bit stereo at 8 kHz: one 4-byte frame per 30,000 CPU cycles.
+/// 16-bit stereo at 8 kHz: one 4-byte frame per 30,000 bus-reference ticks.
 fn receiver(b: &mut SocBus, port: usize, size: u32, buffer: u32) -> (u32, u32) {
     let base = [0x3ff4_f000, 0x3ff6_d000][port];
     let desc = 0x3ffb_0100 + port as u32 * 12;
@@ -193,16 +200,16 @@ fn i2s_clock_gate_partial_dma_faults_and_interrupts() {
         let mut b = bus();
         let (base, desc) = receiver(&mut b, port, 8, 0x3ffb_0300);
         b.i2s_input(port).unwrap().push(&[[1, 2], [3, 4]]);
-        b.tick(30_000);
+        tick_reference(&mut b, 30_000);
         assert_eq!(b.read32(0x3ffb_0300), Ok(0));
         b.write32(0x3ff0_00c0, 1 << [4, 21][port]).unwrap();
         b.write32(0x3ff0_0104 + 4 * (32 + port as u32), 7).unwrap();
-        b.tick(30_000);
+        tick_reference(&mut b, 30_000);
         assert_eq!(b.read32(0x3ffb_0300), Ok(1 | 2 << 16));
         assert_ne!(b.read32(desc).unwrap() & (1 << 31), 0);
         assert_eq!(b.periph.cpu_lines(0) & (1 << 7), 0);
         b.irq_dirty = false;
-        b.tick(30_000);
+        tick_reference(&mut b, 30_000);
         assert!(b.irq_dirty);
         assert_eq!(b.read32(0x3ffb_0304), Ok(3 | 4 << 16));
         assert_ne!(b.periph.cpu_lines(0) & (1 << 7), 0);
@@ -210,7 +217,7 @@ fn i2s_clock_gate_partial_dma_faults_and_interrupts() {
         assert_eq!(b.periph.cpu_lines(0) & (1 << 7), 0);
         // DMA must reject MMIO rather than writing a UART FIFO.
         receiver(&mut b, port, 4, 0x3ff4_0000);
-        b.tick(30_000);
+        tick_reference(&mut b, 30_000);
         assert_ne!(b.read32(base + 0x10).unwrap() & (1 << 13), 0);
         assert_eq!(b.read32(base + 0x10).unwrap() & (1 << 9), 0);
         assert!(b.periph.uart[0].tx_out.is_empty());
@@ -233,7 +240,7 @@ fn i2s_pin_source_checks_all_wires_and_survives_reboot() {
         b.i2s_input(port).unwrap().push(&[[33, 44]]);
         b.reboot([0; 6]);
         assert_eq!(b.pcm_sources().unwrap().inputs[0].as_ref().unwrap().queued_frames(), 16);
-        b.tick(30_000);
+        tick_reference(&mut b, 30_000);
         // The read-only view does not advance source time; attaching synchronizes it.
         assert_eq!(b.pcm_sources().unwrap().inputs[0].as_ref().unwrap().queued_frames(), 16);
         assert_eq!(b.attach_pcm_sources().unwrap().inputs[0].as_ref().unwrap().queued_frames(), 15);
@@ -243,7 +250,7 @@ fn i2s_pin_source_checks_all_wires_and_survives_reboot() {
         b.write32(0x3ff4_4530 + 4 * 4, clock_signal).unwrap();
         b.write32(0x3ff4_4530 + 5 * 4, ws_signal).unwrap();
         receiver(&mut b, port, 4, 0x3ffb_0200);
-        b.tick(30_000);
+        tick_reference(&mut b, 30_000);
         assert_eq!(b.read32(0x3ffb_0200), Ok(11 | 22 << 16));
         // A route that matches no slot reads the per-controller queue (#202's fallback): its
         // one queued frame, then silence once drained.
@@ -255,14 +262,14 @@ fn i2s_pin_source_checks_all_wires_and_survives_reboot() {
             let old = b.read32(address).unwrap();
             b.write32(address, value).unwrap();
             receiver(&mut b, port, 4, 0x3ffb_0200);
-            b.tick(30_000);
+            tick_reference(&mut b, 30_000);
             assert_eq!(b.read32(0x3ffb_0200), Ok(expected), "signal register {address:#x}");
             b.write32(address, old).unwrap();
         }
         // Matched wiring again: the second slot is selected once the first is emptied.
         b.attach_pcm_sources().unwrap().inputs[0] = None;
         receiver(&mut b, port, 4, 0x3ffb_0200);
-        b.tick(30_000);
+        tick_reference(&mut b, 30_000);
         assert_eq!(b.read32(0x3ffb_0200), Ok(55 | 66 << 16));
     }
 }
@@ -283,7 +290,7 @@ fn i2s_two_descriptor_ring_keeps_running_after_owner_writeback() {
         b.write32(0x3ff0_00c0, 1 << [4, 21][port]).unwrap();
         b.i2s_input(port).unwrap().push(&[[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]]);
         for pass in 0..6u32 {
-            b.tick(30_000);
+            tick_reference(&mut b, 30_000);
             let (desc, buf) = if pass % 2 == 0 { (first, 0x3ffb_0200) } else { (second, 0x3ffb_0204) };
             let n = 2 * pass + 1;
             assert_eq!(b.read32(buf), Ok(n | (n + 1) << 16), "pass {pass}");
@@ -295,7 +302,7 @@ fn i2s_two_descriptor_ring_keeps_running_after_owner_writeback() {
         // With LC_CONF CHECK_OWNER (bit 12) set, the CPU-owned descriptor stops the ring.
         b.write32(base + 0x60, 1 << 12).unwrap();
         b.i2s_input(port).unwrap().push(&[[13, 14]]);
-        b.tick(30_000);
+        tick_reference(&mut b, 30_000);
         assert_eq!(b.read32(base + 0xc).unwrap() & ((1 << 9) | (1 << 13)), 1 << 13);
         assert_eq!(b.read32(0x3ffb_0200), Ok(9 | 10 << 16));
     }
@@ -327,7 +334,7 @@ fn i2s_rejects_empty_unowned_with_check_owner_and_non_dram_descriptors() {
         b.load_bytes(buffer, &[0xa5; 2]).unwrap();
         b.write32(base + 0x34, (1 << 29) | (address & 0xfffff)).unwrap();
         b.i2s_input(0).unwrap().push(&[[7, 8]]);
-        b.tick(30_000);
+        tick_reference(&mut b, 30_000);
         assert_eq!(b.read32(base + 0x10).unwrap(), 1 << 13, "{address:#x} {buffer:#x}");
         assert_eq!(b.read32(address), Ok(control), "{address:#x} {buffer:#x}");
         assert_eq!((b.read8(buffer), b.read8(buffer + 1)), (Ok(0xa5), Ok(0xa5)), "{address:#x} {buffer:#x}");
@@ -339,7 +346,7 @@ fn i2s_rejects_empty_unowned_with_check_owner_and_non_dram_descriptors() {
     b.write32(0x3ff0_00c0, 1 << 4).unwrap();
     assert_eq!(b.read32(base + 0x60), Ok(1 << 8));
     b.i2s_input(0).unwrap().push(&[[7, 8]]);
-    b.tick(30_000);
+    tick_reference(&mut b, 30_000);
     assert_eq!(b.read32(0x3ffb_0200), Ok(7 | 8 << 16));
     assert_eq!(b.read32(base + 0x10).unwrap(), 1 << 9);
 }
@@ -354,7 +361,7 @@ fn i2s_inlink_offset_into_registers_does_not_touch_uart_fifo() {
     b.periph.uart[0].0.host_input(b"abcd");
     b.write32(base + 0x34, (1 << 29) | 0x40000).unwrap();
     b.i2s_input(0).unwrap().push(&[[7, 8]]);
-    b.tick(30_000);
+    tick_reference(&mut b, 30_000);
     assert_eq!(b.read32(base + 0x10).unwrap(), 1 << 13);
     assert_eq!(b.periph.uart[0].0.rx_pending(), 4);
     assert!(b.periph.uart[0].0.tx_out.is_empty());
@@ -366,7 +373,7 @@ fn controller_pcm_queue_survives_classic_reset_without_a_source_bank() {
     b.reboot([0; 6]);
     b.write32(0x3ff0_00c0, 1 << 4).unwrap();
     receiver(&mut b, 0, 4, 0x3ffb_0200);
-    b.tick(30_000);
+    tick_reference(&mut b, 30_000);
     assert_eq!(b.read32(0x3ffb_0200), Ok(33 | 44 << 16));
 }
 
@@ -378,7 +385,8 @@ fn classic_raw_stream_uses_shared_clock_and_survives_reset() {
     stream.push_raw(&[1234, 2345], 0, 240_000_000).unwrap();
     b.analog_set(34, AnalogSource::RawStream(stream));
     for (time, raw) in [(0, 17), (30_000, 1234), (60_000, 2345), (90_000, 2345)] {
-        b.tick((time - b.cycles) as u32);
+        let elapsed = (time - b.cycles) as u32;
+        tick_reference(&mut b, elapsed);
         b.reboot([0; 6]);
         b.write32(0x3ff4_8800, 1 << 28).unwrap();
         for attenuation in 0..4 {
@@ -405,16 +413,16 @@ fn i2s_eof_words_span_descriptors_and_reject_unrepresentable_counts() {
         b.write32(base + 0x24, 2).unwrap();
         b.write32(0x3ff0_00c0, 1 << [4, 21][port]).unwrap();
         b.i2s_input(port).unwrap().push(&[[1, 2], [3, 4]]);
-        b.tick(30_000);
+        tick_reference(&mut b, 30_000);
         assert_eq!(b.read32(base + 0x10), Ok(0));
         assert_eq!(b.read32(desc).unwrap() & (3 << 30), 0);
-        b.tick(30_000);
+        tick_reference(&mut b, 30_000);
         assert_eq!(b.read32(base + 0x3c), Ok(next));
         assert_eq!(b.read32(base + 0x10), Ok(1 << 9));
         assert_eq!(b.read32(0x3ffb_0204), Ok(3 | 4 << 16));
         b.write32(base + 0x18, u32::MAX).unwrap();
         receiver(&mut b, port, 4, 0x3ffb_0200);
-        b.tick(60_000);
+        tick_reference(&mut b, 60_000);
         assert_eq!(b.read32(base + 0x10), Ok((1 << 9) | (1 << 13)));
         // The second frame finds no descriptor left: IN_DSCR_EMPTY (bit 15) is raw-only here.
         assert_ne!(b.read32(base + 0xc).unwrap() & (1 << 15), 0);
@@ -422,7 +430,7 @@ fn i2s_eof_words_span_descriptors_and_reject_unrepresentable_counts() {
             b.write32(base + 0x18, u32::MAX).unwrap();
             receiver(&mut b, port, 4, 0x3ffb_0200);
             b.write32(base + 0x24, words).unwrap();
-            b.tick(30_000);
+            tick_reference(&mut b, 30_000);
             assert_eq!(b.read32(base + 0x10), Ok(1 << 13));
             assert_ne!(b.read32(desc).unwrap() & (1 << 31), 0);
         }
