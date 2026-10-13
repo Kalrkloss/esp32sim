@@ -1,6 +1,6 @@
 # EX227: classic ADC, DAC and touch pads
 
-Base: PR #209, branch `esp32-classic-5-wifi-bb`, `schematik-engineering/esp32sim@8dbba838c5ec1e0508a06e98399cc0d888c83d6d`, on upstream main `bb2b33d5`.
+Base: PR #209, branch `esp32-classic-5-wifi-bb`, `schematik-engineering/esp32sim@3e057cac5257ab30860a7cf6b964c143871b1bf3`, on upstream main `bb2b33d5`.
 
 No conversion work is added to tick. Conversion timestamps are captured only
 on SENS writes. New state is appended to classic structs. The shared analog
