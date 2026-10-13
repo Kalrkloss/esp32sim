@@ -1,23 +1,10 @@
 # EX225: classic ESP32 crypto adapters
 
-Base: branch `esp32-classic-3-peripherals-ff` (#207),
-`schematik-engineering/esp32sim@8457808ee973a3975139707a1a542f28214dbcc1`, on upstream main `ff64902a`. Builds on EX230/EX224.
-Adds classic AES and RSA registers and expands the boot SHA-256 adapter to
-SHA-1/256/384/512, sharing AES, SHA and big-integer arithmetic with other chips.
-The classic RSA Montgomery operation uses the programmed M-prime value;
-plain multiply and modular exponentiation use the shared Rsa register operations.
-The adapter translates operand widths and retains only classic commands and
-Montgomery reduction. SHA counts come from the three shared engines, with
-SHA-384/512 sharing a counter as well as state. DPORT owns command gating;
-reset replaces each device with its initial state, including diagnostic counts.
-DPORT clocks, coupled resets, RSA power-down and source 51 route completion.
+Base: PR #207, branch `esp32-classic-3-peripherals-bb`, `schematik-engineering/esp32sim@2662eef297426afacf33f4bb61fdde5364313922`, on upstream main `bb2b33d5`.
 
 ## Rebased validation
 
-Rust 1.99.0 on the ff64902a-based source: both Clippy targets pass with warnings
-denied; 788 CI-mode workspace tests and 766 plain tests
-(36 ignored) pass with empty HOME. All eight production WASM scenarios
-and evidence privacy pass. Classic and existing goldens remain byte-identical.
+
 
 ## Sources and limits
 
@@ -82,3 +69,10 @@ expansion, so three merge and the END arm moves; `Ledc::output`, the host PWM qu
 
 Only public source expressions, test names and outcomes are retained.
 No private captures or machine identifiers are included.
+
+
+## Rebase qualification on bb2b33d5
+
+Only parent clock/DMA/I2C changes are inherited; crypto executable changes replay unchanged.
+
+Rust 1.99.0: both Clippy targets pass; empty-HOME CI-policy 897 passed/0 failed/0 ignored; plain 869 passed/0 failed/46 ignored; production WASM build, eight demos and privacy pass. `checks.json` identifies the exercised source revision; subsequent receipt changes are documentation only.
