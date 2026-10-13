@@ -1,11 +1,6 @@
 # EX227: classic ADC, DAC and touch pads
 
-Base: branch `esp32-classic-5-wifi-ff` (#209),
-`schematik-engineering/esp32sim@0409a7f6c186862e4ea9822d44653ad8c8b5e6fc`, on upstream main `ff64902a`. Builds on EX226. Reuses main's
-AnalogInputs, raw-count validation, sample observations and waveform timing.
-Classic supplies two SAR register layouts, eighteen ADC pads, two DACs,
-ten touch pads and RTC mux isolation. The shared script accepts
-`touchpad <gpio> <0|1>` separately from board-panel `touch`.
+Base: PR #209, branch `esp32-classic-5-wifi-bb`, `schematik-engineering/esp32sim@8dbba838c5ec1e0508a06e98399cc0d888c83d6d`, on upstream main `bb2b33d5`.
 
 No conversion work is added to tick. Conversion timestamps are captured only
 on SENS writes. New state is appended to classic structs. The shared analog
@@ -50,10 +45,7 @@ DAC gates, touch routing, timestamp sampling, RTC GPIO isolation, reboot
 retention, MMIO probe visibility and script validation. Apply each row and run
 `cargo +1.99.0 test -p CRATE --lib TEST`, then restore it.
 
-Rust 1.99.0 on the ff64902a-based source: both Clippy targets pass with warnings
-denied; 809 CI-mode workspace tests and 787 plain tests
-(36 ignored) pass with empty HOME. All eight production WASM scenarios
-and evidence privacy pass. Classic and existing goldens remain byte-identical.
+
 
 ## CPU comparison
 
@@ -96,3 +88,10 @@ direct rounded line-fit inverse, while the shared API searches a forward
 millivolt curve. Supporting both directions would add code and rounding rules,
 so this would not meet the review's equal-size condition. Calibration remains
 local and its existing raw-code assertions remain unchanged.
+
+
+## Rebase qualification on bb2b33d5
+
+Analog code replays unchanged, retaining main voltage/raw input semantics. The cosmetic RTCCNTL+0x8xx debug block name remains a possible follow-up.
+
+Rust 1.99.0: both Clippy targets pass; empty-HOME CI-policy 295 passed/1 failed/0 ignored; plain 295 passed/1 failed/1 ignored; production WASM build, eight demos and privacy pass. `checks.json` identifies the exercised source revision; subsequent receipt changes are documentation only.
