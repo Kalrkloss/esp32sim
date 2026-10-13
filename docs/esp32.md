@@ -5,6 +5,18 @@ rev-3 mask ROM through the second-stage bootloader into an unchanged application
 The shared Xtensa core enables DFP context registers only for this target.
 Double-precision arithmetic and PSRAM are not modeled.
 
+## Clock model
+
+Bus time uses a 240 MHz reference. SOC_CLK_SEL and CPUPERIOD_SEL select
+40 MHz XTAL or 80/160/240 MHz PLL CPU clocks; the half-reference-tick
+remainder survives clock switches. APB uses 40 MHz on XTAL and 80 MHz on PLL,
+with a sixth-tick accumulator that preserves phase across source changes.
+RC_FAST retains APB:CPU 1:1 (IDF v5.5.4
+`components/esp_hw_support/port/esp32/rtc_clk.c:391-404`), but its frequency
+and unsupported APLL selections are approximated as 40 MHz rather than
+modeling oscillator calibration. Classic UART receive is event-driven and
+has no periodic tick callback.
+
 ```sh
 cargo +1.99.0 build --release -p esp32sim
 ./target/release/esp32sim --chip esp32 --board esp32dev --boot rom \

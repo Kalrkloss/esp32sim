@@ -751,7 +751,6 @@ impl Peripherals {
         let phase = self.apb_phase + cycles * (6 / self.apb_divider());
         self.apb_phase = phase % 6;
         let ticks = phase / 6;
-        for uart in &mut self.uart { uart.tick(ticks); }
         for timer in &mut self.timg { timer.tick(ticks); }
         self.ledc.tick(ticks);
         self.rmt.tick(ticks);
@@ -762,9 +761,10 @@ impl Peripherals {
     /// components/esp_hw_support/port/esp32/rtc_clk.c:373-389 sets APB=CPU
     /// on 40 MHz XTAL; components/esp_hw_support/include/esp_private/systimer.h:26
     /// uses LACT prescaler 20 there (40 on 80 MHz PLL APB).
-    /// RC_FAST/APLL remain approximated as 40 MHz CPU with 80 MHz APB.
+    /// rtc_clk.c:391-404 also sets APB=CPU for RC_FAST. RC_FAST/APLL
+    /// frequency remains approximated as XTAL (40 MHz); only PLL uses 80 MHz APB.
     fn apb_divider(&self) -> u64 {
-        if (self.rtc.0.ram.read(0x70) >> 27) & 3 == 0 { 6 } else { 3 }
+        if (self.rtc.0.ram.read(0x70) >> 27) & 3 != 1 { 6 } else { 3 }
     }
     /// Half reference ticks per CPU clock. IDF v5.5.4 clk_tree_ll.h:543-626,
     /// dport_reg.h:154-174 and rtc_cntl_reg.h:863-881: XTAL=40 MHz;
@@ -914,6 +914,18 @@ mod tests {
         p.write32(BASE + 0x04, 1 << 5);
         assert_ne!(p.source_status(0)[SRC_I2C1 / 32] & (1 << (SRC_I2C1 % 32)), 0);
         assert_ne!(p.cpu_lines(0) & (1 << 9), 0);
+    }
+
+    #[test]
+    fn rc_fast_keeps_apb_and_cpu_one_to_one() {
+        let mut p = Peripherals::new([0; 6]);
+        p.write32(0x3ff4_8070, 2 << 27);
+        assert_eq!(p.cpu_scale_half(), 12);
+        assert_eq!(p.apb_divider(), 6);
+        p.write32(0x3ff5_f000, (1 << 31) | (1 << 30) | (1 << 11) | (1 << 10) | (2 << 13));
+        p.tick(60); // ten modeled CPU/APB clocks
+        p.write32(0x3ff5_f00c, 1);
+        assert_eq!(p.read32(0x3ff5_f004), 5);
     }
 
     #[test]
