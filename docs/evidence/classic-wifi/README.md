@@ -1,12 +1,6 @@
 # EX226: classic Wi-Fi on StationLink
 
-Base: branch `esp32-classic-4-crypto-ff` (#208),
-`schematik-engineering/esp32sim@1260a8cbc765c4a18c607c03e96927da832936bc`, on upstream main `ff64902a`. Builds on EX225 and the shared
-StationLink from #193. The classic adapter retains MAC/PHY registers, TSF,
-DPORT gates, DMA and RX metadata. AP/network queues, pacing, Ethernet relay,
-statistics and reboot handling use StationLink. A DPORT MAC reset clears the
-MAC registers only and keeps the link, its relay queues and frame counts, as
-on S3/C3/C6; a guest reboot applies `StationLink::surviving_reboot`.
+Base: PR #208, branch `esp32-classic-4-crypto-bb`, `schematik-engineering/esp32sim@896b622681143c52b5e15cdf24de4bd0b554c482`, on upstream main `bb2b33d5`.
 
 The classic eFuse MAC words carry the ROM CRC8 of the factory MAC, so IDF's
 MAC CRC check passes (`classic_factory_mac_includes_rom_crc8`).
@@ -47,10 +41,7 @@ that fail. Run each with `cargo +1.99.0 test -p CRATE --lib TEST`, restoring
 the original source between mutations. Tests cover register aliases, TSF,
 clock/reset, DMA rejection, RX metadata, shared station pacing and reboot.
 
-Rust 1.99.0 on the ff64902a-based source: both Clippy targets pass with warnings
-denied; 797 CI-mode workspace tests and 775 plain tests
-(36 ignored) pass with empty HOME. All eight production WASM scenarios
-and evidence privacy pass. Classic and existing goldens remain byte-identical.
+
 
 ## CPU comparison
 
@@ -108,3 +99,10 @@ because `Regi2c` is inlined into each chip.
 
 No firmware disassembly, private captures or host information is retained.
 Register interpretations remain explicitly inferred where no header exists.
+
+
+## Rebase qualification on bb2b33d5
+
+Wi-Fi descriptor reads continue using the shared DescriptorWalk adapter. The retained link matches other chips on MAC reset; register clearing is classic-only. Retaining last_rx_desc/last_rx_us can delay the first post-reset frame by the bounded 50 ms RX stall interval. No additional RX policy change is made.
+
+Rust 1.99.0: both Clippy targets pass; empty-HOME CI-policy 906 passed/0 failed/0 ignored; plain 878 passed/0 failed/46 ignored; production WASM build, eight demos and privacy pass. `checks.json` identifies the exercised source revision; subsequent receipt changes are documentation only.

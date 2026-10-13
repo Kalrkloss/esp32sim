@@ -1,20 +1,36 @@
 {
-  "upstream_base": "ff64902a",
-  "validated_source": "a91db99396a867bcf342a6d1989e647702672bec",
-  "source_unchanged_by_following_documentation": true,
-  "clippy_native": "pass",
-  "clippy_wasm": "pass",
-  "test_ci": {
-    "passed": 797,
-    "failed": 0,
-    "ignored": 0
+  "source_revision": "f4087907212e79eacdc309de981d97c42107e883",
+  "base": "896b622681143c52b5e15cdf24de4bd0b554c482",
+  "toolchain": "1.99.0",
+  "clippy-native": {
+    "exit_code": 0
   },
-  "test_plain": {
-    "passed": 775,
-    "failed": 0,
-    "ignored": 36
+  "clippy-wasm": {
+    "exit_code": 0
   },
-  "wasm_scenarios": 8,
-  "privacy": "pass",
-  "goldens": "unchanged"
+  "test-ci": {
+    "exit_code": 0,
+    "totals": {
+      "passed": 906,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "test-plain": {
+    "exit_code": 0,
+    "totals": {
+      "passed": 878,
+      "failed": 0,
+      "ignored": 46
+    }
+  },
+  "wasm-build": {
+    "exit_code": 0
+  },
+  "wasm-test": {
+    "exit_code": 0
+  },
+  "privacy": {
+    "exit_code": 0
+  }
 }
