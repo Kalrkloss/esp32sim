@@ -1,6 +1,6 @@
 # EX226: classic Wi-Fi on StationLink
 
-Base: PR #208, branch `esp32-classic-4-crypto-bb`, `schematik-engineering/esp32sim@896b622681143c52b5e15cdf24de4bd0b554c482`, on upstream main `bb2b33d5`.
+Base: PR #208, branch `esp32-classic-4-crypto-bb`, `schematik-engineering/esp32sim@c60e7a647ed1df1167bbb3c34141e6acdc471ab5`, on upstream main `bb2b33d5`.
 
 The classic eFuse MAC words carry the ROM CRC8 of the factory MAC, so IDF's
 MAC CRC check passes (`classic_factory_mac_includes_rom_crc8`).
