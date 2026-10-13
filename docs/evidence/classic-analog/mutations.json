@@ -148,14 +148,14 @@
   },
   {
     "file": "esp32/src/periph.rs",
-    "mutation": "mmio::write32(self, addr, v); (RTC_IO arm) -> self.adc.rtc_io.write(addr - 0x3ff4_8400, v);",
+    "mutation": "mmio::write32(self, addr, v);\n                self.gpio.rtc_pads -> self.adc.rtc_io.write(addr - 0x3ff4_8400, v);\n                self.gpio.rtc_pads",
     "test": "sens_and_rtc_io_accesses_reach_mmio_probes",
     "crate": "esp32",
     "killed": true
   },
   {
     "file": "esp32/src/periph.rs",
-    "mutation": "0x48 \"SENS\" alias (adc) delta -0x800 @ 0x800..=0x8ff => []; -> (removed)",
+    "mutation": "0x48 \"SENS\" alias (adc) delta -0x800 @ 0x800..=0x8ff => []; -> ",
     "test": "sens_and_rtc_io_accesses_reach_mmio_probes",
     "crate": "esp32",
     "killed": true
@@ -169,7 +169,7 @@
   },
   {
     "file": "esp32/src/periph.rs",
-    "mutation": "self.gpio.rtc_pads = self.adc.rtc_pad_mask(); (restore_rtc_analog) -> (removed)",
+    "mutation": "self.adc = adc;\n        self.gpio.rtc_pads = self.adc.rtc_pad_mask(); -> self.adc = adc;",
     "test": "reboot_keeps_rtc_domain_analog_registers_and_host_inputs",
     "crate": "esp32",
     "killed": true
@@ -183,7 +183,7 @@
   },
   {
     "file": "esp-soc/src/soc.rs",
-    "mutation": "fn has_touch_pad(&self, _pin: u8) -> bool { false } -> { true }",
+    "mutation": "fn has_touch_pad(&self, _pin: u8) -> bool { false } -> fn has_touch_pad(&self, _pin: u8) -> bool { true }",
     "test": "analog_scripts_validate_inputs_and_keep_panel_touch_separate",
     "crate": "esp32sim",
     "killed": true
