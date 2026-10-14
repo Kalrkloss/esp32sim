@@ -364,6 +364,10 @@ Third-party code, data and demo files keep their own licenses:
 - **pocket-tank** ([mediacutlet/pocket-tank](https://github.com/mediacutlet/pocket-tank), MIT). Its
   bootloader, partition table and app are committed under `web/wasm/fw/public/` with
   `pocket-tank-LICENSE.txt`; its model is fetched.
+- **MicroPython** ([micropython.org](https://micropython.org/download/ESP32_GENERIC/), MIT): the
+  official ESP32_GENERIC v1.29.0 image of the T-Display demo, fetched by `tools/fetch-micropython.sh`,
+  not committed; the demo's app and filesystem are in `examples/ttgo-tdisplay` with Russ Hughes's
+  st7789py driver and fonts (MIT), notice in `web/wasm/fw/public/tdisplay-NOTICE.txt`.
 - **Mask ROM ELFs** ([espressif/esp-rom-elfs](https://github.com/espressif/esp-rom-elfs), Apache-2.0),
   fetched, not committed.
 - **xterm.js** ([xtermjs/xterm.js](https://github.com/xtermjs/xterm.js), MIT), fetched, not committed.

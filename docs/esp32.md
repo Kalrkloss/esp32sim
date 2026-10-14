@@ -101,5 +101,8 @@ from the drivers' rotation 0, not measured on a board.
 Checked end to end with official MicroPython v1.29.0 (IDF 5.5.2) and a pure-Python ST7789
 application: the `machine.SPI(2)` driver's CPU and DMA transactions through SPI3, the window and
 pixel writes landing where the driver addresses them, Wi-Fi join and HTTPS fetch through the
-virtual access point.
+virtual access point. That application is [`examples/ttgo-tdisplay`](../examples/ttgo-tdisplay/README.md),
+and the browser runs it as the `tdisplay-prices` demo (`run.html?wasm&fw=tdisplay-prices`): the
+official MicroPython image fetched by `tools/fetch-micropython.sh`, the app's LittleFS image in
+`web/wasm/fw/public/`, demo prices instead of a fetch because the browser has no sockets.
 
