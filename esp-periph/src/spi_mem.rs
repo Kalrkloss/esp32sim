@@ -11,12 +11,15 @@ pub struct SpiMem {
     /// this a flash command issued with CS0 disabled is misrouted to the PSRAM branch and
     /// answered with zeros (found on real C3 silicon: `E memspi: no response`).
     pub has_psram: bool,
-    /// Classic ESP32 SPI_ADDR_REG is shifted out MSB first in user mode: a 24-bit address sits in
-    /// bits 31:8 (IDF v5.5.4 hal/esp32/include/hal/spi_flash_ll.h:365-378 writes
-    /// `(addr << (32 - bitlen)) | ones`), while the SPI_MEM controllers (S3/C3/C6) take it
-    /// right-aligned (esp32s3/include/hal/spimem_flash_ll.h:590-594). Dedicated flash commands
-    /// (FLASH_READ/PP/SE/BE) keep the address in bits 23:0 and a length in 31:24 on both
-    /// (hal/spi_flash_hal_iram.c:75-82).
+    /// Classic ESP32 SPI_ADDR_REG is shifted out MSB first in user mode: for an address phase shorter
+    /// than 32 bits the HAL writes `(addr << (32 - bitlen)) | ones` (IDF v5.5.4
+    /// hal/esp32/include/hal/spi_flash_ll.h:365-377), so a 24-bit address sits in bits 31:8 and the
+    /// ROM's SPIRead writes `addr << 8` for its 32-bit 0xBB/0xEB phases; only a full 32-bit address
+    /// (4-byte-address commands, :368-370, not decoded here) stays right-aligned. The SPI_MEM
+    /// controllers (S3/C3/C6) take the register right-aligned
+    /// (esp32s3/include/hal/spimem_flash_ll.h:590-594). Dedicated flash commands (FLASH_READ/PP/SE/BE)
+    /// keep the address in bits 23:0 and a length in 31:24 on both (hal/spi_flash_hal_iram.c:75-82;
+    /// esp_rom/patches/esp_rom_spiflash.c:151-214).
     pub addr_msb_aligned: bool,
     pub regs: RegRam,
     /// (memory, offset, len) ranges the last command wrote, for the bus's page versions
@@ -64,8 +67,10 @@ impl SpiMem {
         let mosi_bytes = ((self.regs.read(0x24) & 0x3ff) as usize + 8) / 8;
         let addr_bits = ((user1 >> 26) & 0x3f) + 1;
         // User-command address: right-aligned on SPI_MEM; MSB-aligned on the classic ESP32, where the
-        // flash sees the first 24 of the `addr_bits` shifted bits as the address (28/32-bit phases
-        // carry the DIO/QIO continuous-mode bits after it, spi_flash_hal_common.inc:104-138).
+        // flash sees the first 24 of the `addr_bits` shifted bits as the address: the HAL's DIO/QIO
+        // phase is 28 bits (the continuous-mode bits follow, spi_flash_hal_common.inc:104-138), the
+        // ROM's is 32, and the classic PSRAM driver sends an opcode as an 8-bit "address"
+        // (esp_psram_impl_quad.c:495-512).
         let addr = if self.addr_msb_aligned {
             if addr_bits >= 24 { addr_reg >> 8 } else { addr_reg >> (32 - addr_bits) }
         } else if addr_bits > 24 { addr_reg } else { addr_reg & 0xff_ffff };
@@ -194,6 +199,24 @@ mod tests {
         spi.write(0, 1 << 24);
         spi.execute(&mut flash, &mut []);
         assert_eq!(&flash[0x200000..0x200004], &[0xff; 4]);
+        // The ROM's SPIRead: a 32-bit 0xEB phase with the address in bits 31:8 and a zero low byte.
+        flash[0x200000..0x200004].copy_from_slice(&[0x11, 0x22, 0x33, 0x44]);
+        spi.write(0x1c, 31 << 26);
+        spi.write(0x20, 0xeb);
+        spi.write(0x04, 0x200000 << 8);
+        spi.write(0x58, 0);
+        spi.write(0, 1 << 18);
+        spi.execute(&mut flash, &mut []);
+        assert_eq!(spi.w[0], 0x44332211, "ROM-style 32-bit phase");
+        // A phase shorter than 24 bits takes its leading bits (the PSRAM driver's 8-bit opcode phase).
+        flash[0x12..0x16].copy_from_slice(&[0xa1, 0xb2, 0xc3, 0xd4]);
+        spi.write(0x1c, 7 << 26);
+        spi.write(0x20, 0x03);
+        spi.write(0x04, 0x12 << 24);
+        spi.write(0x58, 0);
+        spi.write(0, 1 << 18);
+        spi.execute(&mut flash, &mut []);
+        assert_eq!(spi.w[0], 0xd4c3b2a1, "8-bit phase");
         // Right-aligned decoding reads 0x200000ff, past a 4 MiB array.
         let mut spi = SpiMem::new(true);
         assert_eq!(user_read(&mut spi, &mut flash, 24, 0x03), 0xffffffff);
