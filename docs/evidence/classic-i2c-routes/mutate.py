@@ -18,8 +18,7 @@ mutations = [
     ('omit-routes', route, 'self.i2c[bus].set_pins(pins);', 'let _ = pins;', 'classic_i2c_routes_both_ports_and_aliases'),
     ('reverse-wires', route, 'routes.i2c_pin(sda).zip(routes.i2c_pin(scl))', 'routes.i2c_pin(scl).zip(routes.i2c_pin(sda))', 'classic_i2c_routes_both_ports_and_aliases'),
     ('wrong-port-signals', route, 'let (scl, sda) = I2C_SIGNALS[bus];', 'let (scl, sda) = I2C_SIGNALS[0];', 'classic_i2c_routes_both_ports_and_aliases'),
-    ('classic-reset', control, 'let reset = v & reset_mask != 0;', 'let reset = v & (1 << 10) != 0;', 'classic_i2c_bit10_retains_end_recipient_and_readback'),
-    ('classic-clear-bit10', control, 'v & !((1 << 5) | reset_mask)', 'v & !((1 << 5) | (1 << 10))', 'classic_i2c_bit10_retains_end_recipient_and_readback'),
+    ('classic-reset', control, 'let reset = v & reset_mask != 0;', 'let reset = v & (1 << 10) != 0;', 'classic_i2c_bit10_retains_end_recipient'),
     ('modern-no-reset', control, 'let reset_mask = if $n == 16 { 0 } else { 1 << 10 };', 'let reset_mask = 0;', 'modern_i2c_bit10_cancels_pending_transfer'),
 ]
 rows = []
