@@ -4,13 +4,13 @@
   "artifacts": [
     {
       "label": "base",
-      "binary_sha256": "ea332b0b8b450de6a55be5c66092ff8e7f817df891f6dff2916a420aa716e635",
-      "disassembly_sha256": "32ef251fd96671ca65b20f385f7000566bde547b16270abe5e8f4ab75f4128fb"
+      "binary_sha256": "f2d3909ac7374518e19bf4a8c103efd20a3f7ba2f49802a132e8a1299148a316",
+      "disassembly_sha256": "760704a67861d658b0b7bef1573f00dd8153f7ddd6532482b2c0b70cc5c1330f"
     },
     {
       "label": "candidate",
-      "binary_sha256": "d1f11a22da3eae17e055443933eab9624469eafb41254f7db6ec7abe9434989c",
-      "disassembly_sha256": "1a5c993ea3a6e10befaff54801064d6d08fcfd60c17074e6bcaa7cb2ae445a48"
+      "binary_sha256": "26c9f3c898121f3bbbcd55d30754fcc858559af0a880b32ffa8ea7aa805535fa",
+      "disassembly_sha256": "eea2702349651f7812b43f2baba945faa65e95bf8a0ed2f11293b48d48747558"
     }
   ],
   "selector": "(Machine<esp32::.*>::(?:run|step_core|after_round|present_irqs)|esp32::bus::SocBus.*::(?:tick|read32|write32|fetch|next_deadline)|esp32::periph::.*::(?:source_status|all_cpu_lines|raw_status|irq_status|refresh_level_status|tick|read|write))",
@@ -32,7 +32,7 @@
     {
       "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::tick",
       "base_instructions": 1854,
-      "candidate_instructions": 2313,
+      "candidate_instructions": 2308,
       "same": false
     },
     {
@@ -122,7 +122,7 @@
     {
       "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::run_unmodeled::<false>",
       "base_instructions": 1707,
-      "candidate_instructions": 1707,
+      "candidate_instructions": 1708,
       "same": false
     },
     {
