@@ -1,5 +1,5 @@
 //! Classic I2S RX register adapter and native descriptor DMA.
-//! ESP-IDF v5.5.4 components/soc/esp32/register/soc/i2s_reg.h: CONF bits 21-125,
+//! ESP-IDF v5.5.4 components/soc/esp32/register/soc/i2s_reg.h: CONF bits 21-128,
 //! interrupt _S defines 142-184, RXEOF_NUM 676-682, CONF_CHAN 692-695, INLINK_ADDR 763-768,
 //! LC_CONF 856-868, clocks 1340-1390. include/soc/gpio_sig_map.h:69-72,299,309-312,343
 //! supplies the GPIO matrix signals; dport_reg.h:947,965 defines the clock gates.
