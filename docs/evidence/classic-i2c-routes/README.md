@@ -62,6 +62,53 @@ binary must be used
 for any baseline comparison. Firmware input hashes and observed execution
 results belong in the final qualification receipt.
 
+## Executed qualification
+
+Rust implementation/test revision: `811b69af174e4a4f6051241ca65a4478a44956dc`.
+Against the frozen base above, under Rust 1.99.0 with serialized `-j2`:
+
+- Native workspace/all-target Clippy and release WASM jit-tests Clippy with
+  `-D warnings`: exit 0.
+- Empty-HOME workspace CI policy (only the absolute ROM input set):
+  941 passed, 0 failed. Plain empty-HOME workspace run without ROM setting:
+  913 passed, 47 ignored, 0 failed.
+- `RUSTUP_TOOLCHAIN=1.99.0 tools/wasm-build.sh` and
+  `node tools/wasm-test.mjs hello c3-hello c6-hello c6-energy-scan c6-contiki c6-contiki-net c6-rpl-net panel`:
+  exit 0. Existing golden files are unchanged. No JIT implementation changed.
+- `node tools/check-evidence-privacy.mjs`: exit 0, supplemented by manual review.
+- Three focused register tests pass. All six executable mutations are killed
+  by the named assertion failures (exit 101), not compilation failures.
+- `pio run -j 2` builds the fixture with Arduino 3.3.9/IDF 5.5.4, platform
+  tag 55.03.39 (`cbc3349061987c28bc1b48d43d473e70c5ae04ed`). The ignored
+  Arduino test passes all seven output lines and zero reboots. The exact same
+  firmware fails the routing assertions on the frozen base: all six probes
+  report error 4 and no byte, including the four correctly wired probes.
+
+Firmware SHA-256 (linked binaries remain external inputs, not committed here):
+
+- bootloader.bin: `83e9239d016f18e0b90fb0cac8cbe91cd506fb14852e1b618bc2844579c2a993`
+- partitions.bin: `148b959cbff1c38aa8e1d5c0ba9d612c54997b945e56a63f41223eef650653a1`
+- firmware.bin: `e0671ff1c67f7acf3fc6cd363aea73b501b86a2b09de514b695ea4d0cf3a0421`
+
+Static comparison builds `cargo +1.99.0 build --release -j2 -p esp32sim --bin esp32sim`
+on both revisions and disassembles with
+`llvm-objdump -d --demangle --no-show-raw-insn`. Address/alignment and linker-alias
+normalization yields 2194 equal functions and six differences, none missing.
+Four differences (classic tick, C3/C6 refresh_irq, C3 refresh_pin_lines) are
+only constant-pool zero-offset spelling versus an explicit offset: the 16-byte
+Mach-O constant payloads were checked equal, with unchanged instruction counts,
+opcodes and registers. All 45 selected run/step/tick/deadline functions are
+therefore identical apart from verified layout-only constant references.
+The two semantic differences are the intended classic I2c<16>::write control
+arm and classic SocBus::store, with 37 additional static instructions and
+register-allocation changes around its START route selection. MMIO stores are
+not claimed instruction-identical. No fields or tick operations were added.
+This is static qualification, not a CPU timing result.
+
+Limits: this probe does not qualify complete sensor, RTC/OLED or camera/SCCB
+models or establish hardware error-code parity. Modern shared addressing and
+transfer timing remain covered by the unchanged workspace regressions.
+
 ## CPU comparison
 
 PENDING — measured centrally only. No timing is reported here. The branch is
