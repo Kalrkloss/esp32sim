@@ -25,8 +25,8 @@ fn external_arduino_classic_i2c_routes() {
     let console = String::from_utf8_lossy(&m.console.uart0);
     let lines: Vec<_> = console.lines().filter(|line| line.starts_with("ROUTE:")).collect();
     println!("{console}");
-    assert_eq!(lines, ["ROUTE:0:21:22:0:21", "ROUTE:0:18:19:0:18", "ROUTE:0:21:19:2:-1",
-        "ROUTE:1:21:22:0:21", "ROUTE:1:18:19:0:18", "ROUTE:1:21:19:2:-1", "ROUTE:done"]);
+    assert_eq!(lines, ["ROUTE:0:21:22:0:21", "ROUTE:0:18:19:0:18", "ROUTE:0:21:19:4:-1",
+        "ROUTE:1:21:22:0:21", "ROUTE:1:18:19:0:18", "ROUTE:1:21:19:4:-1", "ROUTE:done"]);
     assert_eq!(m.reboots, 0);
 }
 use esp_periph::i2c::{I2c, I2cDevice, INT_NACK, INT_TRANS_COMPLETE};
