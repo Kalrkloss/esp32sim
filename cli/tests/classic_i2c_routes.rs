@@ -1,4 +1,34 @@
 use emu_core::Bus;
+
+#[test]
+#[ignore = "set CLASSIC_I2C_ROM to the classic mask ROM ELF and CLASSIC_I2C_FIRMWARE to the PlatformIO classic build directory"]
+fn external_arduino_classic_i2c_routes() {
+    use std::{env, fs, path::PathBuf};
+    let firmware = PathBuf::from(env::var_os("CLASSIC_I2C_FIRMWARE")
+        .expect("set CLASSIC_I2C_FIRMWARE to the build directory for docs/evidence/classic-i2c-routes/firmware"));
+    let mut m = esp32::machine([0; 6], 4 * 1024 * 1024);
+    m.console.capture = true;
+    m.load_rom(&fs::read(env::var_os("CLASSIC_I2C_ROM")
+        .expect("set CLASSIC_I2C_ROM to the ESP32 ECO3 mask ROM ELF")).unwrap()).unwrap();
+    for (offset, name) in [(0x1000, "bootloader.bin"), (0x8000, "partitions.bin"), (0x10000, "firmware.bin")] {
+        m.write_flash(offset, &fs::read(firmware.join(name)).unwrap()).unwrap();
+    }
+    for port in 0..2 {
+        for pins in [(21, 22), (18, 19)] {
+            m.bus.periph.i2c[port].attach(0x29, Box::new(Pinned { pins, seen: Arc::new(Mutex::new(Vec::new())) }));
+        }
+    }
+    m.boot_rom();
+    while m.seconds() < 10.0 && !String::from_utf8_lossy(&m.console.uart0).contains("ROUTE:done") {
+        assert!(matches!(m.run(1_000_000), esp_soc::Stop::MaxInsns));
+    }
+    let console = String::from_utf8_lossy(&m.console.uart0);
+    let lines: Vec<_> = console.lines().filter(|line| line.starts_with("ROUTE:")).collect();
+    println!("{console}");
+    assert_eq!(lines, ["ROUTE:0:21:22:0:21", "ROUTE:0:18:19:0:18", "ROUTE:0:21:19:2:-1",
+        "ROUTE:1:21:22:0:21", "ROUTE:1:18:19:0:18", "ROUTE:1:21:19:2:-1", "ROUTE:done"]);
+    assert_eq!(m.reboots, 0);
+}
 use esp_periph::i2c::{I2c, I2cDevice, INT_NACK, INT_TRANS_COMPLETE};
 use esp_periph::Device;
 use std::sync::{Arc, Mutex};
