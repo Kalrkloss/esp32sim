@@ -40,9 +40,7 @@ impl Soc for Esp32 {
         c.set_ar(1, 0x3ffe_0000);
     }
     fn irqs(bus: &SocBus, out: &mut [u32]) {
-        for (core, lines) in out.iter_mut().enumerate() {
-            *lines = bus.periph.cpu_lines(core);
-        }
+        bus.periph.all_cpu_lines(out);
     }
     fn core_state(bus: &SocBus, core: usize) -> CoreState {
         if core == 0 {
