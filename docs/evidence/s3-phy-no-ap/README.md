@@ -52,6 +52,17 @@ count demonstrating exit from the poll, not a host CPU benchmark. The sketch
 continues offline after its own association timeout, so Setup complete alone
 must not be treated as evidence of connection.
 
+These are measured register-access counts, not personal identifiers; privacy
+normalization must preserve their exact digits. The raw `--regstat` rows are
+`196077903 rd FE+0x174 0x60006174 0x00000000 0x42095f03` on base and
+`87 rd FE+0x174 0x60006174 0x00010000 0x42095f03` with the fix. The receipt at
+3dfc247414a6baa8c7ab8bfed964681eb08dd43e already stores the exact count;
+its SHA-256 before this clarification is
+`5bd1ad4262a89e8ad5dd950b59f075fddba93e2127e0e79025bf2261a881fa95`.
+Any masked rendering of that count is not the stored measurement. The evidence
+privacy checker is read-only; it reports patterns without rewriting samples.
+Input hashes and the reproduction command above are unchanged.
+
 ## Other chips
 
 No shared AP-gated completion path: C3 `FeIq` in esp32c3/src/wifi.rs completes
