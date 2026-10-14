@@ -1,0 +1,79 @@
+[
+  {
+    "mutation": "idle-gate",
+    "assertion_killed": true,
+    "exit": 101,
+    "tests": [
+      "bus::irq_event_tests::irq_events_core_control_republishes_after_pre_round_refresh",
+      "bus::tests::irq_events_idle_polling_is_clean_but_writes_and_inputs_are_dirty",
+      "bus::tests::irq_events_timer_alarm_and_clear_keep_both_core_lines_live"
+    ]
+  },
+  {
+    "mutation": "bus-propagation",
+    "assertion_killed": true,
+    "exit": 101,
+    "tests": [
+      "bus::irq_event_tests::irq_events_rtc_dispatch_transition_reaches_bus_dirty",
+      "bus::irq_event_tests::irq_events_manual_apb_ledc_and_rmt_transitions",
+      "bus::irq_event_tests::irq_events_gpio_output_transition_without_peripheral_irq",
+      "bus::tests::irq_events_timer_alarm_and_clear_keep_both_core_lines_live"
+    ]
+  },
+  {
+    "mutation": "dispatch-propagation",
+    "assertion_killed": true,
+    "exit": 101,
+    "tests": [
+      "bus::irq_event_tests::irq_events_rtc_dispatch_transition_reaches_bus_dirty"
+    ]
+  },
+  {
+    "mutation": "manual-timer",
+    "assertion_killed": true,
+    "exit": 101,
+    "tests": [
+      "bus::tests::irq_events_timer_alarm_and_clear_keep_both_core_lines_live"
+    ]
+  },
+  {
+    "mutation": "manual-ledc",
+    "assertion_killed": true,
+    "exit": 101,
+    "tests": [
+      "bus::irq_event_tests::irq_events_manual_apb_ledc_and_rmt_transitions"
+    ]
+  },
+  {
+    "mutation": "manual-rmt",
+    "assertion_killed": true,
+    "exit": 101,
+    "tests": [
+      "bus::irq_event_tests::irq_events_manual_apb_ledc_and_rmt_transitions"
+    ]
+  },
+  {
+    "mutation": "routed-gpio",
+    "assertion_killed": true,
+    "exit": 101,
+    "tests": [
+      "bus::irq_event_tests::irq_events_gpio_output_transition_without_peripheral_irq"
+    ]
+  },
+  {
+    "mutation": "core-release",
+    "assertion_killed": true,
+    "exit": 101,
+    "tests": [
+      "bus::irq_event_tests::irq_events_core_control_republishes_after_pre_round_refresh"
+    ]
+  },
+  {
+    "mutation": "board-reset",
+    "assertion_killed": true,
+    "exit": 101,
+    "tests": [
+      "bus::irq_event_tests::irq_events_core_control_republishes_after_pre_round_refresh"
+    ]
+  }
+]
