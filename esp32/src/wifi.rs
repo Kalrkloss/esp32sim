@@ -2,7 +2,9 @@
 //! MAC and PHY meanings are inferred from Arduino-ESP32 3.3.8 libpp/libphy;
 //! no public MAC register header or hardware timing validation is claimed.
 
-use crate::bus::{SocBus, DRAM_HIGH, ROM_DRAM_LOW};
+use crate::bus::{SocBus, dma_range};
+#[cfg(test)]
+use crate::bus::{DRAM_HIGH, ROM_DRAM_LOW};
 use crate::periph::CPU_HZ;
 use esp_periph::{Device, RegRam, WriteEffect};
 use esp_soc::wifi;
@@ -246,15 +248,25 @@ impl SocBus {
     }
 }
 
-fn dma_range(addr: u32, len: usize) -> Option<std::ops::Range<usize>> {
-    let off = addr.checked_sub(ROM_DRAM_LOW)? as usize;
-    let end = off.checked_add(len)?;
-    (end <= (DRAM_HIGH - ROM_DRAM_LOW) as usize).then_some(off..end)
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn classic_wifi_dma_reach_descriptors_and_payloads() {
+        for address in [crate::bus::DRAM_LOW, DRAM_HIGH - 12, ROM_DRAM_LOW,
+            crate::bus::DRAM_LOW - 12, DRAM_HIGH - 11, 0x4008_0000, 0x3ff8_0000, 0x5000_0000, u32::MAX] {
+            let allowed = address == crate::bus::DRAM_LOW || address == DRAM_HIGH - 12;
+            assert_eq!(dma_range(address, 12).is_some(), allowed, "descriptor {address:#x}");
+            let mut b = SocBus::new(0, [0; 6]);
+            assert_eq!(b.read_dma_descriptor(address).is_ok(), allowed, "read {address:#x}");
+        }
+        assert!(dma_range(DRAM_HIGH - 1, 1).is_some());
+        assert!(dma_range(DRAM_HIGH - 1, 2).is_none());
+        assert!(dma_range(ROM_DRAM_LOW, 1).is_none());
+        assert!(dma_range(crate::bus::DRAM_LOW, usize::MAX).is_none());
+    }
 
     #[test]
     fn authentication_tx_reads_full_length_not_buffer_capacity() {
