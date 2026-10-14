@@ -11,6 +11,13 @@ pub struct SpiMem {
     /// this a flash command issued with CS0 disabled is misrouted to the PSRAM branch and
     /// answered with zeros (found on real C3 silicon: `E memspi: no response`).
     pub has_psram: bool,
+    /// Classic ESP32 SPI_ADDR_REG is shifted out MSB first in user mode: a 24-bit address sits in
+    /// bits 31:8 (IDF v5.5.4 hal/esp32/include/hal/spi_flash_ll.h:365-378 writes
+    /// `(addr << (32 - bitlen)) | ones`), while the SPI_MEM controllers (S3/C3/C6) take it
+    /// right-aligned (esp32s3/include/hal/spimem_flash_ll.h:590-594). Dedicated flash commands
+    /// (FLASH_READ/PP/SE/BE) keep the address in bits 23:0 and a length in 31:24 on both
+    /// (hal/spi_flash_hal_iram.c:75-82).
+    pub addr_msb_aligned: bool,
     pub regs: RegRam,
     /// (memory, offset, len) ranges the last command wrote, for the bus's page versions
     pub dirty: Vec<(DirtyMem, usize, usize)>,
@@ -24,7 +31,7 @@ pub struct SpiMem {
     pub psram_mr: [u8; 9],
 }
 impl SpiMem {
-    pub fn new(is_spi1: bool) -> Self { SpiMem { has_psram: true, regs: RegRam::new(), dirty: Vec::new(), w: [0; 16], pending_cmd: 0, status: 0x200, jedec: [0x20, 0x40, 0x17], is_spi1, log: false , psram_mr: [0x09, 0x0d, 0x8b, 0x00, 0x20, 0, 0, 0, 0x03] } }
+    pub fn new(is_spi1: bool) -> Self { SpiMem { has_psram: true, addr_msb_aligned: false, regs: RegRam::new(), dirty: Vec::new(), w: [0; 16], pending_cmd: 0, status: 0x200, jedec: [0x20, 0x40, 0x17], is_spi1, log: false , psram_mr: [0x09, 0x0d, 0x8b, 0x00, 0x20, 0, 0, 0, 0x03] } }
     pub fn read(&self, off: u32) -> u32 {
         match off {
             0x0 => 0,                                   // CMD: always idle after execution
@@ -56,7 +63,14 @@ impl SpiMem {
         let miso_bytes = ((self.regs.read(0x28) & 0x3ff) as usize + 8) / 8;
         let mosi_bytes = ((self.regs.read(0x24) & 0x3ff) as usize + 8) / 8;
         let addr_bits = ((user1 >> 26) & 0x3f) + 1;
-        let addr = if addr_bits > 24 { addr_reg } else { addr_reg & 0xff_ffff };
+        // User-command address: right-aligned on SPI_MEM; MSB-aligned on the classic ESP32, where the
+        // flash sees the first 24 of the `addr_bits` shifted bits as the address (28/32-bit phases
+        // carry the DIO/QIO continuous-mode bits after it, spi_flash_hal_common.inc:104-138).
+        let addr = if self.addr_msb_aligned {
+            if addr_bits >= 24 { addr_reg >> 8 } else { addr_reg >> (32 - addr_bits) }
+        } else if addr_bits > 24 { addr_reg } else { addr_reg & 0xff_ffff };
+        // Dedicated flash commands (bits 31..22) take the address from bits 23:0 on the classic.
+        let fixed = if self.addr_msb_aligned { addr_reg & 0xff_ffff } else { addr };
         let fsize = flash.len();
         let rd = |a: u32, n: usize| -> Vec<u8> { (0..n).map(|i| { let x = a as usize + i; if x < fsize { flash[x] } else { 0xff } }).collect() };
         // IDF v5.5.5 components/soc/esp32s3/register/soc/spi_mem_reg.h:
@@ -115,7 +129,7 @@ impl SpiMem {
             }
             return;
         }
-        if cmd & (1 << 31) != 0 { let d = rd(addr, miso_bytes); self.set_w_bytes(&d); }                       // FLASH_READ
+        if cmd & (1 << 31) != 0 { let d = rd(fixed, miso_bytes); self.set_w_bytes(&d); }                       // FLASH_READ
         if cmd & (1 << 28) != 0 { let j = self.jedec; self.set_w_bytes(&j); }                                   // RDID
         if cmd & (1 << 30) != 0 { self.status |= 0x02; }                                                         // WREN
         if cmd & (1 << 29) != 0 { self.status &= !0x02; }                                                        // WRDI
@@ -124,12 +138,12 @@ impl SpiMem {
         if cmd & (1 << 25) != 0 {                                                                                // PP
             let n = if addr_reg >> 24 != 0 { (addr_reg >> 24) as usize } else { mosi_bytes };
             let d = self.w_bytes(n);
-            for (i, b) in d.iter().enumerate() { let x = (addr & 0xff_ffff) as usize + i; if x < fsize { flash[x] &= *b; } }
-            self.dirty.push((DirtyMem::Flash, (addr & 0xff_ffff) as usize, d.len()));
+            for (i, b) in d.iter().enumerate() { let x = (fixed & 0xff_ffff) as usize + i; if x < fsize { flash[x] &= *b; } }
+            self.dirty.push((DirtyMem::Flash, (fixed & 0xff_ffff) as usize, d.len()));
             self.status &= !0x02;
         }
-        if cmd & (1 << 24) != 0 { let a = (addr as usize) & !0xfff; for b in flash.iter_mut().take((a + 0x1000).min(fsize)).skip(a) { *b = 0xff; } self.dirty.push((DirtyMem::Flash, a, 0x1000)); self.status &= !0x02; }      // SE
-        if cmd & (1 << 23) != 0 { let a = (addr as usize) & !0xffff; for b in flash.iter_mut().take((a + 0x10000).min(fsize)).skip(a) { *b = 0xff; } self.dirty.push((DirtyMem::Flash, a, 0x10000)); }    // BE
+        if cmd & (1 << 24) != 0 { let a = (fixed as usize) & !0xfff; for b in flash.iter_mut().take((a + 0x1000).min(fsize)).skip(a) { *b = 0xff; } self.dirty.push((DirtyMem::Flash, a, 0x1000)); self.status &= !0x02; }      // SE
+        if cmd & (1 << 23) != 0 { let a = (fixed as usize) & !0xffff; for b in flash.iter_mut().take((a + 0x10000).min(fsize)).skip(a) { *b = 0xff; } self.dirty.push((DirtyMem::Flash, a, 0x10000)); }    // BE
         if cmd & (1 << 22) != 0 { for b in flash.iter_mut() { *b = 0xff; } self.dirty.push((DirtyMem::Flash, 0, fsize)); }                          // CE
     }
 }
@@ -144,6 +158,46 @@ impl Device for SpiMem {
 #[cfg(test)]
 mod tests {
     use super::SpiMem;
+
+    /// IDF v5.5.4 hal/esp32/include/hal/spi_flash_ll.h:365-378: the classic ESP32 shifts SPI_ADDR_REG out MSB first,
+    /// so a 24-bit user address is written as `(addr << 8) | 0xff`, and the DIO read 0xBB uses a 28-bit address
+    /// phase for the continuous-mode bits (spi_flash_hal_common.inc:104-138). Dedicated commands keep the address
+    /// in bits 23:0 with the length in 31:24 (spi_flash_hal_iram.c:75-82). The SPI_MEM controllers take the user
+    /// address right-aligned (esp32s3/include/hal/spimem_flash_ll.h:590-594).
+    #[test]
+    fn classic_user_address_is_msb_aligned_and_dedicated_commands_keep_bits_23_0() {
+        let mut flash = vec![0xffu8; 0x400000];
+        flash[0x200000..0x200004].copy_from_slice(&[0x11, 0x22, 0x33, 0x44]);
+        let user_read = |spi: &mut SpiMem, flash: &mut [u8], addr_bits: u32, cmd: u32| {
+            spi.write(0x34, 2);                                   // CS0: the flash
+            spi.write(0x18, (1 << 31) | (1 << 30) | (1 << 28));   // USER: command, address, miso phases
+            spi.write(0x1c, (addr_bits - 1) << 26);               // USER1: address bit length
+            spi.write(0x20, cmd);                                 // USER2: command
+            spi.write(0x04, (0x200000 << 8) | 0xff);             // ADDR as the classic HAL writes it
+            spi.write(0x28, 31);                                  // MISO_DLEN: 32 bits
+            spi.write(0x58, 0);
+            spi.write(0, 1 << 18);
+            spi.execute(flash, &mut []);
+            spi.w[0]
+        };
+        let mut spi = SpiMem::new(true);
+        spi.addr_msb_aligned = true;
+        for (addr_bits, cmd) in [(24, 0x03), (28, 0xbb)] {
+            assert_eq!(user_read(&mut spi, &mut flash, addr_bits, cmd), 0x44332211, "user read {cmd:#x}, {addr_bits}-bit address phase");
+        }
+        spi.write(0x04, (4 << 24) | 0x200100);                   // PP: length 4 at 0x200100
+        spi.write(0x58, 0xa5a5a5a5);
+        spi.write(0, 1 << 25);
+        spi.execute(&mut flash, &mut []);
+        assert_eq!(&flash[0x200100..0x200104], &[0xa5; 4]);
+        spi.write(0x04, 0x200100);                               // SE: the sector holding both
+        spi.write(0, 1 << 24);
+        spi.execute(&mut flash, &mut []);
+        assert_eq!(&flash[0x200000..0x200004], &[0xff; 4]);
+        // Right-aligned decoding reads 0x200000ff, past a 4 MiB array.
+        let mut spi = SpiMem::new(true);
+        assert_eq!(user_read(&mut spi, &mut flash, 24, 0x03), 0xffffffff);
+    }
 
     #[test]
     fn cs1_quad_id_tracks_capacity_and_keeps_octal_and_flash_ids() {
