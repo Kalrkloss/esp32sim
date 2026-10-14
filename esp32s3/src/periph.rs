@@ -387,7 +387,8 @@ impl Device for I2cMst {
     fn write(&mut self, off: u32, v: u32) -> WriteEffect { I2cMst::write(self, off, v); WriteEffect::NONE }
 }
 /// The FE (RF front end) block is otherwise unmodelled; the one bit the WiFi blob polls is the
-/// "IQ estimation done" flag at +0x174, set once a virtual AP exists (`pre_access` keeps it current).
+/// inferred "IQ estimation done" flag at +0x174. Ideal-radio PHY bring-up completes
+/// even without an AP; this is not association or a silicon calibration timing model.
 pub struct FeIq { word: u32, pub done: bool }
 impl Device for FeIq {
     fn read(&mut self, _off: u32) -> u32 { self.word | if self.done { 1 << 16 } else { 0 } }
@@ -493,7 +494,7 @@ impl DeviceSet for Peripherals {
             0xc2 if !write => self.intmatrix.status = self.source_status(),   // INTERRUPT_*_STATUS reads the live sources
             0x35 => self.wifi.now_cycles = self.clock.cycles(),               // TSF timestamps
             0x08 => self.rtc.now_cycles = self.clock.cycles(),                // SENS ADC samples analog sources at this time
-            0x06 => self.fe.done = self.wifi.link.ap().is_some(),                    // IQ estimation completes once there is an AP
+            0x06 => self.fe.done = true,                                     // PHY completion is independent of AP/association
             _ => {}
         }
     }
