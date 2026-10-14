@@ -1,7 +1,8 @@
 # Classic idle adapter gates
 
 Base: `ab89dc543bd8aa23b2d39f2cc48348ea5a0793ea` (upstream main after #212).
-This is deterministic attribution, not a CPU percentage estimate or a timing benchmark.
+The per-part counters below are deterministic work attribution, not CPU percentages.
+The CPU comparison separately credits the maintainer's central timing run.
 The workload is the committed classic hello fixture, ECO3 ROM, esp32dev, UART0,
 30 emulated seconds including two resets, no Wi-Fi or BLE configuration.
 Input hashes and build/disassembly hashes are in `manifest.json`.
@@ -32,8 +33,9 @@ alias in the dispatch table and has no clock() implementation.
 
 Wi-Fi and LEDC/RMT already returned internally when gated off. They were not doing
 frame processing, timer advancement or channel advancement in this workload.
-The regression mechanism here is repeated adapter entry/gate checking, not active
-peripheral emulation with the clock stopped. Wi-Fi read the DPORT register map once
+This gating is a tidy-up with a small measured gain, not the regression mechanism
+behind the classic hello slowdown (see the maintainer's CPU comparison below).
+Wi-Fi read the DPORT register map once
 per idle tick; I2S read it for both ports even with no DMA pending. LEDC/RMT were
 called after Dispatch on every tick regardless of their clock()/pending-work result.
 
@@ -48,9 +50,14 @@ ESP-IDF v5.5.4 `components/soc/esp32/register/soc/dport_reg.h`, clock bits at
 LEDC/RMT output synchronization and completed-output delivery are retained even with
 clocks off, so already queued GPIO/RMT changes are not lost.
 
-This evidence cannot apportion the maintainer's +10.2% by percentage, or establish
-that this patch recovers it. No wall/user-CPU comparison was made. DMA reach rules
-are unchanged. No hardware equivalence beyond the existing model is claimed.
+The call counts alone cannot apportion or establish recovery of the slowdown.
+The centrally measured table below finds only a small gain. DMA reach rules are
+unchanged. No hardware equivalence beyond the existing model is claimed.
+
+I2S freezes rather than resets its DMA state while DPORT RST is asserted. That
+state-retention behavior is pre-existing; this patch adds the missing reset gate,
+not a DMA reset implementation. As noted in the maintainer review, IDF asserts
+I2S reset only at channel allocation. No DMA-state behavior change is made here.
 
 ## Guest equivalence
 
@@ -124,6 +131,26 @@ still enlarges the enclosing peripheral block. LEDC/RMT engine and output-sync
 function bodies remain identical. Full raw disassemblies/diffs are retained outside
 Git; their hashes are in manifest.json, and the scripts reproduce the comparison.
 
+## Review requalification (October 14, 2026)
+
+The correction to the attribution and catalog is documentation-only on top of
+`626c8b2fcea3da609f0a8c8ae265576033750f38`; no Rust, golden, fixture or dependency
+changes. The required checks above were rerun: both Clippy commands pass,
+empty-HOME CI-policy workspace tests pass 941 (18 filtered), plain empty-HOME
+workspace tests pass 913 (46 ignored), production WASM and all eight demos
+including JIT handoff pass, all eight gate mutations are assertion-killed, and
+restored-source classic tests pass 94 unit + 15 peripheral + 8 review-core.
+Privacy and whitespace checks pass. No JIT source changed.
+
+Fresh `cargo +1.99.0 build --release --bins` builds of the previous head and the
+documentation-corrected tree, followed by the objdump command above, give
+identical complete instruction listings: only objdump's input-path header differs.
+`disasm.py` finds 27/27 classic functions identical; classic-core/hot.py finds
+119/119 shared/S3/C3/C6 functions identical, none missing. This is a comparison
+against the previous PR head, not a replacement of the original main comparison.
+`review-codegen.json` records artifact hashes; binaries can differ in embedded
+build-path data without differing in these instruction listings.
+
 ## Reproduction
 
 Set EVIDENCE_OUT to a writable external evidence directory. Scripts are sequential:
@@ -136,4 +163,43 @@ disasm.py expects base.dis and candidate.dis under EVIDENCE_OUT. Fetch assets wi
 
 ## CPU comparison
 
-PENDING — measured centrally later, without concurrent builds.
+Measured centrally by joakimeriksson in the [October 14, 2026 review of
+`626c8b2f`](https://github.com/mikroverk/esp32sim/pull/224#issuecomment-6177864525),
+against main `ab89dc54`. These are his measurements, not a new local timing run.
+User CPU on Apple silicon, 1-minute load 5–7 throughout, seven alternating pairs,
+identical instruction counts and console hashes in every pair. The review does
+not specify a warmup; no warmup or stricter load-start condition is inferred.
+
+| Workload | main median (s) | PR median (s) | Change | PR slower in |
+| --- | ---: | ---: | ---: | ---: |
+| classic hello (30 s) | 1.89 | 1.86 | -1.6% | 2 of 7 |
+| C3 hello (30 s) | 2.64 | 2.65 | +0.4% | 4 of 7 |
+
+Neither workload is slower in six or more pairs. His separate scratch merge of
+all eight open PRs against the same main, with the same method, measured classic
+hello +0.6% (3/7 slower), C3 hello 0.0% (3/7), C6 hello -0.6% (2/7), S3 hello
+-1.1% (3/7), Pocket Tank +0.2% (3/7). Those combined results do not isolate this PR.
+
+### Regression attribution and follow-up
+
+The maintainer reproduced the earlier slowdown on pristine #206 `bb2b33d5`
+versus pristine main: 1.730 → 1.920 s, +11.0%, slower 5/5. This gating recovers
+about a seventh of that increase, not the regression as a whole.
+
+His `sample` profiles on #206, main and this head put `SocBus::tick` at about 4%
+of samples and `ClassicGpio::raw_status` at about 80%. The latter scans 40 pins
+through pad-level/driven resolution on every round via
+`present_irqs → source_status → cpu_lines`.
+
+His per-merge bisect (median of five, identical instruction counts) was
+non-monotonic: #206 1.70 s, #207 1.79 s, #208 1.73 s, #209 1.80 s, #210 1.91 s,
+#211 2.13 s, #212 1.85 s. #211 adds the BLE adapter with no tick hook. Together
+with the profile, this supports code-layout-sensitive cost of the hot GPIO scan,
+not attribution to unconditional idle adapter entry.
+
+Caching the GPIO interrupt status, invalidated on GPIO/IO_MUX/RTC-pad writes and
+input edges, is the real recovery identified by the maintainer and is the separate
+follow-up [#230](https://github.com/mikroverk/esp32sim/pull/230). This PR does not
+implement that cache. The historical browser
+GPIO-summary attempt in EX028 is not evidence against this native classic finding;
+the workload, adapter and measurement contract differ.
