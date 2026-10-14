@@ -1,5 +1,6 @@
 // The classic ESP32 has a station link (#209); `--wifi` must attach it as on the other chips instead of
-// being refused as unavailable. The run then stops on the missing firmware, before any ROM is needed.
+// being refused as unavailable. The run attaches the access point and then exits on the missing firmware
+// (with a ROM dir it executes one instruction); either way the AP line has been printed.
 #[test]
 fn classic_esp32_accepts_the_wifi_option() {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_esp32sim"))
