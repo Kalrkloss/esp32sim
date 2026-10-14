@@ -2,15 +2,8 @@
 use super::*;
 
 #[test]
-fn irq_events_core_control_republishes_after_pre_round_refresh() {
+fn irq_events_board_and_chip_reset_invalidate() {
     let mut b = SocBus::new(0, [0; 6]);
-    for addr in [0x3ff0_002c, 0x3ff0_0030, 0x3ff0_0034] {
-        b.write32(addr, 0).unwrap();
-        b.irq_dirty = false; // Machine's pre-round refresh precedes APP reset/release.
-        assert_eq!(b.tick(1), 1, "post-release presentation");
-        b.irq_dirty = false;
-        assert_eq!(b.tick(1), 0, "one-shot invalidation");
-    }
     b.attach_board_devices();
     assert!(b.irq_dirty);
     b.irq_dirty = false;

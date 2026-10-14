@@ -32,6 +32,13 @@ impl Soc for Esp32 {
         c
     }
     fn reset_core(c: &mut Cpu, _i: usize) { c.reset(); }
+    #[inline]
+    fn reset_core_with_bus(c: &mut Cpu, bus: &mut SocBus, i: usize) {
+        Self::reset_core(c, i);
+        // Reset erases external levels and edge history. The release write may have
+        // been presented in the previous round, before the scheduler performs reset.
+        bus.irq_dirty = true;
+    }
     fn boot_core(c: &mut Cpu, entry: u32) {
         c.reset();
         c.pc = entry;

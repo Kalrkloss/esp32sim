@@ -58,9 +58,6 @@ pub struct SocBus {
     pub(crate) clock_half: u64,
     pub(crate) pins_active: bool,
     pub ble: esp_soc::ble::vhci::Ble,
-    // A write can release APP CPU after the pre-round IRQ refresh. Re-present
-    // after that round, as the unconditional classic tick did before this gate.
-    irq_written: bool,
 }
 
 impl SocBus {
@@ -87,7 +84,6 @@ impl SocBus {
             clock_half: 0,
             pins_active: false,
             ble: Default::default(),
-            irq_written: false,
         }
     }
     fn load<const N: usize>(&mut self, a: u32) -> Result<[u8; N], Fault> {
@@ -255,9 +251,6 @@ impl SocBus {
         self.flush_rmt();
         self.flush_gpio();
         self.irq_dirty = true;
-        if matches!(a, 0x3ff0_002c | 0x3ff0_0030 | 0x3ff0_0034) {
-            self.irq_written = true;
-        }
     }
     #[inline]
     fn flush_gpio(&mut self) {
@@ -520,7 +513,7 @@ impl Bus for SocBus {
             for input in self.board.uart_rx(self.cycles) { self.periph.uart_pin_input(&input); self.irq_dirty = true; }
         }
         let irq_changed = self.periph.tick(elapsed);
-        self.irq_dirty |= irq_changed | std::mem::take(&mut self.irq_written);
+        self.irq_dirty |= irq_changed;
         self.i2s_step(elapsed);
         self.flush_rmt();
         self.flush_gpio();
