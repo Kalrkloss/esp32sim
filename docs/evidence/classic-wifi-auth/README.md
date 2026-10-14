@@ -1,15 +1,17 @@
 # Classic Wi-Fi authentication TX lengths (EX226 follow-up)
 
 Base: `ab89dc543bd8aa23b2d39f2cc48348ea5a0793ea` (merged upstream main).
-Code: `fb3e5a660a82cc953f3a290e1cb9fce952609831`.
+Reviewed head: `5d760b85bf27899251ccae2a47894e64f812f45d` (#222).
+Maintainer-review follow-up: [receipt](review-follow-up.md).
 
 ## Rule and limits
 
-The classic TX adapter uses descriptor `length` as the number of frame bytes,
-independently of `size`. Arduino-ESP32 3.3.8 libpp authentication descriptors
-use length 30 and size 28. This is an inferred library compatibility rule, not
-silicon validation or a new public MAC-register definition. No exact-value
-30/28 workaround is added to the frame decoder. Ownership, the complete
+The classic TX adapter follows libpp's general TX convention: descriptor
+`length` is the TX byte count, independently of `size`. ESP-IDF v5.5.2
+`soc/include/soc/lldesc.h:32` states "Size (or length for TX)";
+`hal/dma_types.h:23-24` agrees. This is a public DMA-header rule, not a
+special case for any firmware or a new public MAC-register definition.
+Ownership, the complete
 12-byte descriptor extent and the entire frame's mapped-DRAM extent remain
 mandatory. RX capacity checks are unchanged. Multi-descriptor frames, PSRAM DMA
 and RF timing are outside this change.
@@ -25,6 +27,8 @@ other-chip source is changed.
 
 ## Checks
 
+These are the original qualification results for `5d760b85`; the
+[follow-up receipt](review-follow-up.md) records the rerun for this documentation change.
 Rust 1.99.0, serial builds with `-j2` and `nice -n 10`:
 
 - `cargo +1.99.0 clippy --workspace --all-targets -- -D warnings`: pass.
@@ -84,7 +88,16 @@ comparison, not a measured CPU clearance. Artifact identities are in
 
 ## CPU comparison
 
-PENDING — central quiet run only: one warmup and seven alternating pairs,
-start load below 5, redo above 7, no concurrent builds, equal instructions
-and console hashes. Slower in at least six pairs requires explanation.
-No timing or ready-for-review performance acceptance is claimed here.
+Measured centrally by joakimeriksson on 2026-10-14, main `ab89dc54` versus
+head `5d760b85`, classic hello for 30 s. User CPU on Apple silicon,
+seven alternating pairs, 1-minute load 5–7 throughout; instruction counts
+and console hashes identical in every pair. The comment does not specify
+a warmup for this run. This is the maintainer's measurement, not a local rerun.
+
+| Workload | main median (s) | PR median (s) | Change | PR slower in |
+| --- | ---: | ---: | ---: | ---: |
+| classic hello (30 s) | 1.85 | 1.92 | +3.8% | 4 of 7 |
+
+No slower-in-at-least-six-pairs flag. The load range differs from the
+preferred start-below-5 gate; retain that limitation rather than relabeling
+this as a quiet-machine run. [Source review and table](https://github.com/mikroverk/esp32sim/pull/222#issuecomment-6177863678).

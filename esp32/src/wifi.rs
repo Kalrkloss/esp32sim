@@ -170,8 +170,8 @@ impl SocBus {
                 continue;
             }
             let Ok((_, d)) = self.read_dma_descriptor(desc) else { continue };
-            // Arduino-ESP32 3.3.8 libpp authentication uses length=30, size=28.
-            // Inferred TX semantics: length is the frame size, not RX buffer capacity.
+            // libpp's general TX convention: length is the TX byte count, not size.
+            // ESP-IDF v5.5.2 soc/include/soc/lldesc.h:32: "Size (or length for TX)".
             // Keep ownership and bound the entire length against mapped DRAM below.
             if !d.owner_dma { continue; }
             let Some(range) = dma_range(d.buf, d.length as usize) else {
