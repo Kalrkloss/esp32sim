@@ -845,16 +845,29 @@ impl Peripherals {
         if matches!(addr >> 12, 0x3ff00 | 0x3ff59) { self.sync_ledc_outputs(); }
         if matches!(addr >> 12, 0x3ff00 | 0x3ff56) { self.sync_rmt_outputs(); }
     }
-    pub fn tick(&mut self, cycles: u64) {
-        Dispatch::tick(self, cycles);
+    pub fn tick(&mut self, cycles: u64) -> bool {
+        let gpio_before = self.gpio.raw_status();
+        let mut irq_changed = Dispatch::tick(self, cycles);
         let phase = self.apb_phase + cycles * (6 / self.apb_divider());
         self.apb_phase = phase % 6;
         let ticks = phase / 6;
-        for timer in &mut self.timg { timer.tick(ticks); }
+        // These adapters use the manually scaled APB clock, not Dispatch's clock.
+        // Compare only the devices being advanced; never scan all sources here.
+        for timer in &mut self.timg {
+            let before = timer.irq_sources();
+            timer.tick(ticks);
+            irq_changed |= before != timer.irq_sources();
+        }
+        let ledc_before = self.ledc.irq_sources();
+        let rmt_before = self.rmt.irq_sources();
         self.ledc.tick(ticks);
         self.rmt.tick(ticks);
+        irq_changed |= ledc_before != self.ledc.irq_sources();
+        irq_changed |= rmt_before != self.rmt.irq_sources();
         self.sync_ledc_outputs();
         self.sync_rmt_outputs();
+        // Routed PWM/RMT outputs can also change GPIO edge/level interrupts.
+        irq_changed | (gpio_before != self.gpio.raw_status())
     }
     /// Reference ticks per APB tick. IDF v5.5.4
     /// components/esp_hw_support/port/esp32/rtc_clk.c:373-389 sets APB=CPU
