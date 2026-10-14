@@ -68,7 +68,9 @@ fn config(p: &mut Peripherals, pin: usize, typ: u32, routes: u32) {
     );
 }
 fn mux(p: &mut Peripherals, pin: usize, value: u32) {
-    p.write32(0x3ff4_9000 + IOMUX_OFFSETS[pin], value);
+    if IOMUX_OFFSETS[pin] != u32::MAX {
+        p.write32(0x3ff4_9000 + IOMUX_OFFSETS[pin], value);
+    }
 }
 
 #[test]
