@@ -9,7 +9,7 @@ Each boots the **real mask ROM**, the real 2nd-stage bootloader and an unmodifie
 image — no patched firmware, no stubs in the way — with enough of the SoC modelled to run real
 projects end to end. No cloud, no accounts. MIT.
 
-The [classic ESP32](docs/esp32.md) also boots its ECO3 ROM on dual LX6 cores, with GPIO, UART and timers.
+The [classic ESP32](docs/esp32.md) also boots its ECO3 ROM on dual LX6 cores, with GPIO, UART and timers; `--board ttgo-tdisplay` adds the LilyGO TTGO T-Display's ST7789 and buttons.
 
 | | **ESP32-S3** | **ESP32-C3** | **ESP32-C6** |
 | --- | --- | --- | --- |
