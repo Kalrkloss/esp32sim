@@ -1,10 +1,11 @@
 use std::{path::PathBuf, process::Command};
 
-/// Input directory contains an unchanged public Robot Face build's bootloader.bin,
-/// partitions.bin and firmware.bin, plus esp32s3_rev0_rom.elf. No user firmware.
+/// Optional private Robot Face starter build: bootloader.bin, partitions.bin,
+/// firmware.bin and esp32s3_rev0_rom.elf (hashes in docs/evidence/s3-phy-no-ap).
+/// No user firmware. Skip these external tests without the matching artefacts.
 fn robot_face(wifi: Option<&str>, seconds: &str) -> String {
     let dir = PathBuf::from(std::env::var("ROBOT_FACE_FW_DIR")
-        .expect("set ROBOT_FACE_FW_DIR to public Robot Face boot files and S3 ROM"));
+        .expect("set ROBOT_FACE_FW_DIR to private Robot Face boot artefacts and S3 ROM"));
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_esp32sim"));
     cmd.args(["--chip", "s3", "--boot", "rom", "--rom"])
         .arg(dir.join("esp32s3_rev0_rom.elf"))
@@ -23,7 +24,7 @@ fn robot_face(wifi: Option<&str>, seconds: &str) -> String {
 }
 
 #[test]
-#[ignore = "set ROBOT_FACE_FW_DIR to unchanged public Robot Face boot files and S3 ROM"]
+#[ignore = "set ROBOT_FACE_FW_DIR to unchanged private Robot Face boot artefacts and S3 ROM"]
 fn external_robot_face_no_ap_leaves_phy_poll() {
     // 4 nominal seconds = 960,000,000 guest cycles, not a host timing benchmark.
     let text = robot_face(None, "4");
@@ -36,9 +37,9 @@ fn external_robot_face_no_ap_leaves_phy_poll() {
 }
 
 #[test]
-#[ignore = "set ROBOT_FACE_FW_DIR to unchanged public Robot Face boot files and S3 ROM"]
+#[ignore = "set ROBOT_FACE_FW_DIR to unchanged private Robot Face boot artefacts and S3 ROM"]
 fn external_robot_face_matching_ap_connects() {
-    // These are literals in the public starter, not saved credentials.
+    // These are placeholder literals in the starter, not saved credentials.
     let text = robot_face(Some("ssid=YOUR_WIFI_NAME,psk=YOUR_WIFI_PASSWORD,chan=6"), "10");
     assert!(text.contains("Wi-Fi connected — IP:"));
     assert!(text.contains("Setup complete"));
@@ -46,7 +47,7 @@ fn external_robot_face_matching_ap_connects() {
 }
 
 #[test]
-#[ignore = "set ROBOT_FACE_FW_DIR to unchanged public Robot Face boot files and S3 ROM"]
+#[ignore = "set ROBOT_FACE_FW_DIR to unchanged private Robot Face boot artefacts and S3 ROM"]
 fn external_robot_face_mismatched_ap_waits() {
     let text = robot_face(Some("ssid=fixture-unmatched,chan=6"), "10");
     assert!(!text.contains("Wi-Fi connected — IP:"));
