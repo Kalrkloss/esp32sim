@@ -31,6 +31,25 @@ Reproduce the engine tests:
 
     cargo +1.99.0 test --release -p esp32 dma_reach
 
+Actual Wi-Fi payload-engine tests additionally call `wifi_step` (TX) and
+`wifi_rx_fill` (RX), with valid descriptors and payloads at the CPU-only
+prefix, first DRAM byte, exact upper-end extent and one-byte crossing extent.
+TX pins transmitted-frame count, queue completion/control, event/IRQ state
+and unchanged backing memory. RX pins the complete header/frame/FCS bytes,
+descriptor writeback, cursor and completion/IRQ state; rejected transfers
+leave the entire DRAM backing (including prefix and descriptor) unchanged.
+
+Mutation checks (each exact test must fail at runtime):
+
+| Mutation | Exact test (`wifi::tests::` prefix) |
+| --- | --- |
+| Restore prefix-inclusive rule only at TX payload call | `classic_wifi_dma_reach_tx_payload_engine` |
+| Restore prefix-inclusive rule only at RX payload call | `classic_wifi_dma_reach_rx_payload_engine` |
+
+The eight existing distinct reach-rule mutations remain required (12 exact
+test executions); these two independent payload call-site mutations extend
+that requirement to ten distinct mutations and 14 executions.
+
 Existing I2S, SPI and Wi-Fi end-to-end tests also exercise valid transfers,
 completion/error reporting and DMA buffers. The range rule derives from
 public headers; no silicon validation or Wi-Fi hardware fault-bit behavior
