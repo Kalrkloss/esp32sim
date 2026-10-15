@@ -126,8 +126,8 @@ LLVM also changes register allocation, block placement and spills, increasing
 its stack frame from 0x2a0 to 0x2b0. The full function is therefore NOT identical,
 and the difference is not claimed to be purely cold or cost-free. The comparison
 script retains its normalized diff for inspection. No source-level work was
-added to clean rounds, but the generated spill/layout changes require timing
-qualification before claiming CPU parity.
+added to clean rounds. The generated spill/layout changes are covered by the
+CPU comparison below, which does not establish exact CPU parity.
 
 ## Public firmware equality (not timing)
 
@@ -155,9 +155,32 @@ production-cohort or hardware-timing claim is made.
 
 ## CPU comparison
 
-PENDING
+Measured October 15, 2026: candidate
+`bedf0dbd4c5750079bcdf918ea55838e3b50499f` against upstream main
+`f5a038bf917ccb9787714dc1d20c7ae33482337c`, using the exact retained release
+binaries and public inputs from the comparisons above, without a rebuild.
 
-Central measurement must use user CPU, one warmup and seven alternating pairs
-against main, identical instruction counts and console hashes, and the quiet
-machine load gates. No CPU measurement was run here. The generated S3 scheduler
-difference above is explicitly outstanding, not evidence of parity.
+User CPU seconds (`wait4` user resource usage), not wall time: one warmup pair
+and seven measured pairs per fixture, alternating base/candidate order, with
+`nice -n 10`. Instruction counts and console SHA-256s match the public firmware
+equality table above in all 64 accepted runs (8 warmups and 56 measured runs).
+There were no rejected runs or retries.
+
+| Workload | Main median user s | Candidate median user s | Change (ratio of medians) | Candidate slower |
+| --- | --- | --- | --- | --- |
+| S3 hello | 0.049509 | 0.048313 | -2.416% | 5/7 |
+| Pocket Tank startup | 1.069807 | 1.073883 | +0.381% | 4/7 |
+| C3 hello | 0.296777 | 0.301625 | +1.634% | 5/7 |
+| C6 hello | 0.387649 | 0.385845 | -0.465% | 2/7 |
+
+The run window was 12:35:40–12:36:16 UTC. All 140 load samples met the quiet
+machine gates: initial 1-minute load 2.088379, range 2.000977–2.783203, each run
+starting below 5 and none above the redo threshold of 7; no builds were observed.
+No fixture reaches the flag threshold of slower in at least 6/7 pairs.
+
+This is not a claim of exact CPU parity or a speedup. S3 hello is short
+(about 0.05 user CPU seconds) and noisy. Pocket Tank pair 7 varies but is
+retained because it met the predefined load/build gates. The comparison covers
+the bounded workloads above, not full gameplay or other execution modes.
+The independently verified central artifact manifest has SHA-256
+`c9f467ba276678ef5d138269ad25e82f7531d1d155a1677cd74993df1c313834`.
