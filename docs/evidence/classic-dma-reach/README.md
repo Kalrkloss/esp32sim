@@ -75,7 +75,7 @@ completion/error reporting and DMA buffers. The range rule derives from
 public headers; no silicon validation or Wi-Fi hardware fault-bit behavior
 is claimed. No changes to clocks, tick gating, scheduler or struct layout.
 
-## Qualification
+## Qualification before rebase
 
 Follow-up to reviewed head `afb8575434bd6b8c6266e06f59e1cc8b1031200a`,
 without rebasing its main base `ab89dc543bd8aa23b2d39f2cc48348ea5a0793ea`.
@@ -119,7 +119,7 @@ is under OUT. If target already exists, use a fresh worktree instead of replacin
 it. The empty HOME tests retain explicit RUSTUP_HOME/CARGO_HOME so Rust's installed
 toolchain remains available; no firmware discovery falls back to the real HOME.
 
-## Disassembly
+## Disassembly before rebase
 
 Fresh release binaries compare this follow-up with `afb85754`. The normalizer
 removes relocation addresses, branch targets and constant-pool page offsets;
@@ -177,6 +177,85 @@ and combined results are transcribed in `cpu-maintainer.json`.
 
 These measurements predate the SPI slice follow-up; they are not relabeled as
 measurements of it. No additional local CPU run or speed improvement is claimed.
-Rebase onto main is deferred until #222/#224 land, as requested. Preserve both
-adjacent test groups in wifi.rs/i2s.rs and keep the cfg(test) DRAM_HIGH/ROM_DRAM_LOW
-imports that #222's tests require.
+## Qualification on main 86005902 (October 15, 2026)
+
+Rebased source `9cb20855` builds on main
+`860059022e0f9959c96f9726113efb7324cc6b17`, which includes #222.
+The three original commits replay one-for-one. `verify_rebase.sh` reports
+an identical PR diff excluding experiments.md, no duplicate IDs/conflict
+markers and main's rows retained in order. `docs/experiments.md` is also
+byte-identical to the new main. Range-diff differences are only the insertion
+context of the two adjacent Wi-Fi test groups. The additional receipt commit
+changes evidence only, not the qualified Rust bytes.
+
+The resolution retains #222's full TX length independently of buffer capacity,
+including authentication and negative descriptor tests unchanged from main.
+Wi-Fi continues to use the single shared DRAM-only range check for descriptors
+and TX/RX payloads; no private prefix-inclusive helper is restored. Both Wi-Fi
+reach engine tests and the cfg(test) imports are retained. I2S has no conflict.
+
+`rebase-qualification.json` pins source, script, firmware and binary hashes,
+check-log digests and the exact base/source revisions. The earlier qualification
+files remain historical records of their stated revisions. Fresh results:
+
+- `checks.py`: both Clippy commands pass with warnings denied; empty-HOME
+  release workspace with only the ROM location supplied passes 949 tests,
+  zero failed/ignored; plain empty-HOME workspace passes 921, zero failed,
+  46 ignored. Production WASM build and all eight standard demos pass.
+- `cargo +1.99.0 test --release -j2 -p esp32 --lib wifi::tests::`: 9 pass,
+  including both #222 regressions and all three #225 Wi-Fi reach tests.
+- `cargo +1.99.0 test --release -j2 -p esp32 dma_reach`: 6 pass.
+- `mutate.py`: all 11 distinct mutations / 15 exact executions assertion-killed,
+  including the Wi-Fi private-rule and TX/RX payload call-site mutations.
+  No compilation or bounds-panic kills. Restored-source `--lib dma_`: 13 pass;
+  source bytes are identical to the qualified revision after mutation cleanup.
+- Privacy and whitespace checks pass; no tracked firmware or goldens changed.
+- `rebase-firmware-comparison.json`: classic hello, 3 s ROM boot, new main
+  versus rebased source: console and interrupt-report hashes match those above,
+  with identical 3,174 exceptions, 597 interrupts and per-source counts.
+
+See `rebase-checks.json` and `rebase-mutations.json`. Commands, target symlink,
+empty-HOME isolation and sequential mutation procedure are the same as above.
+No JIT source is changed; no separate JIT suite is required.
+
+### Disassembly against new main
+
+`rebase-static.py` uses the same normalizer as the earlier comparison and
+asserts that the only substantive common-function differences are classic
+`SocBus::tick` and `SocBus::store`. `rebase-static-summary.json` retains the
+per-binary counts, relocation-only names and both tick prologues.
+
+| Binary | Common functions | First-pass identical | Identical including zero-page-offset relocations |
+| --- | ---: | ---: | ---: |
+| esp32sim | 2,200 | 2,195 | 2,198 |
+| esp32sim-c3 | 2,200 | 2,193 | 2,198 |
+| esp32sim-c6 | 2,200 | 2,193 | 2,198 |
+
+All 28 other selected hot functions in each binary are identical, including
+scheduler/run loops, IRQ refresh, reads and code-page-version queries.
+Classic tick is not byte-identical to main: 1,851 -> 1,762 normalized
+instructions, total stack frame 0x210 -> 0x1e0 (including saved registers),
+with nine-instruction prologues on both sides. The changed DMA word helpers
+are inlined into tick's I2S/Wi-Fi work: CPU-map per-byte reads/writes become
+DRAM-only checked accesses, and Wi-Fi's bounds become the shared rule.
+This also changes register allocation, spill offsets and block placement;
+it is not merely a relocation difference. No new clock gate, queue scan,
+per-tick field or unconditional helper call is added. The source-level
+idle gating is unchanged, but the generated tick layout is different.
+
+Classic store is 3,625 -> 2,943 normalized instructions; its local stack
+allocation is 0xc70 -> 0xc20 (plus the same saved-register area). SPI DMA
+command handling is inlined here; checked DRAM payload slices replace CPU-map
+byte loops while retaining invalidation and zero-length semantics. These are
+expected DMA-path differences, not evidence that every store path is faster.
+No speed or exact idle-CPU equivalence is inferred from these static counts.
+
+To reproduce, build new main and the rebased source with the release command
+above, retain main's three binaries in OUT/baseline and the rebased binaries
+in OUT/target/release, then run:
+
+    nice -n 10 python3 docs/evidence/classic-dma-reach/rebase-static.py "$PWD" "$OUT"
+
+No CPU benchmark was run on this rebase. The maintainer's table above remains
+historical for its stated revisions; it is not a timing claim for 86005902
+versus this rebased source. New-base CPU timing is a separate measurement.
