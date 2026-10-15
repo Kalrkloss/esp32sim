@@ -118,11 +118,19 @@ impl ClassicSpi {
     fn new(command: bool) -> Self {
         let mut s = SpiMem::new(command);
         s.has_psram = false;
+        s.addr_msb_aligned = true;
         Self(s)
     }
+    // IDF v5.5.4 soc/esp32/register/soc/spi_reg.h -> esp32s3 spi_mem_reg.h offsets:
+    // RD_STATUS 0x10->0x2c, CTRL2 0x14->0x10, CLOCK 0x18->0x14, USER..MISO_DLEN 0x1c-0x2c -> 0x18-0x28,
+    // W0..W15 0x80-0xbc -> 0x58-0x94. Not remapped: the classic CACHE_SCTRL (+0x54) lands on the shared
+    // FSM slot and reads 0, and SRAM_CMD..SLV_RD_BIT (+0x58-0x64) land on W0..W3; both are used only by
+    // the PSRAM path on SPI0, which the classic model does not have.
     fn off(off: u32) -> u32 {
         match off {
             0x10 => 0x2c,
+            0x14 => 0x10,
+            0x18 => 0x14,
             0x1c => 0x18,
             0x20 => 0x1c,
             0x24 => 0x20,

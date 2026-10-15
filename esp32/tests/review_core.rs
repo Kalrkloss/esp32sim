@@ -131,3 +131,16 @@ fn reset_keeps_both_flash_jedec_ids() {
         assert_eq!([bus.periph.spi0.0.jedec, bus.periph.spi1.0.jedec], ids);
     }
 }
+
+/// IDF v5.5.4 soc/esp32/register/soc/spi_reg.h: CTRL2 is +0x14 and CLOCK +0x18 on the classic SPI1, where the
+/// shared SPI_MEM layout keeps CLOCK (+0x14) and USER (+0x18); a write to the classic CLOCK must not land in USER.
+#[test]
+fn spi1_ctrl2_and_clock_do_not_alias_the_shared_user_and_clock_slots() {
+    let mut bus = esp32::bus::SocBus::new(4 << 20, [0; 6]);
+    bus.write32(0x3ff4_2014, 0x0000_1111).unwrap();
+    bus.write32(0x3ff4_2018, 0x0000_2222).unwrap();
+    bus.write32(0x3ff4_201c, 0xa000_0000).unwrap();
+    assert_eq!(bus.read32(0x3ff4_2014).unwrap(), 0x0000_1111, "CTRL2");
+    assert_eq!(bus.read32(0x3ff4_2018).unwrap(), 0x0000_2222, "CLOCK");
+    assert_eq!(bus.read32(0x3ff4_201c).unwrap(), 0xa000_0000, "USER");
+}
