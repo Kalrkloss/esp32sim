@@ -845,12 +845,23 @@ impl Peripherals {
             self.gpio.set_output_signal(sda, true, false);
         }
         if matches!(addr, 0x3ff0_00c0 | 0x3ff0_00c4) {
+            // IDF v5.5.4 register/soc/dport_reg.h:947,965 (I2S clocks),
+            // 982,1000 (resets). Cache on writes, not in the per-tick DMA loop.
+            for (port, bit) in [4, 21].into_iter().enumerate() {
+                self.i2s[port].clock_enabled = self.dport.ram.read(0xc0) & (1 << bit) != 0
+                    && self.dport.ram.read(0xc4) & (1 << bit) == 0;
+            }
             self.ledc.clock_enabled = self.dport.ram.read(0xc0) & (1 << 11) != 0
                 && self.dport.ram.read(0xc4) & (1 << 11) == 0;
             self.rmt.clock_enabled = self.dport.ram.read(0xc0) & (1 << 9) != 0
                 && self.dport.ram.read(0xc4) & (1 << 9) == 0;
         }
         if matches!(addr >> 12, 0x3ff00 | 0x3ff59) { self.sync_ledc_outputs(); }
+        if matches!(addr, 0x3ff0_00cc | 0x3ff0_00d0) {
+            // IDF v5.5.4 dport_reg.h:1040-1043,1064,1069.
+            self.wifi.clock_enabled = self.dport.ram.read(0xcc) & 0x406 == 0x406
+                && self.dport.ram.read(0xd0) & (1 << 2) == 0;
+        }
         if matches!(addr >> 12, 0x3ff00 | 0x3ff56) { self.sync_rmt_outputs(); }
     }
     pub fn tick(&mut self, cycles: u64) -> bool {
@@ -868,8 +879,8 @@ impl Peripherals {
         }
         let ledc_before = self.ledc.irq_sources();
         let rmt_before = self.rmt.irq_sources();
-        self.ledc.tick(ticks);
-        self.rmt.tick(ticks);
+        if self.ledc.clock() == Some(ClockDomain::Apb) { self.ledc.tick(ticks); }
+        if self.rmt.clock() == Some(ClockDomain::Apb) { self.rmt.tick(ticks); }
         irq_changed |= ledc_before != self.ledc.irq_sources();
         irq_changed |= rmt_before != self.rmt.irq_sources();
         self.sync_ledc_outputs();

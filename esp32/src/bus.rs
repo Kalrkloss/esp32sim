@@ -518,7 +518,7 @@ impl Bus for SocBus {
         self.flush_rmt();
         self.flush_gpio();
 
-        self.wifi_step();
+        if self.periph.wifi.clock_enabled { self.wifi_step(); }
         u32::from(self.irq_dirty)
     }
 }
@@ -603,6 +603,40 @@ mod tests {
     }
 
     const SPI2: u32 = 0x3ff6_4000;
+
+    #[test]
+    fn classic_idle_gates_skip_adapter_calls() {
+        let mut b = SocBus::new(4 << 20, [0; 6]);
+        for _ in 0..100 { b.tick(64); }
+        assert_eq!(b.periph.ledc.tick_calls, 0);
+        assert_eq!(b.periph.rmt.tick_calls, 0);
+        assert_eq!(b.periph.wifi.step_calls, 0);
+        // Clock-on but no work must not enter the LEDC/RMT engines either.
+        b.write32(0x3ff0_00c0, (1 << 11) | (1 << 9)).unwrap();
+        for _ in 0..100 { b.tick(64); }
+        assert_eq!(b.periph.ledc.tick_calls, 0);
+        assert_eq!(b.periph.rmt.tick_calls, 0);
+    }
+
+    #[test]
+    fn classic_wifi_clock_and_reset_skip_step() {
+        let mut b = SocBus::new(4 << 20, [0; 6]);
+        b.tick(64);
+        assert_eq!(b.periph.wifi.step_calls, 0);
+        b.write32(0x3ff0_00cc, 0x406).unwrap();
+        b.tick(64);
+        assert_eq!(b.periph.wifi.step_calls, 1);
+        b.write32(0x3ff0_00cc, 0x402).unwrap();
+        b.tick(64);
+        assert_eq!(b.periph.wifi.step_calls, 1);
+        b.write32(0x3ff0_00cc, 0x406).unwrap();
+        b.write32(0x3ff0_00d0, 4).unwrap();
+        b.tick(64);
+        assert_eq!(b.periph.wifi.step_calls, 0); // MAC reset clears counters too.
+        b.write32(0x3ff0_00d0, 0).unwrap();
+        b.tick(64);
+        assert_eq!(b.periph.wifi.step_calls, 1);
+    }
 
     #[test]
     fn pro_mmu_maps_classic_drom_and_irom() {

@@ -29,6 +29,9 @@ pub struct WifiMac {
     pub rx_next: u32,
     pub rx_last: u32,
     pub link: wifi::StationLink,
+    pub(crate) clock_enabled: bool,
+    #[cfg(test)]
+    pub(crate) step_calls: u64,
 }
 
 impl WifiMac {
@@ -155,11 +158,10 @@ impl Device for WifiMac {
 impl SocBus {
     #[inline]
     pub(crate) fn wifi_step(&mut self) {
+        #[cfg(test)] { self.periph.wifi.step_calls += 1; }
         // IDF v5.5.4 register/soc/dport_reg.h:1040-1043 (DPORT_WIFI_CLK_WIFI_EN) and
         // 1064,1069 (DPORT_CORE_RST_EN_REG, DPORT_WIFIMAC_RST).
-        if self.periph.dport.ram.read(0xcc) & 0x406 != 0x406
-            || self.periph.dport.ram.read(0xd0) & (1 << 2) != 0
-        {
+        if !self.periph.wifi.clock_enabled {
             return;
         }
         self.periph.wifi.now_cycles = self.cycles;
