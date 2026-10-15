@@ -7,6 +7,48 @@ The workload is the committed classic hello fixture, ECO3 ROM, esp32dev, UART0,
 30 emulated seconds including two resets, no Wi-Fi or BLE configuration.
 Input hashes and build/disassembly hashes are in `manifest.json`.
 
+## Integration after #230 (October 15, 2026)
+
+Replayed the three reviewed #224 commits onto #230's accepted
+`377716b8e39103711bf9ba27e3e33722410461e1`, then integrated main `f5a038bf`
+(including #227, #228 and #229). The two tick-site conflicts retain both behaviors:
+manual LEDC/RMT advancement remains gated by clock/pending work, while #230's
+before/after source comparisons and routed-GPIO comparison remain live. The
+Wi-Fi call stays gated, and the bus returns #230's `irq_dirty` result rather than
+requesting unconditional interrupt presentation. The Rust delta of the replayed
+commits is identical to reviewed #224 except for two redundant clock comments;
+#230's source-transition comments are retained instead.
+
+Main's EX223–EX229 table move is preserved. EX028 retains the complete #230
+history and maintainer table; EX229 retains this PR's attribution and CPU table.
+All other catalog rows match main byte-for-byte. Historical measurements below
+still refer to their stated revisions; this integration has no new CPU timing.
+In particular, the 9,639,235-call attribution is the original instrumented run,
+not a fresh count on the event-driven stack.
+
+Fresh Rust 1.99.0 verification of the integrated tree: both Clippy gates pass;
+empty-HOME CI-policy workspace tests pass 963 (18 filtered), plain empty-HOME
+workspace tests pass 935 (46 ignored); production WASM, all eight standard demos
+and the JIT shared-memory handoff pass. No golden, fixture or JIT source changes.
+All eight gate mutations are assertion-killed after integration; all 25 parent GPIO
+and 11 parent event mutations are also assertion-killed, with no compiler failures
+counted. The restored classic suite passes 137 tests. Native classic
+hello still matches exact #230 at core0 16,672,061 / core1 4,515,255 instructions,
+27,408 exceptions, 6,016 interrupts and console SHA-256
+`13aadb96ac2d9e7d827e9daea68ec3f5dd70de46bb0c2eb60ee2eaad4f7539ec`.
+
+Fresh release disassembly versus exact #230 selects 27 classic functions: 19
+identical, the gated bus tick 2,308 → 2,310 static instructions, five Machine
+functions differing only by +16-byte field-address immediates (same opcodes,
+registers and order), and two newly out-of-line ClassicSpi read/write functions
+from main's #227 fix. LEDC/RMT engine and GPIO cache bodies remain identical.
+The shared/S3/C3/C6 selection is 118/119 identical: C3 periph_write has two byte
+loads at offsets +1 because main #227 adds a SpiMem field. A separate release
+build of exact #230 merged with `f5a038bf`, without #224, reproduces those C3
+changes; all 119 functions match that integrated control. These are structural
+comparisons, not timing measurements, and do not establish CPU parity of the
+new stack. Original CPU attribution and measured tables remain unchanged.
+
 ## Observed per-part attribution
 
 Denominator: 9,639,235 calls of the classic bus tick, identical on base and candidate.
