@@ -4,7 +4,8 @@ Base: upstream main `ab89dc543bd8aa23b2d39f2cc48348ea5a0793ea`.
 This is the classic LX6 retry of EX028, not another S3 summary-cache screen.
 Earlier EX028 negative results are retained in the catalog. The material difference
 is classic's adapter: each IRQ query scanned 40 pins for both the resolved level
-and each core's routing. No CPU timing or speedup claim is made here.
+and each core's routing. The CPU table below measures the complete PR #230,
+including event-driven presentation, not the cache alone.
 
 ## Contract and scope
 
@@ -25,8 +26,10 @@ production builds. New production fields are appended to the GPIO adapter.
 Only GPIO is event-cached. Other device summaries deliberately remain live:
 host UART input and device timer transitions do not participate in GPIO
 invalidation. IRQ presentation samples their common summary once, then adds
-GPIO's per-core sources and applies each interrupt matrix. No scheduling,
-guest-clock, I2C control/routing, JIT, or other-chip source code is changed.
+GPIO's per-core sources and applies each interrupt matrix. The complete PR changes
+the shared `esp-soc` scheduler in three files (+7/-3) for the bus-aware reset hook;
+S3/C3/C6 chip crates are untouched and all 51 selected hot functions are identical.
+No guest-clock, I2C control/routing, JIT or scheduling semantics change is intended.
 Active classic I2C byte deadlines participate in dispatch; their incremental
 slicing cost is unquantified. Busy polling is not an emulator correctness bug.
 
@@ -150,7 +153,26 @@ python3 docs/evidence/classic-gpio-irq/codegen.py <base-esp32sim> <candidate-esp
 
 ## CPU comparison
 
-PENDING. No timing or speedup conclusion is made on the loaded machine.
+Measured by joakimeriksson on Apple silicon, user CPU, alternating pairs with
+identical instruction counts and console hashes: PR #230 head `d8003ea5` versus
+main `ab89dc54`. Source: [maintainer run, October 15, 2026](https://github.com/mikroverk/esp32sim/pull/230#issuecomment-6186021541).
+These are the maintainer's measurements of the complete cache + event change,
+not a new run or an isolated cache measurement. Unreported medians and pair counts
+are left as dashes; raw samples and load observations were not provided.
+
+| Workload | main median (s) | PR median (s) | Change | PR slower in |
+| --- | ---: | ---: | ---: | ---: |
+| classic hello (30 s) | 1.830 | 0.390 | −78.7% | 0 of 7 |
+| busy GPIO polling fixture | 64.94 | 39.74 | −38.8% | 0 of 5 |
+| busy I2C fixture | 61.13 | 44.40 | −27.4% | 0 of 5 |
+| MicroPython demo (45 s) | 4.86 | 1.79 | −63% | — |
+| C3 hello (control; per-binary layout effect, flagged) | — | — | +2.4% / +2.8% | 6 of 7, 7 of 7 (two runs) |
+| S3 hello (control) | — | — | +2.0% | 4 of 7 |
+
+C3 is slower in 13 of 14 pairs, not parity: `esp32sim-c3` links the classic
+crate, so the maintainer attributes this to a per-binary layout effect, as in
+the #224 bisect. The selected C3 hot functions are byte-identical; this is not
+a whole-binary identity claim. S3's +2.0% in 4/7 is reported without claiming parity.
 
 ## Overlap and limits
 

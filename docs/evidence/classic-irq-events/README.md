@@ -44,9 +44,13 @@ peripheral fields requires the existing `Machine::sync_irq()` contract.
 
 This is a classic follow-up to EX028, related to EX190's precise device refresh,
 not a repeat of the earlier S3 summary-cache timing experiments. Shared machine
-reset call sites use the new default-inlined hook; other-chip specializations
-still call only their existing reset implementation. No extra clean-round
-branch, new shared state, JIT or other-chip source change is introduced.
+reset call sites use the new default-inlined hook: `esp-soc` changes in three
+files (+7/-3). The S3/C3/C6 chip crates are untouched and all 51 selected hot
+functions are identical. Their default hook only calls the existing reset;
+it does not imply unconditional IRQ presentation. The maintainer's S3 held-release
+probe fails on this head and main; an S3 invalidation specialization is a separate
+follow-up, not included here. No extra clean-round branch, new shared state or JIT
+change is introduced.
 
 ## Verification
 
@@ -149,8 +153,26 @@ python3 docs/evidence/classic-irq-events/codegen.py <base-esp32sim> <candidate-e
 
 ## CPU comparison
 
-PENDING. Native ratios, alternating CPU comparisons and new profile attribution
-are centrally qualified; no worker timing or speedup claim is made.
+Measured by joakimeriksson on Apple silicon, user CPU, alternating pairs with
+identical instruction counts and console hashes: PR #230 head `d8003ea5` versus
+main `ab89dc54`. Source: [maintainer run, October 15, 2026](https://github.com/mikroverk/esp32sim/pull/230#issuecomment-6186021541).
+These are the maintainer's measurements of the complete cache + event change,
+not a new run or an isolated cache measurement. Unreported medians and pair counts
+are left as dashes; raw samples and load observations were not provided.
+
+| Workload | main median (s) | PR median (s) | Change | PR slower in |
+| --- | ---: | ---: | ---: | ---: |
+| classic hello (30 s) | 1.830 | 0.390 | −78.7% | 0 of 7 |
+| busy GPIO polling fixture | 64.94 | 39.74 | −38.8% | 0 of 5 |
+| busy I2C fixture | 61.13 | 44.40 | −27.4% | 0 of 5 |
+| MicroPython demo (45 s) | 4.86 | 1.79 | −63% | — |
+| C3 hello (control; per-binary layout effect, flagged) | — | — | +2.4% / +2.8% | 6 of 7, 7 of 7 (two runs) |
+| S3 hello (control) | — | — | +2.0% | 4 of 7 |
+
+C3 is slower in 13 of 14 pairs, not parity: `esp32sim-c3` links the classic
+crate, so the maintainer attributes this to a per-binary layout effect, as in
+the #224 bisect. The selected C3 hot functions are byte-identical; this is not
+a whole-binary identity claim. S3's +2.0% in 4/7 is reported without claiming parity.
 
 ## Overlap and limits
 
@@ -162,7 +184,7 @@ GPIO change is included by ancestry. No push or publication was performed.
 
 Register writes remain conservative; unchanged-value writes may still scan
 sources. Clocked-device change detection adds bounded work to classic tick;
-only central timing can price the tradeoff. No electrical timing, silicon,
+the maintainer's complete-PR timing above measures the tradeoff. No electrical timing, silicon,
 browser speed, OLED routing or SDK behavior change is claimed. Committed
 material contains only public/synthetic recipes, hashes, counts and outcomes;
 raw logs and disassembly remain outside Git.
