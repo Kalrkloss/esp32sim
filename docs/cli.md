@@ -33,7 +33,7 @@ PSRAM and register presets.
 | `--ble-scan` | enable a virtual active scanner in C3 full mode; sends SCAN_REQ and observes guest-configured SCAN_RSP |
 | `--ble-observe` | passive full-mode PDU log: half-microsecond timestamp, channel, type, AdvA, decoded AD and raw PDU |
 | `--ble` | opt-in virtual BLE controller on S3/C3/C6; requires the matching application `--elf` |
-| `--wifi SPEC` | attach a virtual access point the WiFi blob hears, plus a virtual network (DHCP/ARP/ICMP/DNS/SNTP; station 10.0.2.15, gateway 10.0.2.2) — for example `ssid=demo,chan=6,psk=demo-password,bssid=02:00:00:00:00:01`. `password` and `pass` alias `psk`; unknown keys and invalid values are rejected. Open and WPA2-PSK networks both join end to end, on S3, C3 and C6 (docs/wifi-plan.md, docs/esp32c3.md, docs/wifi-c6-plan.md) |
+| `--wifi SPEC` | attach a virtual access point the WiFi blob hears, plus a virtual network (DHCP/ARP/ICMP/DNS/SNTP; station 10.0.2.15, gateway 10.0.2.2) — for example `ssid=demo,chan=6,psk=demo-password,bssid=02:00:00:00:00:01`. `password` and `pass` alias `psk`; unknown keys and invalid values are rejected. Open and WPA2-PSK networks both join end to end, on S3, C3, C6 and the classic ESP32 (docs/wifi-plan.md, docs/esp32c3.md, docs/wifi-c6-plan.md) |
 | `--net nat\|none` | what the virtual network does with traffic it is not itself answering: `nat` (default; `user` is an alias) forwards TCP and UDP to the host's own network through ordinary sockets, `none` refuses it |
 | `--trace-fn PREFIX` (repeatable) | log every call to functions whose name starts with PREFIX, with args and caller; append `$` for an exact name |
 | `--regstat FILE` | write per-register access statistics (count, pc, symbol) at exit — for reverse-engineering |
@@ -72,7 +72,7 @@ separately lists the actual instruction count for each core.
 
 `--pwm PIN` reports the GPIO-matrix PWM frequency in Hz and duty percentage when the run stops.
 Repeat it to observe several pins. PIN is an unsigned 8-bit decimal number.
-LEDC is supported on S3, C3 and C6; MCPWM on S3 and C6.
+LEDC is supported on S3, C3, C6 and the classic ESP32; MCPWM on S3 and C6.
 A running timer with 0% or 100% duty still has a snapshot. "No supported running PWM" means
 unrouted, disabled, paused or unsupported configuration; it does not imply a low GPIO level.
 A paused hardware timer can hold its last level. This reports register-derived steady state,

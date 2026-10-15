@@ -181,7 +181,7 @@ virtual access point as on the S3 (see [WiFi](#wifi-esp32-s3-c3-and-c6) below). 
 5.0  stop
 ```
 
-## WiFi (ESP32-S3, C3 and C6)
+## WiFi (ESP32-S3, C3, C6 and the classic ESP32)
 
 `--wifi ssid=NAME[,psk=PASS,chan=N,bssid=..]` attaches a virtual access point that the **unmodified**
 Espressif WiFi blob associates with — scan, authentication, association and, with a passphrase, the

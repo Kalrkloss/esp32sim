@@ -334,7 +334,11 @@ fn setup_esp32(o: &Opts) -> esp32::Machine {
     let board = if o.board == "atech14" { "none" } else { &o.board };
     m.bus.board = esp32::board::make_board(board).unwrap_or_else(|| usage_error(&format!("unknown classic ESP32 board '{board}' (none, bare, esp32dev)")));
     m.bus.attach_board_devices();
-    for (flag, on) in [("--wifi", o.wifi.is_some()), ("--cam-image", o.cam_image.is_some()), ("--psram-mb", o.psram_mb.is_some()), ("--efuse-regs", o.efuse_regs.is_some()), ("--regs-init", o.regs_init.is_some()), ("--regstat", o.regstat.is_some())] {
+    if let Some(spec) = &o.wifi {
+        let (cfg, nat) = wifi_config(spec, o.net == "nat" || o.net == "user", m.bus.debug.has("net"));
+        m.bus.attach_wifi(cfg, nat).unwrap_or_else(|e| { eprintln!("--wifi: {e}"); std::process::exit(2) });
+    }
+    for (flag, on) in [("--cam-image", o.cam_image.is_some()), ("--psram-mb", o.psram_mb.is_some()), ("--efuse-regs", o.efuse_regs.is_some()), ("--regs-init", o.regs_init.is_some()), ("--regstat", o.regstat.is_some())] {
         if on { eprintln!("{} is not available on the classic ESP32", flag); std::process::exit(2); }
     }
     m
