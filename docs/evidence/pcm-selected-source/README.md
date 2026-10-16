@@ -103,9 +103,62 @@ artifacts and the mutation/disassembly summaries.
 
 ## CPU comparison
 
-PENDING
+Measured on October 16, 2026: candidate
+`d1643ef6464247dfe5ba9c82a27b9f196ce321d5` against upstream main
+`0730659d2e082949c1761c28ef59b0e1ea6268ad`. These measurements do not compare
+against the later main `4e49dac2`.
 
-No timing was run. The CPU table remains pending under the quiet paired
-protocol. Exact-head review, clean mergeability and green CI gate readiness;
-the pending table must be disclosed in the PR body. No performance claim
-follows from structural comparisons or golden tests.
+Native arm64 release builds use cargo +1.99.0, default features, opt-level=3,
+debug=1, fat LTO and one codegen unit. Metric: child user CPU from wait4 rusage,
+not wall time. Each workload runs for 30 emulated seconds with one excluded
+warmup per arm, followed by seven sequential alternating pairs (base/head,
+then head/base alternately), under nice -n 10 with an empty HOME and a clean
+ESP32SIM environment. The classic hello workload uses the verified classic
+hello firmware; s3-hello uses the verified S3 hello.json.
+
+The run stayed within 01:00–07:00 local with no cargo/rustc builds running.
+Once-per-second load samples ranged from 1.5913 to 2.8882 (start below 5,
+redo above 7); zero pairs required redos. All per-core instruction counts
+and console SHA-256 hashes matched between arms, including warmups. Ranges
+below are the seven measured samples; delta compares head/base medians.
+
+| workload | base median [min-max] s | head median [min-max] s | delta % | slower N/7 | instr/hash identical | redos |
+|---|---|---|---|---|---|---|
+| c3-hello | 2.321735 [2.279358-2.379754] | 2.307363 [2.272129-2.333931] | -0.6190% | 3/7 | yes | 0 |
+| c6-hello | 2.995263 [2.989414-3.063480] | 3.016800 [2.981897-3.044911] | +0.7190% | 3/7 | yes | 0 |
+| hello | 0.347962 [0.345938-0.351429] | 0.348250 [0.346673-0.354741] | +0.0828% | 4/7 | yes | 0 |
+| panel | 4.883875 [4.839657-4.905113] | 4.909130 [4.890132-4.929240] | +0.5171% | 7/7 FLAG | yes | 0 |
+| s3-hello | 0.240032 [0.238171-0.243506] | 0.241137 [0.239474-0.243479] | +0.4604% | 3/7 | yes | 0 |
+
+Flag policy: slower in at least six of seven pairs, regardless of magnitude.
+Panel remains flagged: +0.5171% (about +0.52%), slower in all seven pairs.
+
+### Panel flag diagnosis
+
+Inspection of the exact retained measurement binaries found all 192 selected
+hot run/step/dispatch/JIT/tick/DMA functions and their internal branch edges
+identical modulo linker relocations. This is not whole-binary byte identity.
+The eight real code differences are in RX/cold paths: receive attribution,
+reset clearing, cold allocation sizes, and compiler simplification of the
+shared register writer's unchanged TX-width arithmetic.
+
+Deterministic probes of the same 30-emulated-second panel workload preserved
+per-core instruction counts and console hashes. It makes 82 I2S register
+writes and zero RX_CONF writes; none of the 11 traps on added attribution
+work or changed cold allocation-size instructions executes. The shared writer
+is reached for occasional TX setup, not new per-frame attribution work.
+
+No added recurring work was found for this exact panel workload. Linker
+layout changes were observed, but these checks have NOT proven that layout
+caused the +0.52% result. The timing cause is not uniquely established and
+the 7/7 flag stands; structural comparisons and deterministic probes do not
+clear it or establish CPU equivalence for other I2S applications.
+
+Retained measurement artifact SHA-256:
+`81bc8ef5db0c568019db312ace10b203da53f7a07ff5d1f55bbe847f37a4275f`.
+The rebuilt six-binary manifest SHA-256 is
+`06ae34587f4e7bfa1cb9c6e3811b78f0b7f157b148f670325f91cb6cc527a710`;
+its binaries differ from the historical structural receipt's hashes, so the
+diagnosis uses these exact measurement binaries rather than a rebuild.
+Retained diagnosis manifest SHA-256:
+`84e6c54805e52e1058c771746371f55353ac196ab245325006e800415b9cdb9b`.
