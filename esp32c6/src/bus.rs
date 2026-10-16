@@ -116,6 +116,10 @@ impl SocBus {
                 _ => self.mmu_power_ctrl,
             }
         } else {
+            // USB FIFO reads can present the next packet and raise RECV_PKT before tick.
+            // IDF v5.5.4 components/soc/esp32c6/register/soc/usb_serial_jtag_reg.h:
+            // EP1_REG (+0), SERIAL_OUT_RECV_PKT_INT_RAW (bit 2).
+            self.irq_dirty |= addr & !3 == 0x6000_f000;
             self.periph.read32(addr & !3)
         };
         match size { 1 => (w >> ((addr & 3) * 8)) & 0xff, 2 => (w >> ((addr & 2) * 8)) & 0xffff, _ => w }

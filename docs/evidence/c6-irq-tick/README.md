@@ -21,7 +21,12 @@ Invalidation audit:
 
 - Clocked devices: the generated dispatcher already compares interrupt sources
   before/after tick, including optional devices and their cached source words.
-- MMIO: peripheral and CPU-subsystem writes retain their existing dirty flag,
+- MMIO reads: the USB FIFO word (including byte/halfword lane aliases) now
+  invalidates before dispatch, because draining it can present the next packet
+  and raise RECV_PKT before tick's before/after comparison begins. The dirty bit
+  is ORed, so unrelated subsequent reads cannot clear it. Other reads do not
+  acquire blanket invalidation. See the read-side audit and regression below.
+- MMIO writes: peripheral and CPU-subsystem writes retain their existing dirty flag,
   including source enables/clears, matrix routes, PLIC type/priority/threshold
   and software interrupt latches. Edge clears and remaps still refresh even
   if peripheral status itself is unchanged.
@@ -95,7 +100,14 @@ are identical across all six runs of each workload. It refuses active cargo or
 rustc builds before/after each sample. This is engineering smoke, not the
 central quiet-machine 1-warmup/7-pair CPU comparison.
 
-## Engineering smoke result
+## Historical engineering smoke result (before read-side correction)
+
+These samples measure `a41db5cd14ac94d6d6918145952d524c51e633c1`, which
+fails the USB two-packet guest regression described below. They are retained
+as historical measurements, not evidence of the corrected tree's correctness
+or speed. Required checks and the original four mutations did not cover that
+read-driven source transition. Fresh exact-work and codegen results for the
+correction are in [read-side.md](read-side.md); no new speed claim is made.
 
 Twelve successful native runs: three alternating pairs per workload, each 30
 guest seconds, on ARM64 macOS 27.0.1, Rust 1.99.0 release (unchanged fat LTO,
@@ -127,7 +139,7 @@ Both workloads also retain identical exception counts (zero), interrupt totals
 (delay 3,029; display 31,160), and per-line/source interrupt counts. No displayed
 instruction number including idle cycles is substituted for retirement.
 
-## Static cost and other chips
+## Historical static cost and other chips (before read-side correction)
 
 `codegen.py` reuses the committed EX230 normalizer (instruction addresses are
 normalized; field offsets and opcodes are retained). Run it on baseline and
@@ -144,7 +156,7 @@ and optional return propagation are now live, and the post-round call tests the
 new result. There is no non-C6 codegen change. Fetch/decode/execute and timer
 deadline code are unchanged. This selector is scoped, not whole-binary identity.
 
-## Required checks
+## Historical required checks (before read-side correction)
 
 `checks.json` retains command results; `test-totals.json` has parsed totals.
 All Rust commands use `cargo +1.99.0`, nice 10 and an external target directory.
