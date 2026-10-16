@@ -527,7 +527,10 @@ impl SocBus {
         if self.periph.work_pending { self.pending_work(cycles); }
         // Board time advances before peripheral callbacks; inputs are delivered after them.
         if self.board_edges { self.board.advance_to(self.cycles); }
-        self.periph.tick(cycles as u64);
+        // Dispatch already compares clocked sources before/after ticking, including
+        // optional devices. Preserve write/board/DMA invalidations and refresh only
+        // when a source can have moved; time still advances on every round.
+        self.irq_dirty |= esp_periph::Dispatch::tick(&mut self.periph, cycles as u64);
         self.periph.gpio.input_changes.clear();
         if self.board_edges { self.irq_dirty |= esp_soc::gpio::drain_board_inputs(&mut *self.board, &mut self.periph.gpio, &mut self.gpio_events, self.cycles); }
         if self.uart_pins {
@@ -603,7 +606,7 @@ impl Bus for SocBus {
     fn tick(&mut self, cycles: u32) -> u32 {
         self.cycles += cycles as u64;
         self.devices(cycles);
-        1
+        u32::from(self.irq_dirty)
     }
     #[inline(always)]
     fn note_pc(&mut self, pc: u32) { self.periph.misc.cur_pc = pc; }
