@@ -295,3 +295,5 @@ fn rmw_stop(disable_rx: bool) {
 
 #[path = "arming.rs"]
 mod arming;
+#[path = "cancellation.rs"]
+mod cancellation;

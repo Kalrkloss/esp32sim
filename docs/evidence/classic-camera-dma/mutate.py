@@ -17,7 +17,9 @@ cases=[
  ('do not consume byte position',cam,'capture.pos = end;','capture.pos = 0;'),
  ('drop final boundary word',cam,'let tail = capture.packed[capture.pos..].to_vec();','let tail = Vec::new();'),
  ('wrong FIFO mode',cam,'CameraFifo::new(rx.fifo_mode)','CameraFifo::new(3)'),
- ('route loss not terminal',cam,'self.periph.i2s[0].abort_camera_dma();','self.periph.i2s[0].camera = None;'),
+ # Cancellation now has configuration and tick callers; mutate their shared
+ # terminal operation rather than only the redundant late-tick fallback.
+ ('route loss not terminal',i2s,'self.dma.fail_receive(&mut irq);','let _ = &mut irq;'),
  ('RX resets keep DMA running',i2s,'self.dma.running = false;\n                self.dma.buf_pos = 0;','self.dma.running = true;\n                self.dma.buf_pos = 0;'),
  ('START command retained in readback',i2s,'self.ram.write(off, value & !(1 << 29));','self.ram.write(off, value);'),
  ('inlink stop ignored',i2s,'if value & (1 << 28) != 0 { self.dma.running = false; }','if value & (1 << 28) != 0 { self.dma.running = true; }'),

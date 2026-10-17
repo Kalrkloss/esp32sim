@@ -282,6 +282,14 @@ impl SocBus {
         // without changing an output GPIO. Reconcile at this same bus horizon.
         if self.pins_active { self.deliver_board_inputs(); }
         if (0x3ff4_f000..0x3ff4_f100).contains(&a) { self.camera_dma_written(); }
+        // Configuration horizon, not an idle-tick poll: a qualified receiver
+        // must observe even a loss restored before the next DMA step (matrix,
+        // IO_MUX/RTC, PWDN, SCCB streaming, XCLK or peripheral clock gating).
+        // An initially unavailable source still waits for its first valid route.
+        if self.periph.i2s[0].camera.as_ref().is_some_and(|c| c.qualified())
+            && self.camera_routed_frame().is_none() {
+            self.periph.i2s[0].abort_camera_dma();
+        }
         self.irq_dirty = true;
     }
     #[inline]

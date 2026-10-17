@@ -11,6 +11,7 @@ pub(crate) struct Capture {
     qualified: bool,
 }
 impl Capture {
+    pub(crate) fn qualified(&self) -> bool { self.qualified }
     pub(crate) fn armed(armed_at: u64) -> Self {
         Self { armed_at, saw_vsync: false, packed: Vec::new(), pos: 0, frame_at: None, qualified: false }
     }
