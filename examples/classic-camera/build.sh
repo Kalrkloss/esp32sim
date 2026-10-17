@@ -15,4 +15,5 @@ fi
 test "$(git -C "$CAMERA" rev-parse HEAD)" = b817e9b81041980608d1a3d3e0b08d86e3666382
 test -z "$(git -C "$CAMERA" status --porcelain)"
 mkdir -p "$BUILD"
-nice -n 10 idf.py -C "$FIXTURE" -B "$BUILD" -D SDKCONFIG="$BUILD/sdkconfig" build
+nice -n 10 idf.py -C "$FIXTURE" -B "$BUILD" -D SDKCONFIG="$BUILD/sdkconfig" \
+  -D C9_LIFECYCLE="${C9_LIFECYCLE:-OFF}" build
