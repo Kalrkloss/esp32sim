@@ -734,7 +734,7 @@ impl Peripherals {
             analog: crate::wifi::Analog::default(),
             fe: crate::wifi::FrontEnd::default(),
             adc: ClassicAdc::new(),
-            i2s: Default::default(),
+            i2s: [crate::i2s::ClassicI2s::for_port(0), crate::i2s::ClassicI2s::for_port(1)],
         };
         for uart in &mut p.uart { uart.write(0x20, 1 << 27); }
         p.sync_crypto();
