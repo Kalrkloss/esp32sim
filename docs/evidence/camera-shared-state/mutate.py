@@ -7,8 +7,8 @@ path=r/'esp-soc/src/camera.rs'; original=path.read_text()
 old=json.loads((r/'docs/evidence/camera-live-2026-10-05/mutations.json').read_text())
 cases=[(c['mutation'],c['replace_first'],c['with_text']) for c in old['cases'] if c['mutation'] in ['SCCB reset','window sync']]
 cases += [
- ('config cache invalidation','self.frame.is_none() || self.frame_config != Some(config)','self.frame.is_none()'),
- ('picture cache invalidation','self.picture = Some(p); self.frame = None;','self.picture = Some(p);'),
+ ('config cache invalidation','self.cached.as_ref().is_none_or(|(old, _)| *old != config)','self.cached.is_none()'),
+ ('picture cache invalidation','self.picture = Some(p); self.invalidate();','self.picture = Some(p);'),
  ('stream gating','w == 0 || h == 0 || !config.streaming','w == 0 || h == 0'),
  ('JPEG rejection','match (config.jpeg, config.format)','match (false, config.format)'),
  ('RGB565 conversion','Some(picture::PixelFormat::Rgb565)','Some(picture::PixelFormat::Yuyv)'),

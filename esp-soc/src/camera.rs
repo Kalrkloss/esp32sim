@@ -67,54 +67,65 @@ impl I2cDevice for Ov5640 {
 #[derive(Default)]
 pub struct Ov5640Camera {
     pub sensor: std::sync::Arc<std::sync::Mutex<SensorState>>,
-    picture: Option<picture::Picture>,
-    frame: Option<(u32, u32, std::sync::Arc<Vec<u8>>)>,
+    source: HostFrameSource,
     frame_config: Option<SensorState>,
 }
 impl Ov5640Camera {
+    pub fn set_camera_picture(&mut self, p: picture::Picture) -> Result<(), &'static str> { self.source.set_camera_picture(p) }
+    pub fn camera_preview(&self, w: u32, h: u32) -> Option<Vec<u8>> { self.source.camera_preview(w, h) }
+    pub fn camera_frame(&mut self) -> Option<(u32, u32, std::sync::Arc<Vec<u8>>)> {
+        let config = *self.sensor.lock().unwrap();
+        let (w, h) = (config.width, config.height);
+        if w == 0 || h == 0 || !config.streaming { return None; }
+        let format = match (config.jpeg, config.format) {
+            (false, 0x61) => Some(picture::PixelFormat::Rgb565),
+            (false, 0x30) if w.is_multiple_of(2) => Some(picture::PixelFormat::Yuyv),
+            (false, 0x10) => Some(picture::PixelFormat::Grayscale),
+            _ => None,
+        };
+        let Some(format) = format else {
+            if self.frame_config != Some(config) { eprintln!("[camera] unsupported sensor output: format {:#x}, JPEG {}, {}x{}", config.format, config.jpeg, w, h); }
+            self.source.invalidate(); self.frame_config = Some(config); return None;
+        };
+        self.frame_config = Some(config);
+        self.source.frame(w, h, format, config.window.map(|window| (window, 2624, 1952)))
+    }
+}
+
+/// Shared validated host picture, preview and register-selected conversion cache.
+/// Array coordinates are supplied by the sensor adapter, never assumed generic.
+#[derive(Default)]
+pub struct HostFrameSource {
+    picture: Option<picture::Picture>,
+    cached: Option<(FrameConfig, std::sync::Arc<Vec<u8>>)>,
+}
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct FrameConfig { w: u32, h: u32, format: picture::PixelFormat, window: Option<([u32; 4], u32, u32)> }
+impl HostFrameSource {
+    fn invalidate(&mut self) { self.cached = None; }
     pub fn set_camera_picture(&mut self, p: picture::Picture) -> Result<(), &'static str> {
         if !p.valid() { return Err("invalid camera picture or frame exceeds 8 MiB"); }
-        self.picture = Some(p); self.frame = None; Ok(())
+        self.picture = Some(p); self.invalidate(); Ok(())
     }
-
     pub fn camera_preview(&self, w: u32, h: u32) -> Option<Vec<u8>> {
         let p = self.picture.as_ref()?;
         let mut out = Vec::with_capacity((w * h * 3) as usize);
         for y in 0..h { let sy = (y as u64 * p.h as u64 / h as u64) as usize; for x in 0..w { let sx = (x as u64 * p.w as u64 / w as u64) as usize; let o = (sy * p.w as usize + sx) * 3; out.extend_from_slice(&p.rgb[o..o + 3]); } }
         Some(out)
     }
-    pub fn camera_frame(&mut self) -> Option<(u32, u32, std::sync::Arc<Vec<u8>>)> {
-        let config = *self.sensor.lock().unwrap();
-        let (w, h) = (config.width, config.height);
-        if w == 0 || h == 0 || !config.streaming { return None; }
-        if self.frame.is_none() || self.frame_config != Some(config) {
-            let black;
-            let p = match self.picture.as_ref() {
-                Some(p) => p,
-                None => { black = picture::Picture { w: 1, h: 1, rgb: vec![0; 3] }; &black }
-            };
-            // Window coordinates cover the 2624 x 1952 array in esp32-camera v2.1.4's ratio table.
+    pub fn frame(&mut self, w: u32, h: u32, format: picture::PixelFormat, window: Option<([u32; 4], u32, u32)>) -> Option<(u32, u32, std::sync::Arc<Vec<u8>>)> {
+        let config = FrameConfig { w, h, format, window };
+        if self.cached.as_ref().is_none_or(|(old, _)| *old != config) {
+            let black = picture::Picture { w: 1, h: 1, rgb: vec![0; 3] };
+            let p = self.picture.as_ref().unwrap_or(&black);
             let cropped;
-            let p = if let Some(window) = config.window {
-                cropped = picture::crop(p, window, 2624, 1952)?;
-                &cropped
+            let p = if let Some((window, array_w, array_h)) = window {
+                cropped = picture::crop(p, window, array_w, array_h)?; &cropped
             } else { p };
-            // esp32-camera v2.1.4 ov5640_settings.h FORMAT_CTRL00 (0x4300).
-            let format = match (config.jpeg, config.format) {
-                (false, 0x61) => Some(picture::PixelFormat::Rgb565),
-                (false, 0x30) if w.is_multiple_of(2) => Some(picture::PixelFormat::Yuyv),
-                (false, 0x10) => Some(picture::PixelFormat::Grayscale),
-                _ => None,
-            };
-            let Some(format) = format else {
-                if self.frame_config != Some(config) { eprintln!("[camera] unsupported sensor output: format {:#x}, JPEG {}, {}x{}", config.format, config.jpeg, w, h); }
-                self.frame = None; self.frame_config = Some(config); return None;
-            };
             let data = picture::sensor_frame(p, w, h, format)?;
-            self.frame = Some((w, h, std::sync::Arc::new(data)));
-            self.frame_config = Some(config);
+            self.cached = Some((config, std::sync::Arc::new(data)));
         }
-        self.frame.clone()
+        self.cached.as_ref().map(|(_, frame)| (w, h, frame.clone()))
     }
 }
 

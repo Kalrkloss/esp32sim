@@ -1,0 +1,96 @@
+[
+  {
+    "name": "baseline",
+    "exit": 0,
+    "killed": false,
+    "failed_tests": []
+  },
+  {
+    "name": "SCCB reset",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "bus::dma_tests::camera_host_frames_follow_sccb_configuration_into_dma_memory"
+    ]
+  },
+  {
+    "name": "window sync",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "bus::dma_tests::camera_host_frames_follow_sccb_configuration_into_dma_memory"
+    ]
+  },
+  {
+    "name": "config cache invalidation",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "camera::tests::camera_shared_model_needs_no_soc_and_preserves_frame_cache"
+    ]
+  },
+  {
+    "name": "picture cache invalidation",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "camera::tests::camera_shared_model_needs_no_soc_and_preserves_frame_cache"
+    ]
+  },
+  {
+    "name": "stream gating",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "camera::tests::camera_shared_model_needs_no_soc_and_preserves_frame_cache"
+    ]
+  },
+  {
+    "name": "JPEG rejection",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "camera::tests::camera_shared_model_needs_no_soc_and_preserves_frame_cache"
+    ]
+  },
+  {
+    "name": "RGB565 conversion",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "camera::tests::camera_shared_model_needs_no_soc_and_preserves_frame_cache"
+    ]
+  },
+  {
+    "name": "YUYV conversion",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "bus::dma_tests::camera_host_frames_follow_sccb_configuration_into_dma_memory"
+    ]
+  },
+  {
+    "name": "grayscale conversion",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "camera::tests::camera_shared_model_needs_no_soc_and_preserves_frame_cache"
+    ]
+  },
+  {
+    "name": "black fallback",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "camera::tests::camera_shared_model_needs_no_soc_and_preserves_frame_cache"
+    ]
+  },
+  {
+    "name": "preview source",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "camera::tests::camera_shared_model_needs_no_soc_and_preserves_frame_cache"
+    ]
+  }
+]

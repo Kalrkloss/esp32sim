@@ -298,6 +298,12 @@ impl SocBus {
         self.periph.spi1.0.execute(&mut self.flash, &mut []);
         for (_, off, len) in std::mem::take(&mut self.periph.spi1.0.dirty) { self.flash_written(off, len); }
     }
+    /// Request sensor bytes using current physical XCLK routing, without polling
+    /// the camera from the ordinary bus tick. I2S transport is a separate adapter.
+    pub fn camera_frame(&mut self) -> Option<(u32, u32, std::sync::Arc<Vec<u8>>)> {
+        let periph = &self.periph;
+        self.board.camera_frame_with_clock(&|pin| periph.pwm_output(u32::from(pin)))
+    }
     pub fn attach_board_devices(&mut self) {
         self.irq_dirty = true;
         self.pins_active = self.board.uses_gpio_edges() || self.board.uses_uart_pins();

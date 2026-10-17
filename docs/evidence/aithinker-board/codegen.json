@@ -1,0 +1,145 @@
+{
+  "base": "935da1221bce40e60581895a9e11f0f268c122ad",
+  "method": "EX230 asmcmp: addresses/page relocations and equivalent call aliases normalized; not entire binary equivalence",
+  "selector": "(Machine<esp32::.*>::(?:run|step_core|after_round|present_irqs)|esp32::bus::SocBus.*::(?:tick|read32|write32|fetch|next_deadline)|xtensa_lx7::.*::(?:run|step|exec).*esp32::bus::SocBus)",
+  "artifacts": [
+    {
+      "label": "base",
+      "sha256": "5d96892288ea41e65ba17485d1dd190696879db8a1d4a399446de595ad677d83",
+      "disassembly_sha256": "3e4c0fd75de2e5e351860eedf20dd347cb4a95bbf085c8ed137ef25a9a0bbe80"
+    },
+    {
+      "label": "candidate",
+      "sha256": "e995e8f847844d278386643bb8f69360b11b868f09ea80af0f15cc8bf9aa57c9",
+      "disassembly_sha256": "bd0282c33e7cebcb67ea3840b77bd2b9323fc001a85c70f7e77cea0f0e7f993b"
+    }
+  ],
+  "rows": [
+    {
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "same": true,
+      "base_instructions": 122,
+      "candidate_instructions": 122
+    },
+    {
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 171,
+      "candidate_instructions": 171
+    },
+    {
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::tick",
+      "same": true,
+      "base_instructions": 2207,
+      "candidate_instructions": 2207
+    },
+    {
+      "name": "<esp32::bus::SocBus as esp_soc::soc::SocBus>::next_deadline",
+      "same": true,
+      "base_instructions": 817,
+      "candidate_instructions": 817
+    },
+    {
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::after_round",
+      "same": true,
+      "base_instructions": 84,
+      "candidate_instructions": 84
+    },
+    {
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::present_irqs",
+      "same": true,
+      "base_instructions": 234,
+      "candidate_instructions": 234
+    },
+    {
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::run_modeled",
+      "same": true,
+      "base_instructions": 3445,
+      "candidate_instructions": 3445
+    },
+    {
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::run_unmodeled::<false>",
+      "same": true,
+      "base_instructions": 1708,
+      "candidate_instructions": 1708
+    },
+    {
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::step_core",
+      "same": true,
+      "base_instructions": 838,
+      "candidate_instructions": 838
+    },
+    {
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus> as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 37,
+      "candidate_instructions": 37
+    },
+    {
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus> as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 40,
+      "candidate_instructions": 40
+    },
+    {
+      "name": "<xtensa_lx7::state::Cpu as emu_core::core::Core>::run::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 706,
+      "candidate_instructions": 706
+    },
+    {
+      "name": "xtensa_lx7::block::step_extra::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 143,
+      "candidate_instructions": 143
+    },
+    {
+      "name": "xtensa_lx7::exec::exec_insn::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 2566,
+      "candidate_instructions": 2566
+    },
+    {
+      "name": "xtensa_lx7::exec::exec_insn::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 2562,
+      "candidate_instructions": 2562
+    },
+    {
+      "name": "xtensa_lx7::exec::exec_mac16::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 208,
+      "candidate_instructions": 208
+    },
+    {
+      "name": "xtensa_lx7::exec::exec_mac16::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 261,
+      "candidate_instructions": 261
+    },
+    {
+      "name": "xtensa_lx7::pie::exec::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 468,
+      "candidate_instructions": 468
+    },
+    {
+      "name": "xtensa_lx7::pie::exec::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 776,
+      "candidate_instructions": 776
+    },
+    {
+      "name": "xtensa_lx7::pie::exec_table::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 4774,
+      "candidate_instructions": 4774
+    },
+    {
+      "name": "xtensa_lx7::pie::exec_table::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 5721,
+      "candidate_instructions": 5721
+    }
+  ]
+}

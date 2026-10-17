@@ -65,8 +65,10 @@ pub trait BoardModel {
     fn i2c_devices(&mut self) -> Vec<(u8, u8, Box<dyn I2cDevice>)> { Vec::new() }
     /// Give the board's camera a picture to look at (RGB888).
     fn set_camera_picture(&mut self, _p: crate::picture::Picture) -> Result<(), &'static str> { Err("no camera on this board") }
-    /// Next camera frame as the sensor would put it on the DVP bus (YUYV), with its size. None = no camera / nothing to show.
+    /// Next camera frame in the sensor's register-selected wire format, with its size.
+    /// Boards requiring an external clock use `camera_frame_with_clock` instead.
     fn camera_frame(&mut self) -> Option<(u32, u32, std::sync::Arc<Vec<u8>>)> { None }
+
     /// Small RGB preview of what the camera is looking at (for the UI), if a picture is loaded.
     fn camera_preview(&self, _w: u32, _h: u32) -> Option<Vec<u8>> { None }
     /// A complete frame from the LCD_CAM RGB interface (RGB565 little-endian, `w`x`h`).
@@ -121,6 +123,10 @@ pub trait BoardModel {
     fn encoder(&self) -> Option<(u8, u8)> { None }
     /// Lines for the end-of-run report.
     fn report(&self) -> String { String::new() }
+    /// Lazy physical clock query; called by the capture adapter, never polled per tick.
+    /// The callback returns routed PWM frequency and duty (0..=65535) at a GPIO.
+    /// Appended to preserve the existing board vtable's hot-call offsets.
+    fn camera_frame_with_clock(&mut self, _clock: &dyn Fn(u8) -> Option<(f64, u32)>) -> Option<(u32, u32, std::sync::Arc<Vec<u8>>)> { self.camera_frame() }
 }
 
 pub type Board = Box<dyn BoardModel>;
