@@ -7,6 +7,9 @@ The original qualification below predates that additional regression; use
 The scheduled falling-edge start window and retained native-driver qualification
 are documented in [arming-window.md](arming-window.md).
 
+The reproducible public-driver fixture and independent frame hash are recorded
+in [fixture.md](fixture.md); this adds CI inputs, not a new transport path.
+
 # Scope and base
 
 Local-only C7, a new feature, not a reproduced production bug. The merge base is
