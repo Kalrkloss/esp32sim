@@ -41,6 +41,7 @@ pub struct ClassicI2s {
     pub(crate) step_calls: u64,
     camera_capable: bool,
     pub(crate) camera: Option<Box<crate::camera_dma::Capture>>,
+    camera_mode: bool,
 }
 impl Default for ClassicI2s { fn default() -> Self { Self::new() } }
 impl ClassicI2s {
@@ -53,7 +54,7 @@ impl ClassicI2s {
         ram.write(0x24, 64);
         ram.write(0x60, LC_CONF_RESET);
         Self { inner: I2s::new(CPU_HZ), ram, dma: esp_periph::gdma::GdmaInCh { conf1: LC_CONF_RESET & CHECK_OWNER, ..Default::default() }, clock_enabled: false,
-            #[cfg(test)] step_calls: 0, camera_capable: port == 0, camera: None }
+            #[cfg(test)] step_calls: 0, camera_capable: port == 0, camera: None, camera_mode: false }
     }
     /// ESP-IDF v4.4.7 components/soc/esp32/include/soc/i2s_reg.h:
     /// CONF2 0xa8, LCD_EN bit 5 and CAMERA_EN bit 0 (1298-1346);
@@ -148,6 +149,9 @@ impl Device for ClassicI2s {
     fn write(&mut self, off: u32, value: u32) -> WriteEffect {
         let previous = self.ram.read(off);
         self.ram.write(off, value);
+        // Cache dispatch on configuration writes: a PCM-only channel must not
+        // call the camera producer or poll camera registers on every DMA step.
+        if off == 0xa8 { self.camera_mode = self.camera_capable && value & 0x21 == 0x21; }
         if self.camera_rx().is_some() || self.camera.is_some() {
             // Stop/restart, mode/FIFO reconfiguration and all native RX reset
             // pulses discard the old frame. INLINK restarts begin at fresh VSYNC.
@@ -215,7 +219,7 @@ impl SocBus {
             #[cfg(test)] { self.periph.i2s[port].step_calls += 1; }
             // Pin-routed sources live on controller 0, as on the other chips.
             let mut bank = self.periph.i2s[0].inner.take_pcm_bank();
-            let data = if port == 0 {
+            let data = if self.periph.i2s[port].camera_mode {
                 self.camera_dma_data(cycles).unwrap_or_else(|| self.periph.i2s[port].data(cycles, self.cycles, port, &self.periph.gpio, bank.as_deref_mut()))
             } else {
                 self.periph.i2s[port].data(cycles, self.cycles, port, &self.periph.gpio, bank.as_deref_mut())

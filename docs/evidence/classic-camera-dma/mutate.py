@@ -7,7 +7,8 @@ out.mkdir(parents=True, exist_ok=True)
 cam='esp32/src/camera_dma.rs'; i2s='esp32/src/i2s.rs'; dma='esp-periph/src/gdma/receive.rs'; bus='esp32/src/bus.rs'
 cases=[
  ('peripheral reset preserves stale frame','esp32/src/periph.rs','self.i2s[port] = crate::i2s::ClassicI2s::for_port(port);','let _ = port;'),
- ('camera-free board polling',cam,'let rx = self.periph.i2s[0].camera_rx()?;','let _ = self.board.camera_dvp_pins(); let rx = self.periph.i2s[0].camera_rx()?;'),
+ ('camera-free board polling',i2s,'let mut bank = self.periph.i2s[0].inner.take_pcm_bank();','let mut bank = self.periph.i2s[0].inner.take_pcm_bank(); let _ = self.board.camera_dvp_pins();'),
+ ('camera dispatch cache missing',i2s,'self.camera_mode = self.camera_capable && value & 0x21 == 0x21','self.camera_mode = false'),
  ('transport disabled',cam,'let data = capture.packed[capture.pos..end].to_vec();','let data = Vec::new();'),
  ('ignore VSYNC arm',cam,'if !capture.saw_vsync { return Some(Vec::new()); }','if false { return Some(Vec::new()); }'),
  ('charge pulse as pixels',cam,'// The falling edge begins the active frame.','capture.elapsed = VSYNC_CYCLES; // The falling edge begins the active frame.'),

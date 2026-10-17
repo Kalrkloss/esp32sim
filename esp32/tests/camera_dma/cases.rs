@@ -191,7 +191,7 @@ fn c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks() {
     b.board.set_camera_picture(Picture {w:2,h:2,rgb:vec![255,0,0,0,255,0,0,0,255,255,255,255]}).unwrap();
     let (w,h,wire)=b.camera_routed_frame().unwrap();
     assert_eq!((w,h,wire.len()),(160,120,38400));
-    let expected:Vec<_>=wire.chunks_exact(2).flat_map(|v| [v[1],0,v[0],0]).collect();
+    let expected:Vec<_>=wire.as_chunks::<2>().0.iter().flat_map(|v| [v[1],0,v[0],0]).collect();
     for j in 0..20 {
         put(&mut b,D+j*12,(1<<31)|3840);
         put(&mut b,D+j*12+4,B+j*3840);
