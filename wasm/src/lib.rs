@@ -10,7 +10,7 @@ use esp_soc::web::{json_escape, WebServer};
 use esp_soc::{Machine, Soc, SocBus};
 
 mod machine;
-#[cfg(any(test, feature = "jit-tests"))]
+#[cfg(any(test, feature = "psram-tests"))]
 pub mod psram_tests;
 mod network;
 mod ethernet;
@@ -99,6 +99,7 @@ unsafe fn text<'a>(ptr: *const u8, len: usize) -> &'a str {
 /// C6, `esp32c3` for the C3 or `esp32p4` for the P4 (rev < 3), which are console-only and take no
 /// board. Null on failure.
 /// Flash and PSRAM are each limited to 32 MiB, matching the browser configuration form.
+/// Classic ESP32 accepts only 0 (absent, the default) or 4 MiB PSRAM; other sizes fail.
 ///
 /// # Safety
 /// For nonzero `board_len`, `board` must be non-null and readable for `board_len` bytes throughout
