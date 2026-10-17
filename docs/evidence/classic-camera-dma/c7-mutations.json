@@ -1,0 +1,345 @@
+[
+  {
+    "name": "baseline",
+    "file": "esp32/src/camera_dma.rs",
+    "before": null,
+    "after": null,
+    "exit": 0,
+    "killed": false,
+    "failed_tests": []
+  },
+  {
+    "name": "peripheral reset preserves stale frame",
+    "file": "esp32/src/periph.rs",
+    "before": "self.i2s[port] = crate::i2s::ClassicI2s::for_port(port);",
+    "after": "let _ = port;",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_dport_reset_drops_capture_and_requires_fresh_inlink"
+    ]
+  },
+  {
+    "name": "camera-free board polling",
+    "file": "esp32/src/i2s.rs",
+    "before": "let mut bank = self.periph.i2s[0].inner.take_pcm_bank();",
+    "after": "let mut bank = self.periph.i2s[0].inner.take_pcm_bank(); let _ = self.board.camera_dvp_pins();",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_camera_free_active_pcm_does_not_poll_board_camera"
+    ]
+  },
+  {
+    "name": "camera dispatch cache missing",
+    "file": "esp32/src/i2s.rs",
+    "before": "self.camera_mode = self.camera_capable && value & 0x21 == 0x21",
+    "after": "self.camera_mode = false",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_dport_reset_drops_capture_and_requires_fresh_inlink",
+      "c7::c7_bad_owner_forbidden_descriptor_and_buffer_never_eof",
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
+      "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+      "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+      "c7::c7_reacquire_next_image_on_reused_ring",
+      "c7::c7_mid_frame_route_or_power_loss_is_terminal_until_rearm",
+      "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq"
+    ]
+  },
+  {
+    "name": "transport disabled",
+    "file": "esp32/src/camera_dma.rs",
+    "before": "let data = capture.packed[capture.pos..end].to_vec();",
+    "after": "let data = Vec::new();",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
+      "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+      "c7::c7_tick_split_invariance_and_late_arm_waits_vsync"
+    ]
+  },
+  {
+    "name": "ignore VSYNC arm",
+    "file": "esp32/src/camera_dma.rs",
+    "before": "if !capture.saw_vsync { return Some(Vec::new()); }",
+    "after": "if false { return Some(Vec::new()); }",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_tick_split_invariance_and_late_arm_waits_vsync"
+    ]
+  },
+  {
+    "name": "charge pulse as pixels",
+    "file": "esp32/src/camera_dma.rs",
+    "before": "// The falling edge begins the active frame.",
+    "after": "capture.elapsed = VSYNC_CYCLES; // The falling edge begins the active frame.",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+    ]
+  },
+  {
+    "name": "lose fractional word position",
+    "file": "esp32/src/camera_dma.rs",
+    "before": "capture.elapsed.saturating_add(cycles)",
+    "after": "cycles",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+    ]
+  },
+  {
+    "name": "wrong frame rate",
+    "file": "esp32/src/camera_dma.rs",
+    "before": "u128::from(FRAME_CYCLES - VSYNC_CYCLES)",
+    "after": "u128::from(FRAME_CYCLES)",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+      "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+    ]
+  },
+  {
+    "name": "do not consume byte position",
+    "file": "esp32/src/camera_dma.rs",
+    "before": "capture.pos = end;",
+    "after": "capture.pos = 0;",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
+      "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq"
+    ]
+  },
+  {
+    "name": "drop final boundary word",
+    "file": "esp32/src/camera_dma.rs",
+    "before": "let tail = capture.packed[capture.pos..].to_vec();",
+    "after": "let tail = Vec::new();",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_bad_owner_forbidden_descriptor_and_buffer_never_eof",
+      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+      "c7::c7_reacquire_next_image_on_reused_ring",
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
+      "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+      "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+      "c7::c7_dport_reset_drops_capture_and_requires_fresh_inlink",
+      "c7::c7_ring_starvation_and_finite_guest_service_reuse"
+    ]
+  },
+  {
+    "name": "wrong FIFO mode",
+    "file": "esp32/src/camera_dma.rs",
+    "before": "CameraFifo::new(rx.fifo_mode)",
+    "after": "CameraFifo::new(3)",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+      "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+      "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+      "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+      "c7::c7_reacquire_next_image_on_reused_ring"
+    ]
+  },
+  {
+    "name": "route loss not terminal",
+    "file": "esp32/src/camera_dma.rs",
+    "before": "self.periph.i2s[0].abort_camera_dma();",
+    "after": "self.periph.i2s[0].camera = None;",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_mid_frame_route_or_power_loss_is_terminal_until_rearm"
+    ]
+  },
+  {
+    "name": "RX resets keep DMA running",
+    "file": "esp32/src/i2s.rs",
+    "before": "self.dma.running = false;\n                self.dma.buf_pos = 0;",
+    "after": "self.dma.running = true;\n                self.dma.buf_pos = 0;",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame"
+    ]
+  },
+  {
+    "name": "inlink stop ignored",
+    "file": "esp32/src/i2s.rs",
+    "before": "if value & (1 << 28) != 0 { self.dma.running = false; }",
+    "after": "if value & (1 << 28) != 0 { self.dma.running = true; }",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame"
+    ]
+  },
+  {
+    "name": "wrong EOF count unit",
+    "file": "esp32/src/i2s.rs",
+    "before": "ram.read(0x24).checked_mul(4)",
+    "after": "ram.read(0x24).checked_mul(1)",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+      "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+      "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+      "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+      "c7::c7_mid_frame_route_or_power_loss_is_terminal_until_rearm",
+      "c7::c7_reacquire_next_image_on_reused_ring",
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
+      "c7::c7_bad_owner_forbidden_descriptor_and_buffer_never_eof"
+    ]
+  },
+  {
+    "name": "wrong EOF descriptor register",
+    "file": "esp32/src/i2s.rs",
+    "before": "self.ram.write(0x3c, eof_desc)",
+    "after": "self.ram.write(0x3c, 0)",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+      "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+    ]
+  },
+  {
+    "name": "wrong classic IRQ mapping",
+    "file": "esp32/src/i2s.rs",
+    "before": "((gdma & 3) << 8)",
+    "after": "((gdma & 3) << 7)",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
+      "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+      "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+      "c7::c7_reacquire_next_image_on_reused_ring",
+      "c7::c7_dport_reset_drops_capture_and_requires_fresh_inlink"
+    ]
+  },
+  {
+    "name": "owner check bypassed",
+    "file": "esp-periph/src/gdma/receive.rs",
+    "before": "r.conf1 & (1 << 12) != 0 && !d.owner_dma",
+    "after": "false && !d.owner_dma",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_bad_owner_forbidden_descriptor_and_buffer_never_eof",
+      "c7::c7_ring_starvation_and_finite_guest_service_reuse"
+    ]
+  },
+  {
+    "name": "owner not returned",
+    "file": "esp-periph/src/gdma/receive.rs",
+    "before": "(dw0 & !(0xfff << 12) & !(3 << 30))",
+    "after": "(dw0 & !(0xfff << 12) & !(1 << 30))",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
+      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+      "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+      "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+      "c7::c7_ring_starvation_and_finite_guest_service_reuse"
+    ]
+  },
+  {
+    "name": "length not written",
+    "file": "esp-periph/src/gdma/receive.rs",
+    "before": "(self.buf_pos << 12)",
+    "after": "(0 << 12)",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+      "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+      "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+    ]
+  },
+  {
+    "name": "EOF flag not written",
+    "file": "esp-periph/src/gdma/receive.rs",
+    "before": "if eof { 1 << 30 } else { 0 }",
+    "after": "if eof { 0 } else { 0 }",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
+      "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+      "c7::c7_tick_split_invariance_and_late_arm_waits_vsync"
+    ]
+  },
+  {
+    "name": "wrong descriptor advance",
+    "file": "esp-periph/src/gdma/receive.rs",
+    "before": "self.desc = next; self.buf_pos = 0;",
+    "after": "self.desc = 0; self.buf_pos = 0;",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_reacquire_next_image_on_reused_ring",
+      "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+    ]
+  },
+  {
+    "name": "DRAM rule admits CPU-only prefix",
+    "file": "esp32/src/bus.rs",
+    "before": "!(DRAM_LOW..DRAM_HIGH).contains(&addr)",
+    "after": "!(ROM_DRAM_LOW..DRAM_HIGH).contains(&addr)",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_bad_owner_forbidden_descriptor_and_buffer_never_eof"
+    ]
+  },
+  {
+    "name": "mode1 sensor sample ordering",
+    "file": "esp32/src/camera_fifo.rs",
+    "before": "[sample, 0, first, 0]",
+    "after": "[first, 0, sample, 0]",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+      "c7::c7_reacquire_next_image_on_reused_ring",
+      "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+      "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+      "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+    ]
+  },
+  {
+    "name": "mode3 sensor sample lane",
+    "file": "esp32/src/camera_fifo.rs",
+    "before": "[0, 0, sample, 0]",
+    "after": "[sample, 0, 0, 0]",
+    "exit": 101,
+    "killed": true,
+    "failed_tests": [
+      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq"
+    ]
+  }
+]
