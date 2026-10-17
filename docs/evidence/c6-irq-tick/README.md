@@ -178,8 +178,39 @@ All Rust commands use `cargo +1.99.0`, nice 10 and an external target directory.
 
 ## CPU comparison
 
-PENDING
+Measured October 17, 2026: corrected candidate
+`2f0cbb092fcd335822463ead84d63e49368a8a7a` against upstream main
+`142805d5399e0c3cf25995fe21ba524e75a2b3cb`, using retained release binaries
+without a rebuild. The two C6 30-second workloads use the identical retirement
+probe described above on both arms; the other workloads use the native CLI.
 
-The formal quiet-machine CPU table is deliberately left to separate central
-measurement. Engineering smoke does not establish the cause of slow production
-sessions, a WASM speedup, or a hardware timing correction.
+User CPU seconds (`wait4` user resource usage), not wall time: one warmup pair
+and seven measured pairs per fixture, with `nice -n 10`. Odd measured pairs run
+candidate/base; even pairs run base/candidate.
+
+| Workload | Main median user s | Candidate median user s | Change (ratio of medians) | Candidate slower | Flag |
+| --- | ---: | ---: | ---: | ---: | --- |
+| hello-delay | 3.200214 | 1.630844 | -49.040% | 0/7 | no |
+| public-display-starter | 12.530602 | 10.924238 | -12.820% | 0/7 | no |
+| s3-hello | 0.048686 | 0.048321 | -0.750% | 3/7 | no |
+| c3-hello | 0.263981 | 0.264203 | +0.084% | 4/7 | no |
+| c6-hello | 0.342944 | 0.182179 | -46.878% | 0/7 | no |
+| classic-hello | 0.061382 | 0.061376 | -0.010% | 4/7 | no |
+| pocket-tank-startup | 1.129013 | 1.094202 | -3.083% | 2/7 | no |
+
+All 112 executions (14 warmup runs and 98 measured runs / 49 measured pairs)
+match instruction counts, console SHA-256s and stop summaries across arms and
+the accepted smoke manifest. Both C6 30-second workloads also match actual
+retired-core0 counts. Cycle-derived C3/C6 CLI instruction fields alone are not
+retirement proof.
+
+The run window was 05:52:56–05:58:01 UTC+02:00. Initial 1-minute load was
+2.369, final load 2.782, maximum 2.861. Monitoring every 0.5 seconds enforced
+an initial load below 5, abort at load >=7, no cargo/rustc builds and the
+01:00–07:00 local window. No build was detected.
+
+No fixture reaches the flag threshold of slower in at least 6/7 pairs. This
+threshold is not a statistical significance test; no layout-only waiver is
+claimed. Short hello CPU times are noisy. These bounded native results do not
+establish the cause of slow production sessions, a browser/WASM speedup or a
+hardware timing correction.
