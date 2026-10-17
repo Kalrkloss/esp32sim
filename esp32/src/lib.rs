@@ -13,6 +13,7 @@ pub use soc::{machine, Esp32, Machine};
 pub mod board;
 
 pub mod i2s;
+pub mod camera_fifo;
 pub mod ledc;
 pub mod rmt;
 pub mod spi;
