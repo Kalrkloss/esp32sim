@@ -57,6 +57,12 @@ The companion `lifecycle.bin` uses the same pinned project
 and public driver for replacement, deinit/reinit and reboot tests; [recipe](../../../examples/classic-camera/lifecycle.md)
 and `lifecycle-NOTICE` accompany it. The bootloader and partition table are shared.
 
+The native-only `public/classic-psram-idf-{bootloader,ptable,app}.bin` inputs
+exercise genuine ESP-IDF 4.4.7 unicore PSRAM startup and allocator code.
+[Recipe, configuration and hashes](../../../docs/fixtures/classic-psram-idf/README.md),
+`classic-psram-idf-NOTICE.txt` and `classic-psram-idf-licenses.txt` accompany them.
+They do not expose a browser demo or qualify classic PSRAM under WASM.
+
 `tdisplay-prices.json` is the LilyGO TTGO T-Display demo on the classic ESP32: stock MicroPython
 v1.29.0 (`ESP32_GENERIC-20260824-v1.29.0.bin`, MIT, fetched from micropython.org by
 `tools/fetch-micropython.sh` and pinned by SHA-256; not committed) written whole at flash 0x1000 through
