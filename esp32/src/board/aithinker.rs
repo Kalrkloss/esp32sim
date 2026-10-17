@@ -5,6 +5,15 @@ use esp_periph::i2c::I2cDevice;
 use esp_soc::{board::BoardModel, camera::{Ov2640, Ov2640State, HostFrameSource}, picture::{Picture, PixelFormat}};
 use std::sync::{Arc, Mutex};
 
+use esp_soc::board::BoardEdge;
+
+pub const PIN_VSYNC: u8 = 25;
+/// Approximate 10Hz frame cadence, with a 1ms active-high blanking pulse.
+/// Not a sensor/PCLK timing claim. In particular the driver's 1us ISR check
+/// must still see the pulse (esp32-camera v2.1.4 ll_cam.c:212-242).
+pub const FRAME_CYCLES: u64 = crate::periph::CPU_HZ / 10;
+pub const VSYNC_CYCLES: u64 = crate::periph::CPU_HZ / 1000;
+
 pub const PIN_PWDN: u8 = 32;
 pub const PIN_XCLK: u8 = 0;
 /// The module has no reset wire. Never interpret -1 as GPIO 255 or GPIO 0.
@@ -14,8 +23,12 @@ pub struct AiThinkerCam {
     sensor: Arc<Mutex<Ov2640State>>,
     source: HostFrameSource,
     power: Arc<Mutex<bool>>,
+    now: u64,
+    next: Option<u64>,
+    vsync: bool,
+    edges: Vec<BoardEdge>,
 }
-impl Default for AiThinkerCam { fn default() -> Self { Self { sensor: Default::default(), source: Default::default(), power: Arc::new(Mutex::new(true)) } } }
+impl Default for AiThinkerCam { fn default() -> Self { Self { sensor: Default::default(), source: Default::default(), power: Arc::new(Mutex::new(true)), now: 0, next: None, vsync: false, edges: Vec::new() } } }
 
 struct Sccb { sensor: Ov2640, powered_down: Arc<Mutex<bool>> }
 // Power is shared with the SCCB device so a powered-down sensor does not ACK.
@@ -30,6 +43,35 @@ impl I2cDevice for Sccb {
 
 impl BoardModel for AiThinkerCam {
     fn name(&self) -> &'static str { "ai-thinker-cam" }
+    fn input_levels(&self) -> Vec<(u8, bool)> { vec![(PIN_VSYNC, self.vsync)] }
+    fn next_deadline(&self) -> Option<u64> { self.next }
+    fn take_edges(&mut self) -> Vec<BoardEdge> { std::mem::take(&mut self.edges) }
+    fn camera_dvp_pins(&self) -> Option<[u8; 11]> { Some([5, 18, 19, 21, 36, 39, 34, 35, 22, 23, 25]) }
+    fn advance_to(&mut self, cycle: u64) {
+        if cycle < self.now { return; }
+        while let Some(at) = self.next.filter(|&at| at <= cycle) {
+            self.vsync = !self.vsync;
+            self.edges.push(BoardEdge { cycle: at, pin: PIN_VSYNC, level: self.vsync });
+            self.next = at.checked_add(if self.vsync { VSYNC_CYCLES } else { FRAME_CYCLES - VSYNC_CYCLES });
+        }
+        self.now = cycle;
+    }
+    fn advance_inputs_with_clock(&mut self, cycle: u64, clock: &dyn Fn(u8) -> Option<(f64, u32)>) {
+        if cycle < self.now { return; }
+        let streaming = self.sensor.lock().unwrap().streaming;
+        let live = clock(PIN_XCLK).is_some_and(|(hz, duty)| hz.is_finite() && hz > 0.0 && duty > 0 && duty < 65535);
+        if !*self.power.lock().unwrap() && streaming && live {
+            if self.next.is_none() { self.next = cycle.checked_add(FRAME_CYCLES); }
+            self.advance_to(cycle);
+        } else {
+            self.next = None;
+            if self.vsync {
+                self.vsync = false;
+                self.edges.push(BoardEdge { cycle, pin: PIN_VSYNC, level: false });
+            }
+            self.now = cycle;
+        }
+    }
     fn gpio_output_at(&mut self, _: u64, _: &[(u8, bool)], enabled: u64, output: u64) {
         // A floating/unconfigured PWDN is conservatively inactive. The guest must
         // explicitly drive it low; no reset GPIO is attached on this board.

@@ -261,6 +261,9 @@ impl SocBus {
         self.run_gp_spi();
         self.flush_rmt();
         self.flush_gpio();
+        // Clock, matrix and SCCB writes can start/stop autonomous sensor inputs
+        // without changing an output GPIO. Reconcile at this same bus horizon.
+        if self.pins_active { self.deliver_board_inputs(); }
         self.irq_dirty = true;
     }
     #[inline]
@@ -276,7 +279,8 @@ impl SocBus {
         }
     }
     fn deliver_board_inputs(&mut self) {
-        self.board.advance_to(self.cycles);
+        let periph = &self.periph;
+        self.board.advance_inputs_with_clock(self.cycles, &|pin| periph.pwm_output(u32::from(pin)));
         for edge in self.board.take_edges() {
             self.periph.gpio.set_input(edge.pin, edge.level);
             self.irq_dirty = true;
@@ -303,6 +307,32 @@ impl SocBus {
     pub fn camera_frame(&mut self) -> Option<(u32, u32, std::sync::Arc<Vec<u8>>)> {
         let periph = &self.periph;
         self.board.camera_frame_with_clock(&|pin| periph.pwm_output(u32::from(pin)))
+    }
+    /// Qualify a camera frame for I2S0's parallel receiver. No FIFO or DMA work
+    /// occurs here. esp32-camera v2.1.4 ll_cam.c:350-395 and IDF v4.4.7
+    /// gpio_sig_map.h define D0=140, WS/PCLK=28, H/V_SYNC=190/191,
+    /// H_ENABLE=192 (constant high). A fixed sensor's inverted data lines
+    /// invert the actual bytes; inverted control polarities are unsupported.
+    pub fn camera_routed_frame(&mut self) -> Option<(u32, u32, std::sync::Arc<Vec<u8>>)> {
+        if !self.periph.i2s[0].clock_enabled { return None; }
+        let rx = self.periph.i2s[0].camera_rx()?;
+        if !rx.started || rx.reset || !rx.slave || !rx.descriptor_enabled || !rx.fifo_mode_forced || ![1, 3].contains(&rx.fifo_mode) { return None; }
+        let pins = self.board.camera_dvp_pins()?;
+        let gpio = &self.periph.gpio;
+        for (signal, pin) in [(28, pins[8]), (190, pins[9]), (191, pins[10])] {
+            if gpio.matrix_input_route(signal) != Some((pin, false)) { return None; }
+        }
+        let enable = gpio.gpio.func_in_sel[192];
+        if ![0x30, 0x38].contains(&(enable & 0x3f)) || gpio.signal_input(192) != Some(true) { return None; }
+        let mut invert = 0u8;
+        for (bit, pin) in pins[..8].iter().enumerate() {
+            let (actual, inverted) = gpio.matrix_input_route(140 + bit)?;
+            if actual != *pin { return None; }
+            if inverted { invert |= 1 << bit; }
+        }
+        let (w, h, mut frame) = self.camera_frame()?;
+        if invert != 0 { for byte in std::sync::Arc::make_mut(&mut frame) { *byte ^= invert; } }
+        Some((w, h, frame))
     }
     pub fn attach_board_devices(&mut self) {
         self.irq_dirty = true;

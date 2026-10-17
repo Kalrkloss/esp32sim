@@ -373,6 +373,15 @@ impl ClassicGpio {
             self.gpio.set_input(pin as u8, false);
         }
     }
+    /// Physical matrix input, retaining inversion. IDF v4.4.7 gpio_reg.h:
+    /// GPIO_FUNCm_IN_SEL_CFG source bits 0..5, invert bit 6, matrix-select bit 7.
+    /// Unlike the non-inverted input_pin helper, DVP data can use inversion.
+    pub(crate) fn matrix_input_route(&self, signal: usize) -> Option<(u8, bool)> {
+        let cfg = *self.gpio.func_in_sel.get(signal)?;
+        let pin = (cfg & 0x3f) as usize;
+        (cfg & (1 << 7) != 0 && pin < 40 && self.matrix_pad(pin) && self.input_enabled(pin))
+            .then_some((pin as u8, cfg & (1 << 6) != 0))
+    }
     pub fn input_pin(&self, signal: usize) -> Option<u8> {
         esp_soc::pins::ChipPins::ESP32.routes(&self.gpio, &self.route_mux).input_pin(signal)
             .or_else(|| Self::direct_pin(signal).filter(|&pin| (self.mux(pin) >> 12) & 7 == 1 && self.input_enabled(pin)).map(|p| p as u8))

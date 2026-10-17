@@ -177,3 +177,194 @@ fn aithinker_xclk_requires_live_routed_pwm_not_gpio_level() {
     put(&mut bus, 0x3ff0_00c0, 0);
     assert!(bus.camera_frame().is_none());
 }
+
+fn dvp(bus: &mut SocBus) {
+    // IDF v4.4.7 gpio_sig_map.h, io_mux_reg.h; AI-Thinker fixed wiring.
+    for (signal, pin, mux) in [(140,5,0x6c),(141,18,0x70),(142,19,0x74),(143,21,0x7c),
+        (144,36,4),(145,39,0x10),(146,34,0x14),(147,35,0x18),
+        (28,22,0x80),(190,23,0x8c),(191,25,0x24)] {
+        put(bus, 0x3ff4_9000 + mux, (2 << 12) | (1 << 9));
+        put(bus, 0x3ff4_4130 + 4 * signal, 0x80 | pin);
+    }
+    put(bus, 0x3ff4_4130 + 4 * 192, 0xb8);
+}
+fn receiver(bus: &mut SocBus) {
+    // Preserve LEDC's gate while enabling I2S0 (IDF v4.4.7 dport_reg.h).
+    put(bus, 0x3ff0_00c0, (1 << 11) | (1 << 4));
+    put(bus, 0x3ff4_f0a8, 0x21);
+    put(bus, 0x3ff4_f020, (1 << 12) | (1 << 16) | (1 << 20));
+    put(bus, 0x3ff4_f008, (1 << 7) | (1 << 5));
+}
+fn tick_bus(bus: &mut SocBus, cycles: u64) {
+    let cpu = esp_soc::SocBus::cpu_cycles_for_bus(bus, cycles);
+    bus.tick(cpu.try_into().unwrap());
+}
+fn running() -> SocBus {
+    let mut bus = board();
+    put(&mut bus, 0x3ff4_8070, 1 << 27);
+    put(&mut bus, 0x3ff0_003c, 2); // 240MHz for exact deadline boundaries
+    configure(&mut bus); clock(&mut bus); dvp(&mut bus);
+    // Reconcile the first latched PWM duty without requiring an I2S start.
+    bus.read32(0x3ff4_403c).unwrap();
+    bus
+}
+#[test]
+fn c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma() {
+    use esp32::board::aithinker::{FRAME_CYCLES, VSYNC_CYCLES};
+    let mut bus = running();
+    let original = bus.dram.clone();
+    // GPIO25 rising edge, core0 enable: IDF v4.4.7 gpio_reg.h.
+    put(&mut bus, 0x3ff4_4088 + 4 * 25, (1 << 7) | (1 << 15));
+    let first = bus.board.next_deadline().unwrap();
+    assert_eq!(first, FRAME_CYCLES);
+    assert_eq!(esp_soc::SocBus::next_deadline(&bus), Some(esp_soc::SocBus::cpu_cycles_for_bus(&bus, first)));
+    tick_bus(&mut bus, first - 1);
+    assert_eq!(bus.read32(0x3ff4_403c).unwrap() & (1 << 25), 0);
+    tick_bus(&mut bus, 1);
+    assert_ne!(bus.read32(0x3ff4_403c).unwrap() & (1 << 25), 0);
+    assert_ne!(bus.read32(0x3ff4_4044).unwrap() & (1 << 25), 0, "GPIO edge IRQ latched");
+    assert!(bus.periph.gpio.irq(0, false));
+    tick_bus(&mut bus, 240); // one microsecond in the stable bus domain
+    assert_ne!(bus.read32(0x3ff4_403c).unwrap() & (1 << 25), 0, "delayed ISR check");
+    tick_bus(&mut bus, VSYNC_CYCLES - 240);
+    assert_eq!(bus.read32(0x3ff4_403c).unwrap() & (1 << 25), 0);
+    receiver(&mut bus);
+    put(&mut bus, 0x3ff4_f008, 1 << 7); // explicitly stopped
+    let next = bus.board.next_deadline().unwrap();
+    let delta = next - esp_soc::SocBus::cycles(&bus);
+    tick_bus(&mut bus, delta);
+    assert_ne!(bus.read32(0x3ff4_403c).unwrap() & (1 << 25), 0, "stopped capture still gets VSYNC");
+    assert_eq!(bus.dram, original, "C6 never writes DMA memory");
+    assert_eq!(bus.read32(0x3ff4_f00c).unwrap(), 0, "not an I2S/LCD_CAM interrupt");
+}
+#[test]
+fn c6_power_clock_and_sensor_stop_cancel_and_restart_vsync() {
+    let mut bus = running();
+    for (addr, off, on) in [(0x3ff4_4010,1,0),(0x3ff4_4034,1,0)] {
+        let next = bus.board.next_deadline().unwrap();
+        let delta = next - esp_soc::SocBus::cycles(&bus); tick_bus(&mut bus, delta);
+        assert!(bus.periph.gpio.gpio.level(25));
+        put(&mut bus, addr, off);
+        assert_eq!(bus.board.next_deadline(), None);
+        assert!(!bus.periph.gpio.gpio.level(25));
+        if addr == 0x3ff4_4034 { put(&mut bus, 0x3ff4_4030, 1); } else { put(&mut bus, addr, on); }
+        assert!(bus.board.next_deadline().is_some());
+    }
+    put(&mut bus, 0x3ff4_4530, 256);
+    assert_eq!(bus.board.next_deadline(), None);
+    put(&mut bus, 0x3ff4_4530, 71 | (1 << 9));
+    assert!(bus.board.next_deadline().is_some(), "inverted XCLK is still a clock");
+    write(&mut bus, 0xe0, 4);
+    assert_eq!(bus.board.next_deadline(), None);
+    write(&mut bus, 0xe0, 0);
+    assert!(bus.board.next_deadline().is_some());
+}
+#[test]
+fn c6_physical_routes_inversion_and_reconfiguration() {
+    let mut bus = running(); receiver(&mut bus);
+    bus.board.set_camera_picture(picture([255,0,0])).unwrap();
+    assert_eq!(*bus.camera_routed_frame().unwrap().2, [248,0].repeat(16));
+    // Every data/clock/sync wire is required; restoring it recovers immediately.
+    for (signal,pin) in [(140,5),(141,18),(142,19),(143,21),(144,36),(145,39),(146,34),(147,35),(28,22),(190,23),(191,25)] {
+        let wrong = if pin == 5 { 18 } else { 5 }; // another enabled physical input, not a floating pad
+        put(&mut bus, 0x3ff4_4130 + 4*signal, 0x80 | wrong);
+        assert!(bus.camera_routed_frame().is_none(), "wrong signal {signal}");
+        put(&mut bus, 0x3ff4_4130 + 4*signal, 0x80 | pin);
+        assert!(bus.camera_routed_frame().is_some());
+    }
+    for (signal,pin) in [(28,22),(190,23),(191,25)] {
+        put(&mut bus, 0x3ff4_4130 + 4*signal, 0xc0 | pin);
+        assert!(bus.camera_routed_frame().is_none(), "unsupported control polarity");
+        put(&mut bus, 0x3ff4_4130 + 4*signal, 0x80 | pin);
+    }
+    put(&mut bus, 0x3ff4_4130 + 4*140, 0xc0 | 5);
+    put(&mut bus, 0x3ff4_4130 + 4*147, 0xc0 | 35);
+    assert_eq!(*bus.camera_routed_frame().unwrap().2, [121,129].repeat(16));
+    dvp(&mut bus);
+    assert_eq!(*bus.camera_routed_frame().unwrap().2, [248,0].repeat(16), "inversion cannot corrupt cached source");
+    put(&mut bus, 0x3ff4_4130 + 4*192, 0xb0);
+    assert!(bus.camera_routed_frame().is_none());
+    dvp(&mut bus);
+    put(&mut bus, 0x3ff4_9004, 2 << 12); // disable D4 pad input
+    assert!(bus.camera_routed_frame().is_none());
+    dvp(&mut bus);
+    put(&mut bus, 0x3ff4_9070, 1 << 9); // wrong D1 pad function
+    assert!(bus.camera_routed_frame().is_none());
+    dvp(&mut bus);
+    put(&mut bus, 0x3ff4_4530, 256);
+    assert!(bus.camera_routed_frame().is_none());
+    clock(&mut bus); receiver(&mut bus);
+    assert!(bus.camera_routed_frame().is_some());
+    put(&mut bus, 0x3ff4_4010, 1);
+    assert!(bus.camera_routed_frame().is_none());
+}
+#[test]
+fn c6_receiver_unarmed_reset_and_modes_withhold_routed_frames() {
+    let mut bus = running();
+    assert!(bus.camera_routed_frame().is_none());
+    receiver(&mut bus); assert!(bus.camera_routed_frame().is_some());
+    for conf in [1 << 7, 1 << 5, (1<<7)|(1<<5)|2, (1<<7)|(1<<5)|8] {
+        put(&mut bus, 0x3ff4_f008, conf);
+        assert!(bus.camera_routed_frame().is_none());
+    }
+    receiver(&mut bus);
+    for fifo in [(1<<16)|(1<<20), (1<<16)|(1<<12), (1<<12)|(1<<20)] {
+        put(&mut bus, 0x3ff4_f020, fifo);
+        assert!(bus.camera_routed_frame().is_none());
+    }
+    receiver(&mut bus);
+    put(&mut bus, 0x3ff4_f020, (3<<16)|(1<<12)|(1<<20));
+    assert!(bus.camera_routed_frame().is_some());
+    put(&mut bus, 0x3ff0_00c0, 1 << 11);
+    assert!(bus.camera_routed_frame().is_none(), "I2S0 gate");
+    receiver(&mut bus);
+    put(&mut bus, 0x3ff0_00c4, 1 << 4);
+    assert!(bus.camera_routed_frame().is_none(), "I2S0 reset gate");
+}
+#[test]
+fn c6_deadline_edges_preserve_timestamps_and_large_steps() {
+    use esp32::board::aithinker::{FRAME_CYCLES, VSYNC_CYCLES};
+    use esp_soc::board::BoardEdge;
+    let mut bus = running();
+    let first = bus.board.next_deadline().unwrap();
+    bus.board.advance_to(first + FRAME_CYCLES + VSYNC_CYCLES);
+    assert_eq!(bus.board.take_edges(), [
+        BoardEdge { cycle: first, pin: 25, level: true },
+        BoardEdge { cycle: first + VSYNC_CYCLES, pin: 25, level: false },
+        BoardEdge { cycle: first + FRAME_CYCLES, pin: 25, level: true },
+        BoardEdge { cycle: first + FRAME_CYCLES + VSYNC_CYCLES, pin: 25, level: false },
+    ]);
+    let next = bus.board.next_deadline();
+    bus.board.advance_to(0);
+    assert_eq!(bus.board.next_deadline(), next, "advance is monotonic");
+    assert!(bus.board.take_edges().is_empty());
+    assert_eq!(next, Some(first + 2 * FRAME_CYCLES));
+}
+#[test]
+fn c6_active_non_camera_board_never_queries_camera_clock() {
+    use esp_soc::board::BoardModel;
+    struct Button { now: u64 }
+    impl BoardModel for Button {
+        fn name(&self) -> &'static str { "button" }
+        fn advance_to(&mut self, cycle: u64) { self.now = cycle; }
+    }
+    let mut board = Button { now: 0 };
+    board.advance_inputs_with_clock(240, &|_| panic!("camera clock polled"));
+    assert_eq!(board.now, 240);
+    assert_eq!(board.camera_dvp_pins(), None);
+}
+#[test]
+fn c6_camera_free_has_no_producer_deadlines_or_steps() {
+    struct Idle;
+    impl esp_soc::board::BoardModel for Idle {
+        fn name(&self) -> &'static str { "idle" }
+        fn uses_gpio_edges(&self) -> bool { false }
+        fn next_deadline(&self) -> Option<u64> { panic!("camera-free deadline poll") }
+        fn advance_inputs_with_clock(&mut self, _: u64, _: &dyn Fn(u8)->Option<(f64,u32)>) { panic!("camera-free producer step") }
+        fn camera_dvp_pins(&self) -> Option<[u8;11]> { panic!("camera-free route poll") }
+    }
+    let mut bus = SocBus::new(0, [0;6]); bus.board = Box::new(Idle); bus.attach_board_devices();
+    assert_eq!(esp_soc::SocBus::next_deadline(&bus), None);
+    for _ in 0..100 { bus.tick(240); bus.read32(0x3ff4_403c).unwrap(); }
+    assert_eq!(esp_soc::SocBus::next_deadline(&bus), None);
+}

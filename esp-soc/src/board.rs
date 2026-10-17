@@ -127,6 +127,11 @@ pub trait BoardModel {
     /// The callback returns routed PWM frequency and duty (0..=65535) at a GPIO.
     /// Appended to preserve the existing board vtable's hot-call offsets.
     fn camera_frame_with_clock(&mut self, _clock: &dyn Fn(u8) -> Option<(f64, u32)>) -> Option<(u32, u32, std::sync::Arc<Vec<u8>>)> { self.camera_frame() }
+    /// Advance scheduled inputs, querying a physical clock only on boards that need it.
+    /// This replaces the existing advance call, not an additional producer poll.
+    fn advance_inputs_with_clock(&mut self, cycle: VirtualCycle, _clock: &dyn Fn(u8) -> Option<(f64, u32)>) { self.advance_to(cycle); }
+    /// Parallel camera wiring: D0..D7, PCLK, HREF, VSYNC. None on camera-free boards.
+    fn camera_dvp_pins(&self) -> Option<[u8; 11]> { None }
 }
 
 pub type Board = Box<dyn BoardModel>;
