@@ -1,0 +1,611 @@
+{
+  "method": "Additional explanation only; original 10/21 equality score is not changed",
+  "rows": [
+    {
+      "comparison": "base",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 11,
+      "examples": [
+        {
+          "before": "mov\tw9, #0x2898",
+          "after": "mov\tw9, #0x28a8"
+        },
+        {
+          "before": "mov\tw8, #0x28b0",
+          "after": "mov\tw8, #0x28c0"
+        },
+        {
+          "before": "mov\tw9, #0x2850",
+          "after": "mov\tw9, #0x2860"
+        }
+      ]
+    },
+    {
+      "comparison": "base",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::read32",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 17,
+      "examples": [
+        {
+          "before": "mov\tw8, #0x6a99",
+          "after": "mov\tw8, #0x6aa9"
+        },
+        {
+          "before": "mov\tw9, #0x2898",
+          "after": "mov\tw9, #0x28a8"
+        },
+        {
+          "before": "mov\tw8, #0x28b0",
+          "after": "mov\tw8, #0x28c0"
+        }
+      ]
+    },
+    {
+      "comparison": "base",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::tick",
+      "classification": "active-DMA camera dispatch plus layout/stack/register allocation changes",
+      "instruction_delta": 30,
+      "opcode_delta": {
+        "add": 2,
+        "and": 2,
+        "b": 3,
+        "b.eq": 1,
+        "b.hi": 1,
+        "b.ls": -1,
+        "bl": 2,
+        "cbnz": 1,
+        "cbz": 1,
+        "cmn": 1,
+        "ldp": 2,
+        "ldr": -1,
+        "ldrb": 2,
+        "ldur": 4,
+        "mov": -3,
+        "movk": -5,
+        "stp": 1,
+        "str": 10,
+        "stur": 3,
+        "sub": 4
+      },
+      "camera_call_windows": [
+        {
+          "index": 1005,
+          "instructions": [
+            "add\tx11, x11, #PAGEOFF",
+            "str\tx11, [sp, #0x8]",
+            "ldr\tx24, [sp, #0x40]",
+            "str\tx12, [sp, #0xa8]",
+            "b\t<<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "stp\tx22, x26, [x21, #0x60]",
+            "str\tx23, [x21, #0x70]",
+            "ldr\tx9, [sp, #0xd8]",
+            "ldrb\tw8, [x9]",
+            "orr\tw8, w8, w20",
+            "strb\tw8, [x9]",
+            "ldr\tx12, [sp, #0xa8]",
+            "mov\tw13, #0xd8",
+            "ldr\tw22, [sp, #0xd0]",
+            "mov\tw10, #0x0",
+            "mov\tx9, x24",
+            "mov\tx20, x24",
+            "mov\tw8, #0x1",
+            "tbz\tw22, #0x0, <<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "mov\tx22, x10",
+            "madd\tx21, x8, x13, x12",
+            "ldrb\tw8, [x21, #0xd0]",
+            "tbz\tw8, #0x0, <<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "ldrb\tw8, [x21, #0xc4]",
+            "cbz\tw8, <<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "ldr\tx8, [x19, #0x2688]",
+            "cbz\tx8, <<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "ldr\tx26, [x8, #0x80]",
+            "str\txzr, [x8, #0x80]",
+            "ldrb\tw8, [x21, #0xd2]",
+            "str\tw22, [sp, #0xd0]",
+            "cbz\tw8, <<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "sub\tx0, x29, #0x80",
+            "mov\tx1, x19",
+            "ldr\tx2, [sp, #0xb8]",
+            "bl\t<<esp32::bus::SocBus>::camera_dma_data>",
+            "ldur\tx8, [x29, #-0x80]",
+            "cmn\tx8, #0x1",
+            "b.eq\t<<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "ldur\tq0, [x29, #-0x80]",
+            "stur\tq0, [x29, #-0xd0]",
+            "ldur\tx8, [x29, #-0x70]",
+            "stur\tx8, [x29, #-0xc0]",
+            "b\t<<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "mov\tx26, #0x0",
+            "ldrb\tw8, [x21, #0xd2]",
+            "str\tw22, [sp, #0xd0]"
+          ]
+        }
+      ]
+    },
+    {
+      "comparison": "base",
+      "name": "<esp32::bus::SocBus as esp_soc::soc::SocBus>::next_deadline",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 7,
+      "examples": [
+        {
+          "before": "mov\tw8, #0x6a99",
+          "after": "mov\tw8, #0x6aa9"
+        },
+        {
+          "before": "ldr\tx8, [x20, #0x6a90]",
+          "after": "ldr\tx8, [x20, #0x6aa0]"
+        },
+        {
+          "before": "mov\tw8, #0x6a99",
+          "after": "mov\tw8, #0x6aa9"
+        }
+      ]
+    },
+    {
+      "comparison": "base",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::after_round",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 20,
+      "examples": [
+        {
+          "before": "ldrb\tw8, [x20, #0xa98]",
+          "after": "ldrb\tw8, [x20, #0xaa8]"
+        },
+        {
+          "before": "strb\twzr, [x20, #0xa98]",
+          "after": "strb\twzr, [x20, #0xaa8]"
+        },
+        {
+          "before": "ldr\tx9, [x19, #0x6ac0]",
+          "after": "ldr\tx9, [x19, #0x6ad0]"
+        }
+      ]
+    },
+    {
+      "comparison": "base",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::present_irqs",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 15,
+      "examples": [
+        {
+          "before": "ldr\tx9, [x19, #0x6b80]",
+          "after": "ldr\tx9, [x19, #0x6b90]"
+        },
+        {
+          "before": "ldr\tx10, [x19, #0x6b78]",
+          "after": "ldr\tx10, [x19, #0x6b88]"
+        },
+        {
+          "before": "mov\tw9, #0x6e74",
+          "after": "mov\tw9, #0x6e84"
+        }
+      ]
+    },
+    {
+      "comparison": "base",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::run_modeled",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 143,
+      "examples": [
+        {
+          "before": "ldr\tw8, [x24, #0xcc0]",
+          "after": "ldr\tw8, [x24, #0xcd0]"
+        },
+        {
+          "before": "ldr\tw8, [x24, #0xcc4]",
+          "after": "ldr\tw8, [x24, #0xcd4]"
+        },
+        {
+          "before": "mov\tw8, #0x6a98",
+          "after": "mov\tw8, #0x6aa8"
+        }
+      ]
+    },
+    {
+      "comparison": "base",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::run_unmodeled::<false>",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [
+        {
+          "before": {
+            "address": "0x1001eb000",
+            "bytes_hex": "0004004000000000010000001f000000",
+            "sha256": "8439af16ba673956ea7f98bfd003430c76a8e6aa35317e166cce13743da3b059",
+            "instruction_addresses": [
+              "0x1000cdd78",
+              "0x1000cdd7c"
+            ]
+          },
+          "after": {
+            "address": "0x1001ec4c0",
+            "bytes_hex": "0004004000000000010000001f000000",
+            "sha256": "8439af16ba673956ea7f98bfd003430c76a8e6aa35317e166cce13743da3b059",
+            "instruction_addresses": [
+              "0x1000cf138",
+              "0x1000cf13c"
+            ]
+          },
+          "index": 319
+        }
+      ],
+      "changed_field_operands": 121,
+      "examples": [
+        {
+          "before": "ldr\tx8, [x1, #0x6d80]",
+          "after": "ldr\tx8, [x1, #0x6d90]"
+        },
+        {
+          "before": "mov\tw8, #0x6a98",
+          "after": "mov\tw8, #0x6aa8"
+        },
+        {
+          "before": "ldr\tx11, [x1, #0x6d00]",
+          "after": "ldr\tx11, [x1, #0x6d10]"
+        }
+      ]
+    },
+    {
+      "comparison": "base",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::step_core",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 54,
+      "examples": [
+        {
+          "before": "ldr\tx1, [x1, #0x6b80]",
+          "after": "ldr\tx1, [x1, #0x6b90]"
+        },
+        {
+          "before": "ldr\tx8, [x20, #0x6b78]",
+          "after": "ldr\tx8, [x20, #0x6b88]"
+        },
+        {
+          "before": "ldr\tx8, [x20, #0x6d70]",
+          "after": "ldr\tx8, [x20, #0x6d80]"
+        }
+      ]
+    },
+    {
+      "comparison": "base",
+      "name": "<xtensa_lx7::state::Cpu as emu_core::core::Core>::run::<esp32::bus::SocBus>",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 5,
+      "examples": [
+        {
+          "before": "ldr\tx9, [x22, #0x2918]",
+          "after": "ldr\tx9, [x22, #0x2928]"
+        },
+        {
+          "before": "ldr\tx10, [x22, #0x2920]",
+          "after": "ldr\tx10, [x22, #0x2930]"
+        },
+        {
+          "before": "ldr\tx9, [x22, #0x2918]",
+          "after": "ldr\tx9, [x22, #0x2928]"
+        }
+      ]
+    },
+    {
+      "comparison": "base",
+      "name": "xtensa_lx7::block::step_extra::<esp32::bus::SocBus>",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 4,
+      "examples": [
+        {
+          "before": "ldr\tx9, [x22, #0x2918]",
+          "after": "ldr\tx9, [x22, #0x2928]"
+        },
+        {
+          "before": "ldr\tx10, [x22, #0x2920]",
+          "after": "ldr\tx10, [x22, #0x2930]"
+        },
+        {
+          "before": "ldr\tx9, [x22, #0x2918]",
+          "after": "ldr\tx9, [x22, #0x2928]"
+        }
+      ]
+    },
+    {
+      "comparison": "main",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 11,
+      "examples": [
+        {
+          "before": "mov\tw9, #0x2898",
+          "after": "mov\tw9, #0x28a8"
+        },
+        {
+          "before": "mov\tw8, #0x28b0",
+          "after": "mov\tw8, #0x28c0"
+        },
+        {
+          "before": "mov\tw9, #0x2850",
+          "after": "mov\tw9, #0x2860"
+        }
+      ]
+    },
+    {
+      "comparison": "main",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::read32",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 17,
+      "examples": [
+        {
+          "before": "mov\tw8, #0x6a99",
+          "after": "mov\tw8, #0x6aa9"
+        },
+        {
+          "before": "mov\tw9, #0x2898",
+          "after": "mov\tw9, #0x28a8"
+        },
+        {
+          "before": "mov\tw8, #0x28b0",
+          "after": "mov\tw8, #0x28c0"
+        }
+      ]
+    },
+    {
+      "comparison": "main",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::tick",
+      "classification": "active-DMA camera dispatch plus layout/stack/register allocation changes",
+      "instruction_delta": 30,
+      "opcode_delta": {
+        "add": 2,
+        "and": 2,
+        "b": 3,
+        "b.eq": 1,
+        "b.hi": 1,
+        "b.ls": -1,
+        "bl": 2,
+        "cbnz": 1,
+        "cbz": 1,
+        "cmn": 1,
+        "ldp": 2,
+        "ldr": -1,
+        "ldrb": 2,
+        "ldur": 4,
+        "mov": -3,
+        "movk": -5,
+        "stp": 1,
+        "str": 10,
+        "stur": 3,
+        "sub": 4
+      },
+      "camera_call_windows": [
+        {
+          "index": 1005,
+          "instructions": [
+            "add\tx11, x11, #PAGEOFF",
+            "str\tx11, [sp, #0x8]",
+            "ldr\tx24, [sp, #0x40]",
+            "str\tx12, [sp, #0xa8]",
+            "b\t<<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "stp\tx22, x26, [x21, #0x60]",
+            "str\tx23, [x21, #0x70]",
+            "ldr\tx9, [sp, #0xd8]",
+            "ldrb\tw8, [x9]",
+            "orr\tw8, w8, w20",
+            "strb\tw8, [x9]",
+            "ldr\tx12, [sp, #0xa8]",
+            "mov\tw13, #0xd8",
+            "ldr\tw22, [sp, #0xd0]",
+            "mov\tw10, #0x0",
+            "mov\tx9, x24",
+            "mov\tx20, x24",
+            "mov\tw8, #0x1",
+            "tbz\tw22, #0x0, <<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "mov\tx22, x10",
+            "madd\tx21, x8, x13, x12",
+            "ldrb\tw8, [x21, #0xd0]",
+            "tbz\tw8, #0x0, <<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "ldrb\tw8, [x21, #0xc4]",
+            "cbz\tw8, <<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "ldr\tx8, [x19, #0x2688]",
+            "cbz\tx8, <<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "ldr\tx26, [x8, #0x80]",
+            "str\txzr, [x8, #0x80]",
+            "ldrb\tw8, [x21, #0xd2]",
+            "str\tw22, [sp, #0xd0]",
+            "cbz\tw8, <<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "sub\tx0, x29, #0x80",
+            "mov\tx1, x19",
+            "ldr\tx2, [sp, #0xb8]",
+            "bl\t<<esp32::bus::SocBus>::camera_dma_data>",
+            "ldur\tx8, [x29, #-0x80]",
+            "cmn\tx8, #0x1",
+            "b.eq\t<<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "ldur\tq0, [x29, #-0x80]",
+            "stur\tq0, [x29, #-0xd0]",
+            "ldur\tx8, [x29, #-0x70]",
+            "stur\tx8, [x29, #-0xc0]",
+            "b\t<<esp32::bus::SocBus as emu_core::bus::Bus>::tick>",
+            "mov\tx26, #0x0",
+            "ldrb\tw8, [x21, #0xd2]",
+            "str\tw22, [sp, #0xd0]"
+          ]
+        }
+      ]
+    },
+    {
+      "comparison": "main",
+      "name": "<esp32::bus::SocBus as esp_soc::soc::SocBus>::next_deadline",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 7,
+      "examples": [
+        {
+          "before": "mov\tw8, #0x6a99",
+          "after": "mov\tw8, #0x6aa9"
+        },
+        {
+          "before": "ldr\tx8, [x20, #0x6a90]",
+          "after": "ldr\tx8, [x20, #0x6aa0]"
+        },
+        {
+          "before": "mov\tw8, #0x6a99",
+          "after": "mov\tw8, #0x6aa9"
+        }
+      ]
+    },
+    {
+      "comparison": "main",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::after_round",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 20,
+      "examples": [
+        {
+          "before": "ldrb\tw8, [x20, #0xa98]",
+          "after": "ldrb\tw8, [x20, #0xaa8]"
+        },
+        {
+          "before": "strb\twzr, [x20, #0xa98]",
+          "after": "strb\twzr, [x20, #0xaa8]"
+        },
+        {
+          "before": "ldr\tx9, [x19, #0x6ac0]",
+          "after": "ldr\tx9, [x19, #0x6ad0]"
+        }
+      ]
+    },
+    {
+      "comparison": "main",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::present_irqs",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 15,
+      "examples": [
+        {
+          "before": "ldr\tx9, [x19, #0x6b80]",
+          "after": "ldr\tx9, [x19, #0x6b90]"
+        },
+        {
+          "before": "ldr\tx10, [x19, #0x6b78]",
+          "after": "ldr\tx10, [x19, #0x6b88]"
+        },
+        {
+          "before": "mov\tw9, #0x6e74",
+          "after": "mov\tw9, #0x6e84"
+        }
+      ]
+    },
+    {
+      "comparison": "main",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::run_modeled",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 143,
+      "examples": [
+        {
+          "before": "ldr\tw8, [x24, #0xcc0]",
+          "after": "ldr\tw8, [x24, #0xcd0]"
+        },
+        {
+          "before": "ldr\tw8, [x24, #0xcc4]",
+          "after": "ldr\tw8, [x24, #0xcd4]"
+        },
+        {
+          "before": "mov\tw8, #0x6a98",
+          "after": "mov\tw8, #0x6aa8"
+        }
+      ]
+    },
+    {
+      "comparison": "main",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::run_unmodeled::<false>",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 121,
+      "examples": [
+        {
+          "before": "ldr\tx8, [x1, #0x6d80]",
+          "after": "ldr\tx8, [x1, #0x6d90]"
+        },
+        {
+          "before": "mov\tw8, #0x6a98",
+          "after": "mov\tw8, #0x6aa8"
+        },
+        {
+          "before": "ldr\tx11, [x1, #0x6d00]",
+          "after": "ldr\tx11, [x1, #0x6d10]"
+        }
+      ]
+    },
+    {
+      "comparison": "main",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::step_core",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 54,
+      "examples": [
+        {
+          "before": "ldr\tx1, [x1, #0x6b80]",
+          "after": "ldr\tx1, [x1, #0x6b90]"
+        },
+        {
+          "before": "ldr\tx8, [x20, #0x6b78]",
+          "after": "ldr\tx8, [x20, #0x6b88]"
+        },
+        {
+          "before": "ldr\tx8, [x20, #0x6d70]",
+          "after": "ldr\tx8, [x20, #0x6d80]"
+        }
+      ]
+    },
+    {
+      "comparison": "main",
+      "name": "<xtensa_lx7::state::Cpu as emu_core::core::Core>::run::<esp32::bus::SocBus>",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 5,
+      "examples": [
+        {
+          "before": "ldr\tx9, [x22, #0x2918]",
+          "after": "ldr\tx9, [x22, #0x2928]"
+        },
+        {
+          "before": "ldr\tx10, [x22, #0x2920]",
+          "after": "ldr\tx10, [x22, #0x2930]"
+        },
+        {
+          "before": "ldr\tx9, [x22, #0x2918]",
+          "after": "ldr\tx9, [x22, #0x2928]"
+        }
+      ]
+    },
+    {
+      "comparison": "main",
+      "name": "xtensa_lx7::block::step_extra::<esp32::bus::SocBus>",
+      "classification": "same operations/registers/order; +16-byte struct field displacements, equivalent call aliases and verified constant relocations",
+      "verified_constant_loads": [],
+      "changed_field_operands": 4,
+      "examples": [
+        {
+          "before": "ldr\tx9, [x22, #0x2918]",
+          "after": "ldr\tx9, [x22, #0x2928]"
+        },
+        {
+          "before": "ldr\tx10, [x22, #0x2920]",
+          "after": "ldr\tx10, [x22, #0x2930]"
+        },
+        {
+          "before": "ldr\tx9, [x22, #0x2918]",
+          "after": "ldr\tx9, [x22, #0x2928]"
+        }
+      ]
+    }
+  ]
+}

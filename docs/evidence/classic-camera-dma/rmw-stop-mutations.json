@@ -1,0 +1,883 @@
+{
+  "c4": [
+    {
+      "mutation": "zero camera width",
+      "failed_tests": [
+        "i2s::tests::camera_reset_bits_and_fifo_fields_are_live",
+        "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm",
+        "i2s::tests::camera_requires_both_mode_bits_on_port_zero_only",
+        "i2s::tests::camera_driver_config_start_stop_trace"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "unwrap_expectation"
+    },
+    {
+      "mutation": "camera audio clock validation",
+      "failed_tests": [
+        "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "unwrap_expectation"
+    },
+    {
+      "mutation": "port identity",
+      "failed_tests": [
+        "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm",
+        "i2s::tests::camera_requires_both_mode_bits_on_port_zero_only"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "LCD required",
+      "failed_tests": [
+        "i2s::tests::camera_requires_both_mode_bits_on_port_zero_only"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "CAMERA required",
+      "failed_tests": [
+        "i2s::tests::camera_requires_both_mode_bits_on_port_zero_only"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "CONF2 offset",
+      "failed_tests": [
+        "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm",
+        "i2s::tests::camera_reset_bits_and_fifo_fields_are_live",
+        "i2s::tests::camera_driver_config_start_stop_trace",
+        "i2s::tests::camera_requires_both_mode_bits_on_port_zero_only"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "unwrap_expectation"
+    },
+    {
+      "mutation": "RX reset",
+      "failed_tests": [
+        "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "RX FIFO reset",
+      "failed_tests": [
+        "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "TX reset isolation",
+      "failed_tests": [
+        "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "LC input reset",
+      "failed_tests": [
+        "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "LC AHB FIFO reset",
+      "failed_tests": [
+        "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "LC AHB reset",
+      "failed_tests": [
+        "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "TX LC reset isolation",
+      "failed_tests": [
+        "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "start bit",
+      "failed_tests": [
+        "i2s::tests::camera_reset_bits_and_fifo_fields_are_live",
+        "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm",
+        "i2s::tests::camera_driver_config_start_stop_trace"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "reset gates start",
+      "failed_tests": [
+        "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "slave bit",
+      "failed_tests": [
+        "i2s::tests::camera_driver_config_start_stop_trace"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "FIFO mode",
+      "failed_tests": [
+        "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "descriptor enable",
+      "failed_tests": [
+        "i2s::tests::camera_driver_config_start_stop_trace"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "forced mode",
+      "failed_tests": [
+        "i2s::tests::camera_driver_config_start_stop_trace"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "camera bypass",
+      "failed_tests": [
+        "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm",
+        "i2s::tests::camera_driver_config_start_stop_trace"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "audio rate disabled",
+      "failed_tests": [
+        "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm",
+        "i2s::tests::camera_driver_config_start_stop_trace"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "audio producer stopped",
+      "failed_tests": [
+        "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm",
+        "i2s::tests::camera_driver_config_start_stop_trace"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "mode write synchronizes",
+      "failed_tests": [
+        "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    }
+  ],
+  "c5": [
+    {
+      "mutation": "mode1 sample ordering",
+      "failed_tests": [
+        "camera_fifo::tests::camera_fifo_exact_little_endian_words",
+        "camera_fifo::tests::camera_fifo_row_tail_is_not_next_row",
+        "camera_fifo::tests::camera_fifo_rgb565_yuv_and_grayscale",
+        "camera_fifo::tests::camera_fifo_reset_discards_partial_word"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "mode3 sample lane",
+      "failed_tests": [
+        "camera_fifo::tests::camera_fifo_reset_discards_partial_word",
+        "camera_fifo::tests::camera_fifo_rgb565_yuv_and_grayscale",
+        "camera_fifo::tests::camera_fifo_exact_little_endian_words",
+        "camera_fifo::tests::camera_fifo_row_tail_is_not_next_row"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "mode1 zero padding",
+      "failed_tests": [
+        "camera_fifo::tests::camera_fifo_exact_little_endian_words",
+        "camera_fifo::tests::camera_fifo_reset_discards_partial_word"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "mode3 zero padding",
+      "failed_tests": [
+        "camera_fifo::tests::camera_fifo_exact_little_endian_words"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "split carry",
+      "failed_tests": [
+        "camera_fifo::tests::camera_fifo_arbitrary_splits_and_empty_chunks"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "row tail emission",
+      "failed_tests": [
+        "camera_fifo::tests::camera_fifo_row_tail_is_not_next_row"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "row tail lane",
+      "failed_tests": [
+        "camera_fifo::tests::camera_fifo_row_tail_is_not_next_row"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "row boundary consumes tail",
+      "failed_tests": [
+        "camera_fifo::tests::camera_fifo_row_tail_is_not_next_row"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "reset discards tail",
+      "failed_tests": [
+        "camera_fifo::tests::camera_fifo_reset_discards_partial_word"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "reject overlap mode zero",
+      "failed_tests": [
+        "camera_fifo::tests::camera_fifo_rejects_every_unsupported_mode"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "reject mode two",
+      "failed_tests": [
+        "camera_fifo::tests::camera_fifo_rejects_every_unsupported_mode"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "mode3 differs from mode1",
+      "failed_tests": [
+        "camera_fifo::tests::camera_fifo_row_tail_is_not_next_row",
+        "camera_fifo::tests::camera_fifo_exact_little_endian_words",
+        "camera_fifo::tests::camera_fifo_rgb565_yuv_and_grayscale",
+        "camera_fifo::tests::camera_fifo_reset_discards_partial_word"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    }
+  ],
+  "c6": [
+    {
+      "mutation": "vsync-pin",
+      "failed_tests": [
+        "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "pulse-shorter-than-isr",
+      "failed_tests": [
+        "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "missing-deadline",
+      "failed_tests": [
+        "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "unwrap_expectation"
+    },
+    {
+      "mutation": "vsync-stuck-low",
+      "failed_tests": [
+        "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "vsync-stuck-high",
+      "failed_tests": [
+        "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "first-edge-too-early",
+      "failed_tests": [
+        "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "capture-start-gates-vsync",
+      "failed_tests": [
+        "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "unwrap_expectation"
+    },
+    {
+      "mutation": "no-gpio-delivery",
+      "failed_tests": [
+        "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "no-board-deadline-in-scheduler",
+      "failed_tests": [
+        "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "dma-write-before-transport",
+      "failed_tests": [
+        "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "vsync-power-ignored",
+      "failed_tests": [
+        "c6_power_clock_and_sensor_stop_cancel_and_restart_vsync"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "vsync-xclk-ignored",
+      "failed_tests": [
+        "c6_power_clock_and_sensor_stop_cancel_and_restart_vsync"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "vsync-stream-ignored",
+      "failed_tests": [
+        "c6_power_clock_and_sensor_stop_cancel_and_restart_vsync"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "stop-retains-high",
+      "failed_tests": [
+        "c6_power_clock_and_sensor_stop_cancel_and_restart_vsync"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "stop-retains-deadline",
+      "failed_tests": [
+        "c6_power_clock_and_sensor_stop_cancel_and_restart_vsync"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "edge-timestamps-lost",
+      "failed_tests": [
+        "c6_deadline_edges_preserve_timestamps_and_large_steps"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "skip-intermediate-edges",
+      "failed_tests": [
+        "c6_deadline_edges_preserve_timestamps_and_large_steps"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "data-wire-unqualified",
+      "failed_tests": [
+        "c6_physical_routes_inversion_and_reconfiguration"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "clock-wire-unqualified",
+      "failed_tests": [
+        "c6_physical_routes_inversion_and_reconfiguration"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "href-wire-unqualified",
+      "failed_tests": [
+        "c6_physical_routes_inversion_and_reconfiguration"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "vsync-wire-unqualified",
+      "failed_tests": [
+        "c6_physical_routes_inversion_and_reconfiguration"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "control-polarity-ignored",
+      "failed_tests": [
+        "c6_physical_routes_inversion_and_reconfiguration"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "ignore-data-inversion",
+      "failed_tests": [
+        "c6_physical_routes_inversion_and_reconfiguration"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "ignore-enable",
+      "failed_tests": [
+        "c6_physical_routes_inversion_and_reconfiguration"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "pad-input-disable-ignored",
+      "failed_tests": [
+        "c6_physical_routes_inversion_and_reconfiguration"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "pad-function-ignored",
+      "failed_tests": [
+        "c6_physical_routes_inversion_and_reconfiguration"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "rx-start-ignored",
+      "failed_tests": [
+        "c6_receiver_unarmed_reset_and_modes_withhold_routed_frames"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "rx-slave-ignored",
+      "failed_tests": [
+        "c6_receiver_unarmed_reset_and_modes_withhold_routed_frames"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "rx-descriptor-ignored",
+      "failed_tests": [
+        "c6_receiver_unarmed_reset_and_modes_withhold_routed_frames"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "rx-force-ignored",
+      "failed_tests": [
+        "c6_receiver_unarmed_reset_and_modes_withhold_routed_frames"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "rx-fifo-mode-ignored",
+      "failed_tests": [
+        "c6_receiver_unarmed_reset_and_modes_withhold_routed_frames"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "rx-clock-gate-ignored",
+      "failed_tests": [
+        "c6_receiver_unarmed_reset_and_modes_withhold_routed_frames"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "camera-free-input-poll",
+      "failed_tests": [
+        "c6_camera_free_has_no_producer_deadlines_or_steps"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "camera-free-deadline-poll",
+      "failed_tests": [
+        "c6_camera_free_has_no_producer_deadlines_or_steps"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "non-camera-clock-poll",
+      "failed_tests": [
+        "c6_active_non_camera_board_never_queries_camera_clock"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    }
+  ],
+  "c7": [
+    {
+      "mutation": "peripheral reset preserves stale frame",
+      "failed_tests": [
+        "c7::c7_dport_reset_drops_capture_and_requires_fresh_inlink"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "camera-free board polling",
+      "failed_tests": [
+        "c7::c7_camera_free_active_pcm_does_not_poll_board_camera"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "camera dispatch cache missing",
+      "failed_tests": [
+        "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
+        "c7::c7_mid_frame_route_or_power_loss_is_terminal_until_rearm",
+        "c7::c7_rx_disable_rmw_stop_and_reenable_requires_fresh_start",
+        "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+        "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+        "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start",
+        "c7::c7_reacquire_next_image_on_reused_ring",
+        "c7::c7_bad_owner_forbidden_descriptor_and_buffer_never_eof",
+        "c7::c7_dport_reset_drops_capture_and_requires_fresh_inlink"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "transport disabled",
+      "failed_tests": [
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+        "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start",
+        "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+        "c7::c7_rx_disable_rmw_stop_and_reenable_requires_fresh_start",
+        "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "ignore VSYNC arm",
+      "failed_tests": [
+        "c7::c7_tick_split_invariance_and_late_arm_waits_vsync"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "charge pulse as pixels",
+      "failed_tests": [
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "lose fractional word position",
+      "failed_tests": [
+        "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "wrong frame rate",
+      "failed_tests": [
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
+        "c7::c7_ring_starvation_and_finite_guest_service_reuse"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "do not consume byte position",
+      "failed_tests": [
+        "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "drop final boundary word",
+      "failed_tests": [
+        "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start",
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+        "c7::c7_reacquire_next_image_on_reused_ring",
+        "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+        "c7::c7_rx_disable_rmw_stop_and_reenable_requires_fresh_start",
+        "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+        "c7::c7_dport_reset_drops_capture_and_requires_fresh_inlink",
+        "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "wrong FIFO mode",
+      "failed_tests": [
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+        "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+        "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start",
+        "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+        "c7::c7_reacquire_next_image_on_reused_ring",
+        "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "route loss not terminal",
+      "failed_tests": [
+        "c7::c7_mid_frame_route_or_power_loss_is_terminal_until_rearm"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "RX resets keep DMA running",
+      "failed_tests": [
+        "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "START command retained in readback",
+      "failed_tests": [
+        "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start",
+        "c7::c7_rx_disable_rmw_stop_and_reenable_requires_fresh_start"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "inlink stop ignored",
+      "failed_tests": [
+        "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start",
+        "c7::c7_rx_disable_rmw_stop_and_reenable_requires_fresh_start",
+        "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "wrong EOF count unit",
+      "failed_tests": [
+        "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+        "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start",
+        "c7::c7_rx_disable_rmw_stop_and_reenable_requires_fresh_start",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
+        "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+        "c7::c7_mid_frame_route_or_power_loss_is_terminal_until_rearm",
+        "c7::c7_reacquire_next_image_on_reused_ring",
+        "c7::c7_bad_owner_forbidden_descriptor_and_buffer_never_eof"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "wrong EOF descriptor register",
+      "failed_tests": [
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
+        "c7::c7_ring_starvation_and_finite_guest_service_reuse"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "wrong classic IRQ mapping",
+      "failed_tests": [
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+        "c7::c7_dport_reset_drops_capture_and_requires_fresh_inlink",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
+        "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+        "c7::c7_reacquire_next_image_on_reused_ring",
+        "c7::c7_rx_disable_rmw_stop_and_reenable_requires_fresh_start",
+        "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+        "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "owner check bypassed",
+      "failed_tests": [
+        "c7::c7_bad_owner_forbidden_descriptor_and_buffer_never_eof",
+        "c7::c7_ring_starvation_and_finite_guest_service_reuse"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "owner not returned",
+      "failed_tests": [
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+        "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+        "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start",
+        "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+        "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+        "c7::c7_rx_disable_rmw_stop_and_reenable_requires_fresh_start",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "length not written",
+      "failed_tests": [
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+        "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+        "c7::c7_rx_disable_rmw_stop_and_reenable_requires_fresh_start",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
+        "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+        "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "EOF flag not written",
+      "failed_tests": [
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+        "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+        "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+        "c7::c7_rx_disable_rmw_stop_and_reenable_requires_fresh_start",
+        "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "wrong descriptor advance",
+      "failed_tests": [
+        "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+        "c7::c7_reacquire_next_image_on_reused_ring",
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "DRAM rule admits CPU-only prefix",
+      "failed_tests": [
+        "c7::c7_bad_owner_forbidden_descriptor_and_buffer_never_eof"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "mode1 sensor sample ordering",
+      "failed_tests": [
+        "c7::c7_rx_disable_rmw_stop_and_reenable_requires_fresh_start",
+        "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start",
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
+        "c7::c7_tick_split_invariance_and_late_arm_waits_vsync",
+        "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame",
+        "c7::c7_reacquire_next_image_on_reused_ring",
+        "c7::c7_ring_starvation_and_finite_guest_service_reuse",
+        "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    },
+    {
+      "mutation": "mode3 sensor sample lane",
+      "failed_tests": [
+        "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start",
+        "c7::c7_rx_disable_rmw_stop_and_reenable_requires_fresh_start",
+        "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq"
+      ],
+      "runtime_semantic_killed": true,
+      "failure_kind": "assertion_or_explicit_panic_guard"
+    }
+  ]
+}

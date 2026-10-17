@@ -240,3 +240,55 @@ fn c7_dport_reset_drops_capture_and_requires_fresh_inlink() {
     tick_bus(&mut b,FRAME_CYCLES-VSYNC_CYCLES);
     assert_eq!(raw(&mut b)&EOF,EOF);
 }
+
+#[test]
+fn c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start() {
+    rmw_stop(false);
+}
+#[test]
+fn c7_rx_disable_rmw_stop_and_reenable_requires_fresh_start() {
+    rmw_stop(true);
+}
+fn rmw_stop(disable_rx: bool) {
+    for mode in [1,3] {
+        let mut b=setup(mode);
+        let size=if mode==1 {64}else{128};
+        descriptor(&mut b,0,size,0); arm(&mut b,size/4); begin(&mut b);
+        let active=FRAME_CYCLES-VSYNC_CYCLES;
+        tick_bus(&mut b,active/4);
+        assert_eq!(raw(&mut b),0);
+        assert_ne!(bytes(&mut b,B,16),[0;16],"capture actually started");
+        if disable_rx {
+            let conf=b.read32(I+8).unwrap();
+            put(&mut b,I+8,conf & !(1<<5));
+        }
+        // Volatile bitfield STOP, as in IDF and esp32-camera ll_cam_stop.
+        let inlink=b.read32(I+0x34).unwrap();
+        put(&mut b,I+0x34,inlink | (1<<28));
+        let stopped=bytes(&mut b,B,size);
+        let desc=b.read32(D).unwrap();
+        let eof_desc=b.read32(I+0x3c).unwrap();
+        // Re-enabling RX alone must not re-arm the stopped inlink.
+        if disable_rx {
+            let conf=b.read32(I+8).unwrap();
+            put(&mut b,I+8,conf | (1<<5));
+        }
+        tick_bus(&mut b,active*3/4);
+        begin(&mut b); tick_bus(&mut b,active);
+        assert_eq!(raw(&mut b),0,"RMW STOP requires explicit new START");
+        assert_eq!(b.read32(I+0x10).unwrap(),0);
+        assert_eq!(b.read32(I+0x3c).unwrap(),eof_desc);
+        assert_eq!(b.read32(D).unwrap(),desc);
+        assert_eq!(bytes(&mut b,B,size),stopped);
+        // Fresh START, after explicitly clearing other commands, and a new
+        // physical VSYNC recover the full frame, never a partial old frame.
+        descriptor(&mut b,0,size,0);
+        let inlink=b.read32(I+0x34).unwrap();
+        put(&mut b,I+0x34,(inlink & !(7<<28)) | (1<<29));
+        begin(&mut b); tick_bus(&mut b,active);
+        assert_eq!(raw(&mut b),DONE|EOF);
+        assert_eq!(b.read32(D).unwrap(),size|(size<<12)|(1<<30));
+        let pattern=if mode==1 {vec![0,0,248,0]}else{vec![0,0,248,0,0,0,0,0]};
+        assert_eq!(bytes(&mut b,B,size),pattern.repeat(16));
+    }
+}

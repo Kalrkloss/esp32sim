@@ -171,6 +171,12 @@ impl Device for ClassicI2s {
         match off {
             0x14 | 0x18 => { Device::write(&mut self.inner, off, value); }
             0x34 => {
+                // ESP32 TRM v5.8, section 2.6 (I2S DMA): INLINK_START is
+                // self-cleared by hardware. Consume it synchronously, so a later
+                // volatile RMW (notably IDF v4.4.7 i2s_ll.h:535-538 STOP)
+                // cannot replay a stale START. Keep the descriptor address.
+                // No new priority rule for explicitly combined commands is inferred.
+                self.ram.write(off, value & !(1 << 29));
                 if value & (1 << 28) != 0 { self.dma.running = false; }
                 if value & (3 << 29) != 0 { self.dma.desc = 0x3ff0_0000 | (value & 0xfffff); self.dma.buf_pos = 0; self.dma.rx_eof_pos = 0; self.dma.running = true; }
             }
@@ -274,6 +280,34 @@ mod tests {
         b.write32(base + 0x1c, 0).unwrap();
         rmw(b, base, 0x1c, 0, 1 << 21);
     }
+    #[test]
+    fn inlink_start_self_clears_without_replaying_on_rmw() {
+        for port in 0..2 {
+            let mut i=ClassicI2s::for_port(port); // includes PCM-only I2S1
+            i.write(0x34,0xb0000 | (1<<29));
+            assert!(i.dma.running);
+            assert_eq!(i.dma.desc,0x3ffb_0000);
+            assert_eq!(i.read(0x34)&((1<<29)|0xfffff),0xb0000);
+            i.dma.buf_pos=16;
+            i.dma.rx_eof_pos=16;
+            // An address-only RMW must not silently replay START/reset progress.
+            let old=i.read(0x34);
+            i.write(0x34,(old & !0xfffff)|0xb0020);
+            assert!(i.dma.running);
+            assert_eq!((i.dma.desc,i.dma.buf_pos,i.dma.rx_eof_pos),(0x3ffb_0000,16,16));
+            let old=i.read(0x34);
+            i.write(0x34,old | (1<<28));
+            assert!(!i.dma.running);
+            assert_eq!(i.read(0x34)&(1<<29),0);
+            // Explicit new START is still accepted, using the updated address.
+            let old=i.read(0x34);
+            i.write(0x34,(old & !(7<<28)) | (1<<29));
+            assert!(i.dma.running);
+            assert_eq!((i.dma.desc,i.dma.buf_pos,i.dma.rx_eof_pos),(0x3ffb_0020,0,0));
+            assert_eq!(i.read(0x34)&(1<<29),0);
+        }
+    }
+
     #[test]
     fn camera_driver_config_start_stop_trace() {
         for mode in [1, 3] {

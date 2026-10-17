@@ -19,6 +19,7 @@ cases=[
  ('wrong FIFO mode',cam,'CameraFifo::new(rx.fifo_mode)','CameraFifo::new(3)'),
  ('route loss not terminal',cam,'self.periph.i2s[0].abort_camera_dma();','self.periph.i2s[0].camera = None;'),
  ('RX resets keep DMA running',i2s,'self.dma.running = false;\n                self.dma.buf_pos = 0;','self.dma.running = true;\n                self.dma.buf_pos = 0;'),
+ ('START command retained in readback',i2s,'self.ram.write(off, value & !(1 << 29));','self.ram.write(off, value);'),
  ('inlink stop ignored',i2s,'if value & (1 << 28) != 0 { self.dma.running = false; }','if value & (1 << 28) != 0 { self.dma.running = true; }'),
  ('wrong EOF count unit',i2s,'ram.read(0x24).checked_mul(4)','ram.read(0x24).checked_mul(1)'),
  ('wrong EOF descriptor register',i2s,'self.ram.write(0x3c, eof_desc)','self.ram.write(0x3c, 0)'),
