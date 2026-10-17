@@ -1,0 +1,1557 @@
+{
+  "base": "142805d5399e0c3cf25995fe21ba524e75a2b3cb",
+  "method": "EX230 asmcmp: addresses/page relocations and equivalent call aliases normalized; selected hot functions, not entire binary equivalence",
+  "selector": "(Machine<esp32(?:::|s3::|c3::|c6::).*>::(?:run|step_core|after_round|present_irqs)|esp32(?:::|s3::|c3::|c6::)bus::SocBus.*::(?:tick|read32|write32|fetch|next_deadline)|(?:xtensa_lx7|riscv_rv32)::.*::(?:run|step|exec).*esp32(?:::|s3::|c3::|c6::)bus::SocBus)",
+  "artifacts": [
+    {
+      "label": "base",
+      "binary": "esp32sim",
+      "sha256": "f2233ae632a0833c0fe249d846a0644d0de9fdd43e8635f386f8df8325fb80dc",
+      "disassembly_sha256": "7547c91e024989b1a4784618655ca97a2e723e99ef21852c9437d61d96a1cad2"
+    },
+    {
+      "label": "candidate",
+      "binary": "esp32sim",
+      "sha256": "3cf12a222092bec49f89a627687b050e8d39fed95087b96b74de2c9abb85b510",
+      "disassembly_sha256": "e4aeb81043168d81ead3edb98e26838366e7ec0273858ee9bebf20357a41a6f1"
+    },
+    {
+      "label": "base",
+      "binary": "esp32sim-c3",
+      "sha256": "b136b7c9cc4510ab83c0c489c59d941f2cc9afd9a8f09e2ac50147645b068fae",
+      "disassembly_sha256": "459ea153b14aad403c77333c802bb60ef35b56aea7ff34c12a6f00717651f630"
+    },
+    {
+      "label": "candidate",
+      "binary": "esp32sim-c3",
+      "sha256": "3ab031d0953cebdc1d05aa0641948a0a13f67e1d503543836a3b3ea6a22f3d0f",
+      "disassembly_sha256": "4d2f9832aeec489b5fa62b077d68f8201acc9aec0b32db44899ef41ff0c86bb1"
+    },
+    {
+      "label": "base",
+      "binary": "esp32sim-c6",
+      "sha256": "684c5e37732eb13cbf32edacf7eaafea04bb2fc6bb57ad4086ebf25960bc7a2e",
+      "disassembly_sha256": "98dee49da6929da391afe2328c913c61f4211a71c370e4a23ca58bdd323a116f"
+    },
+    {
+      "label": "candidate",
+      "binary": "esp32sim-c6",
+      "sha256": "657137924993bc7edfd4719656c5a6679144ef11d9e2c588a492e9a6f4c70bd8",
+      "disassembly_sha256": "0608b5e0727f5d1a1bcc5d69076c433025aba24527f5e6d4d6cc8b09ee992db0"
+    }
+  ],
+  "rows": [
+    {
+      "binary": "esp32sim",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "same": true,
+      "base_instructions": 122,
+      "candidate_instructions": 122
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 171,
+      "candidate_instructions": 171
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::tick",
+      "same": true,
+      "base_instructions": 2207,
+      "candidate_instructions": 2207
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32::bus::SocBus as esp_soc::soc::SocBus>::next_deadline",
+      "same": true,
+      "base_instructions": 817,
+      "candidate_instructions": 817
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32c3::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "same": true,
+      "base_instructions": 103,
+      "candidate_instructions": 103
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32c3::bus::SocBus as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 114,
+      "candidate_instructions": 114
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32c3::bus::SocBus as emu_core::bus::Bus>::tick",
+      "same": true,
+      "base_instructions": 279,
+      "candidate_instructions": 279
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32c3::bus::SocBus as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 56,
+      "candidate_instructions": 56
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32c3::bus::SocBus as esp_soc::soc::SocBus>::next_deadline",
+      "same": true,
+      "base_instructions": 194,
+      "candidate_instructions": 194
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32c3::bus::SocBus>::tick_with_pins",
+      "same": true,
+      "base_instructions": 475,
+      "candidate_instructions": 475
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32c6::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "same": true,
+      "base_instructions": 106,
+      "candidate_instructions": 106
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32c6::bus::SocBus as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 96,
+      "candidate_instructions": 96
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32c6::bus::SocBus as emu_core::bus::Bus>::tick",
+      "same": true,
+      "base_instructions": 1983,
+      "candidate_instructions": 1983
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32c6::bus::SocBus as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 48,
+      "candidate_instructions": 48
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32c6::bus::SocBus as esp_soc::soc::SocBus>::next_deadline",
+      "same": true,
+      "base_instructions": 298,
+      "candidate_instructions": 298
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32s3::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "same": true,
+      "base_instructions": 102,
+      "candidate_instructions": 102
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32s3::bus::SocBus as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 235,
+      "candidate_instructions": 235
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32s3::bus::SocBus as emu_core::bus::Bus>::tick",
+      "same": true,
+      "base_instructions": 26,
+      "candidate_instructions": 26
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32s3::bus::SocBus as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 315,
+      "candidate_instructions": 315
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32s3::bus::SocBus>::read32_access::<false>",
+      "same": true,
+      "base_instructions": 128,
+      "candidate_instructions": 128
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32s3::bus::SocBus>::tick_impl",
+      "same": true,
+      "base_instructions": 3686,
+      "candidate_instructions": 3686
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp32s3::bus::SocBus>::write32_access::<false>",
+      "same": true,
+      "base_instructions": 199,
+      "candidate_instructions": 199
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::after_round",
+      "same": true,
+      "base_instructions": 84,
+      "candidate_instructions": 84
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::present_irqs",
+      "same": true,
+      "base_instructions": 234,
+      "candidate_instructions": 234
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::run_modeled",
+      "same": true,
+      "base_instructions": 3445,
+      "candidate_instructions": 3445
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::run_unmodeled::<false>",
+      "same": true,
+      "base_instructions": 1708,
+      "candidate_instructions": 1708
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::step_core",
+      "same": true,
+      "base_instructions": 838,
+      "candidate_instructions": 838
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::after_round",
+      "same": true,
+      "base_instructions": 84,
+      "candidate_instructions": 84
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::present_irqs",
+      "same": true,
+      "base_instructions": 119,
+      "candidate_instructions": 119
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::run",
+      "same": true,
+      "base_instructions": 4319,
+      "candidate_instructions": 4319
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::run_unmodeled::<false>",
+      "same": true,
+      "base_instructions": 1048,
+      "candidate_instructions": 1048
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::step_core",
+      "same": true,
+      "base_instructions": 463,
+      "candidate_instructions": 463
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::after_round",
+      "same": true,
+      "base_instructions": 92,
+      "candidate_instructions": 92
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::present_irqs",
+      "same": true,
+      "base_instructions": 120,
+      "candidate_instructions": 120
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::run",
+      "same": true,
+      "base_instructions": 4325,
+      "candidate_instructions": 4325
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::run_unmodeled::<false>",
+      "same": true,
+      "base_instructions": 1053,
+      "candidate_instructions": 1053
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::step_core",
+      "same": true,
+      "base_instructions": 465,
+      "candidate_instructions": 465
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::after_round",
+      "same": true,
+      "base_instructions": 116,
+      "candidate_instructions": 116
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::present_irqs",
+      "same": true,
+      "base_instructions": 247,
+      "candidate_instructions": 247
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::run_modeled",
+      "same": true,
+      "base_instructions": 3379,
+      "candidate_instructions": 3379
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::run_unmodeled::<false>",
+      "same": true,
+      "base_instructions": 3339,
+      "candidate_instructions": 3339
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::step_core",
+      "same": true,
+      "base_instructions": 992,
+      "candidate_instructions": 992
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus> as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 37,
+      "candidate_instructions": 37
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus> as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 40,
+      "candidate_instructions": 40
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32c3::bus::SocBus> as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 37,
+      "candidate_instructions": 37
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32c3::bus::SocBus> as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 90,
+      "candidate_instructions": 90
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32c6::bus::SocBus> as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 37,
+      "candidate_instructions": 37
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32c6::bus::SocBus> as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 87,
+      "candidate_instructions": 87
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus> as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 37,
+      "candidate_instructions": 37
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus> as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 35,
+      "candidate_instructions": 35
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<xtensa_lx7::state::Cpu as emu_core::core::Core>::run::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 706,
+      "candidate_instructions": 706
+    },
+    {
+      "binary": "esp32sim",
+      "name": "<xtensa_lx7::state::Cpu as emu_core::core::Core>::run::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 948,
+      "candidate_instructions": 948
+    },
+    {
+      "binary": "esp32sim",
+      "name": "riscv_rv32::exec::step_outcome::<esp32c3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 846,
+      "candidate_instructions": 846
+    },
+    {
+      "binary": "esp32sim",
+      "name": "riscv_rv32::exec::step_outcome::<esp32c6::bus::SocBus>",
+      "same": true,
+      "base_instructions": 846,
+      "candidate_instructions": 846
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::block::step_extra::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 143,
+      "candidate_instructions": 143
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::block::step_extra::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 143,
+      "candidate_instructions": 143
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::exec::exec_insn::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 2566,
+      "candidate_instructions": 2566
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::exec::exec_insn::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 2562,
+      "candidate_instructions": 2562
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::exec::exec_insn::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 2562,
+      "candidate_instructions": 2562
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::exec::exec_insn::<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 2562,
+      "candidate_instructions": 2562
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::exec::exec_mac16::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 208,
+      "candidate_instructions": 208
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::exec::exec_mac16::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 208,
+      "candidate_instructions": 208
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::exec::exec_mac16::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 261,
+      "candidate_instructions": 261
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::exec::exec_mac16::<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 261,
+      "candidate_instructions": 261
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::pie::exec::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 468,
+      "candidate_instructions": 468
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::pie::exec::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 467,
+      "candidate_instructions": 467
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::pie::exec::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 776,
+      "candidate_instructions": 776
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::pie::exec::<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 768,
+      "candidate_instructions": 768
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::pie::exec_table::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 4774,
+      "candidate_instructions": 4774
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::pie::exec_table::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 4741,
+      "candidate_instructions": 4741
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::pie::exec_table::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 5721,
+      "candidate_instructions": 5721
+    },
+    {
+      "binary": "esp32sim",
+      "name": "xtensa_lx7::pie::exec_table::<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 5723,
+      "candidate_instructions": 5723
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "same": true,
+      "base_instructions": 122,
+      "candidate_instructions": 122
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 171,
+      "candidate_instructions": 171
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::tick",
+      "same": true,
+      "base_instructions": 2207,
+      "candidate_instructions": 2207
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32::bus::SocBus as esp_soc::soc::SocBus>::next_deadline",
+      "same": true,
+      "base_instructions": 817,
+      "candidate_instructions": 817
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32c3::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "same": true,
+      "base_instructions": 103,
+      "candidate_instructions": 103
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32c3::bus::SocBus as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 114,
+      "candidate_instructions": 114
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32c3::bus::SocBus as emu_core::bus::Bus>::tick",
+      "same": true,
+      "base_instructions": 279,
+      "candidate_instructions": 279
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32c3::bus::SocBus as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 56,
+      "candidate_instructions": 56
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32c3::bus::SocBus as esp_soc::soc::SocBus>::next_deadline",
+      "same": true,
+      "base_instructions": 194,
+      "candidate_instructions": 194
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32c3::bus::SocBus>::tick_with_pins",
+      "same": true,
+      "base_instructions": 475,
+      "candidate_instructions": 475
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32c6::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "same": true,
+      "base_instructions": 106,
+      "candidate_instructions": 106
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32c6::bus::SocBus as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 96,
+      "candidate_instructions": 96
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32c6::bus::SocBus as emu_core::bus::Bus>::tick",
+      "same": true,
+      "base_instructions": 1983,
+      "candidate_instructions": 1983
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32c6::bus::SocBus as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 48,
+      "candidate_instructions": 48
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32c6::bus::SocBus as esp_soc::soc::SocBus>::next_deadline",
+      "same": true,
+      "base_instructions": 298,
+      "candidate_instructions": 298
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32s3::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "same": true,
+      "base_instructions": 102,
+      "candidate_instructions": 102
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32s3::bus::SocBus as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 235,
+      "candidate_instructions": 235
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32s3::bus::SocBus as emu_core::bus::Bus>::tick",
+      "same": true,
+      "base_instructions": 26,
+      "candidate_instructions": 26
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32s3::bus::SocBus as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 315,
+      "candidate_instructions": 315
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32s3::bus::SocBus>::read32_access::<false>",
+      "same": true,
+      "base_instructions": 128,
+      "candidate_instructions": 128
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32s3::bus::SocBus>::tick_impl",
+      "same": true,
+      "base_instructions": 3686,
+      "candidate_instructions": 3686
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp32s3::bus::SocBus>::write32_access::<false>",
+      "same": true,
+      "base_instructions": 199,
+      "candidate_instructions": 199
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::after_round",
+      "same": true,
+      "base_instructions": 84,
+      "candidate_instructions": 84
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::present_irqs",
+      "same": true,
+      "base_instructions": 234,
+      "candidate_instructions": 234
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::run_modeled",
+      "same": true,
+      "base_instructions": 3445,
+      "candidate_instructions": 3445
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::run_unmodeled::<false>",
+      "same": true,
+      "base_instructions": 1708,
+      "candidate_instructions": 1708
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::step_core",
+      "same": true,
+      "base_instructions": 838,
+      "candidate_instructions": 838
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::after_round",
+      "same": true,
+      "base_instructions": 84,
+      "candidate_instructions": 84
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::present_irqs",
+      "same": true,
+      "base_instructions": 119,
+      "candidate_instructions": 119
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::run",
+      "same": true,
+      "base_instructions": 4319,
+      "candidate_instructions": 4319
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::run_unmodeled::<false>",
+      "same": true,
+      "base_instructions": 1048,
+      "candidate_instructions": 1048
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::step_core",
+      "same": true,
+      "base_instructions": 463,
+      "candidate_instructions": 463
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::after_round",
+      "same": true,
+      "base_instructions": 92,
+      "candidate_instructions": 92
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::present_irqs",
+      "same": true,
+      "base_instructions": 120,
+      "candidate_instructions": 120
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::run",
+      "same": true,
+      "base_instructions": 4325,
+      "candidate_instructions": 4325
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::run_unmodeled::<false>",
+      "same": true,
+      "base_instructions": 1053,
+      "candidate_instructions": 1053
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::step_core",
+      "same": true,
+      "base_instructions": 465,
+      "candidate_instructions": 465
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::after_round",
+      "same": true,
+      "base_instructions": 116,
+      "candidate_instructions": 116
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::present_irqs",
+      "same": true,
+      "base_instructions": 247,
+      "candidate_instructions": 247
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::run_modeled",
+      "same": true,
+      "base_instructions": 3379,
+      "candidate_instructions": 3379
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::run_unmodeled::<false>",
+      "same": true,
+      "base_instructions": 3339,
+      "candidate_instructions": 3339
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::step_core",
+      "same": true,
+      "base_instructions": 992,
+      "candidate_instructions": 992
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus> as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 37,
+      "candidate_instructions": 37
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus> as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 40,
+      "candidate_instructions": 40
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32c3::bus::SocBus> as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 37,
+      "candidate_instructions": 37
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32c3::bus::SocBus> as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 90,
+      "candidate_instructions": 90
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32c6::bus::SocBus> as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 37,
+      "candidate_instructions": 37
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32c6::bus::SocBus> as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 87,
+      "candidate_instructions": 87
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus> as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 37,
+      "candidate_instructions": 37
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus> as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 35,
+      "candidate_instructions": 35
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<xtensa_lx7::state::Cpu as emu_core::core::Core>::run::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 706,
+      "candidate_instructions": 706
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "<xtensa_lx7::state::Cpu as emu_core::core::Core>::run::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 948,
+      "candidate_instructions": 948
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "riscv_rv32::exec::step_outcome::<esp32c3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 846,
+      "candidate_instructions": 846
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "riscv_rv32::exec::step_outcome::<esp32c6::bus::SocBus>",
+      "same": true,
+      "base_instructions": 846,
+      "candidate_instructions": 846
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::block::step_extra::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 143,
+      "candidate_instructions": 143
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::block::step_extra::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 143,
+      "candidate_instructions": 143
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::exec::exec_insn::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 2566,
+      "candidate_instructions": 2566
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::exec::exec_insn::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 2562,
+      "candidate_instructions": 2562
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::exec::exec_insn::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 2562,
+      "candidate_instructions": 2562
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::exec::exec_insn::<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 2562,
+      "candidate_instructions": 2562
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::exec::exec_mac16::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 208,
+      "candidate_instructions": 208
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::exec::exec_mac16::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 208,
+      "candidate_instructions": 208
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::exec::exec_mac16::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 261,
+      "candidate_instructions": 261
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::exec::exec_mac16::<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 261,
+      "candidate_instructions": 261
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::pie::exec::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 468,
+      "candidate_instructions": 468
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::pie::exec::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 467,
+      "candidate_instructions": 467
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::pie::exec::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 776,
+      "candidate_instructions": 776
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::pie::exec::<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 768,
+      "candidate_instructions": 768
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::pie::exec_table::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 4774,
+      "candidate_instructions": 4774
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::pie::exec_table::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 4741,
+      "candidate_instructions": 4741
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::pie::exec_table::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 5721,
+      "candidate_instructions": 5721
+    },
+    {
+      "binary": "esp32sim-c3",
+      "name": "xtensa_lx7::pie::exec_table::<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 5723,
+      "candidate_instructions": 5723
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "same": true,
+      "base_instructions": 122,
+      "candidate_instructions": 122
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 171,
+      "candidate_instructions": 171
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::tick",
+      "same": true,
+      "base_instructions": 2207,
+      "candidate_instructions": 2207
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32::bus::SocBus as esp_soc::soc::SocBus>::next_deadline",
+      "same": true,
+      "base_instructions": 817,
+      "candidate_instructions": 817
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32c3::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "same": true,
+      "base_instructions": 103,
+      "candidate_instructions": 103
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32c3::bus::SocBus as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 114,
+      "candidate_instructions": 114
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32c3::bus::SocBus as emu_core::bus::Bus>::tick",
+      "same": true,
+      "base_instructions": 279,
+      "candidate_instructions": 279
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32c3::bus::SocBus as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 56,
+      "candidate_instructions": 56
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32c3::bus::SocBus as esp_soc::soc::SocBus>::next_deadline",
+      "same": true,
+      "base_instructions": 194,
+      "candidate_instructions": 194
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32c3::bus::SocBus>::tick_with_pins",
+      "same": true,
+      "base_instructions": 475,
+      "candidate_instructions": 475
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32c6::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "same": true,
+      "base_instructions": 106,
+      "candidate_instructions": 106
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32c6::bus::SocBus as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 96,
+      "candidate_instructions": 96
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32c6::bus::SocBus as emu_core::bus::Bus>::tick",
+      "same": true,
+      "base_instructions": 1983,
+      "candidate_instructions": 1983
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32c6::bus::SocBus as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 48,
+      "candidate_instructions": 48
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32c6::bus::SocBus as esp_soc::soc::SocBus>::next_deadline",
+      "same": true,
+      "base_instructions": 298,
+      "candidate_instructions": 298
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32s3::bus::SocBus as emu_core::bus::Bus>::fetch",
+      "same": true,
+      "base_instructions": 102,
+      "candidate_instructions": 102
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32s3::bus::SocBus as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 235,
+      "candidate_instructions": 235
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32s3::bus::SocBus as emu_core::bus::Bus>::tick",
+      "same": true,
+      "base_instructions": 26,
+      "candidate_instructions": 26
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32s3::bus::SocBus as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 315,
+      "candidate_instructions": 315
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32s3::bus::SocBus>::read32_access::<false>",
+      "same": true,
+      "base_instructions": 128,
+      "candidate_instructions": 128
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32s3::bus::SocBus>::tick_impl",
+      "same": true,
+      "base_instructions": 3686,
+      "candidate_instructions": 3686
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp32s3::bus::SocBus>::write32_access::<false>",
+      "same": true,
+      "base_instructions": 199,
+      "candidate_instructions": 199
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::after_round",
+      "same": true,
+      "base_instructions": 84,
+      "candidate_instructions": 84
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::present_irqs",
+      "same": true,
+      "base_instructions": 234,
+      "candidate_instructions": 234
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::run_modeled",
+      "same": true,
+      "base_instructions": 3445,
+      "candidate_instructions": 3445
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::run_unmodeled::<false>",
+      "same": true,
+      "base_instructions": 1708,
+      "candidate_instructions": 1708
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32::soc::Esp32>>::step_core",
+      "same": true,
+      "base_instructions": 838,
+      "candidate_instructions": 838
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::after_round",
+      "same": true,
+      "base_instructions": 84,
+      "candidate_instructions": 84
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::present_irqs",
+      "same": true,
+      "base_instructions": 119,
+      "candidate_instructions": 119
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::run",
+      "same": true,
+      "base_instructions": 4319,
+      "candidate_instructions": 4319
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::run_unmodeled::<false>",
+      "same": true,
+      "base_instructions": 1048,
+      "candidate_instructions": 1048
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32c3::soc::C3>>::step_core",
+      "same": true,
+      "base_instructions": 463,
+      "candidate_instructions": 463
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::after_round",
+      "same": true,
+      "base_instructions": 92,
+      "candidate_instructions": 92
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::present_irqs",
+      "same": true,
+      "base_instructions": 120,
+      "candidate_instructions": 120
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::run",
+      "same": true,
+      "base_instructions": 4325,
+      "candidate_instructions": 4325
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::run_unmodeled::<false>",
+      "same": true,
+      "base_instructions": 1053,
+      "candidate_instructions": 1053
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32c6::soc::C6>>::step_core",
+      "same": true,
+      "base_instructions": 465,
+      "candidate_instructions": 465
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::after_round",
+      "same": true,
+      "base_instructions": 116,
+      "candidate_instructions": 116
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::present_irqs",
+      "same": true,
+      "base_instructions": 247,
+      "candidate_instructions": 247
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::run_modeled",
+      "same": true,
+      "base_instructions": 3379,
+      "candidate_instructions": 3379
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::run_unmodeled::<false>",
+      "same": true,
+      "base_instructions": 3339,
+      "candidate_instructions": 3339
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::Machine<esp32s3::soc::S3>>::step_core",
+      "same": true,
+      "base_instructions": 992,
+      "candidate_instructions": 992
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus> as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 37,
+      "candidate_instructions": 37
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus> as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 40,
+      "candidate_instructions": 40
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32c3::bus::SocBus> as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 37,
+      "candidate_instructions": 37
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32c3::bus::SocBus> as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 90,
+      "candidate_instructions": 90
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32c6::bus::SocBus> as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 37,
+      "candidate_instructions": 37
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32c6::bus::SocBus> as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 87,
+      "candidate_instructions": 87
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus> as emu_core::bus::Bus>::read32",
+      "same": true,
+      "base_instructions": 37,
+      "candidate_instructions": 37
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus> as emu_core::bus::Bus>::write32",
+      "same": true,
+      "base_instructions": 35,
+      "candidate_instructions": 35
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<xtensa_lx7::state::Cpu as emu_core::core::Core>::run::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 706,
+      "candidate_instructions": 706
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "<xtensa_lx7::state::Cpu as emu_core::core::Core>::run::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 948,
+      "candidate_instructions": 948
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "riscv_rv32::exec::step_outcome::<esp32c3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 846,
+      "candidate_instructions": 846
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "riscv_rv32::exec::step_outcome::<esp32c6::bus::SocBus>",
+      "same": true,
+      "base_instructions": 846,
+      "candidate_instructions": 846
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::block::step_extra::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 143,
+      "candidate_instructions": 143
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::block::step_extra::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 143,
+      "candidate_instructions": 143
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::exec::exec_insn::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 2566,
+      "candidate_instructions": 2566
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::exec::exec_insn::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 2562,
+      "candidate_instructions": 2562
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::exec::exec_insn::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 2562,
+      "candidate_instructions": 2562
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::exec::exec_insn::<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 2562,
+      "candidate_instructions": 2562
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::exec::exec_mac16::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 208,
+      "candidate_instructions": 208
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::exec::exec_mac16::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 208,
+      "candidate_instructions": 208
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::exec::exec_mac16::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 261,
+      "candidate_instructions": 261
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::exec::exec_mac16::<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 261,
+      "candidate_instructions": 261
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::pie::exec::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 468,
+      "candidate_instructions": 468
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::pie::exec::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 467,
+      "candidate_instructions": 467
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::pie::exec::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 776,
+      "candidate_instructions": 776
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::pie::exec::<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 768,
+      "candidate_instructions": 768
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::pie::exec_table::<esp32::bus::SocBus>",
+      "same": true,
+      "base_instructions": 4774,
+      "candidate_instructions": 4774
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::pie::exec_table::<esp32s3::bus::SocBus>",
+      "same": true,
+      "base_instructions": 4741,
+      "candidate_instructions": 4741
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::pie::exec_table::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 5721,
+      "candidate_instructions": 5721
+    },
+    {
+      "binary": "esp32sim-c6",
+      "name": "xtensa_lx7::pie::exec_table::<esp_soc::machine::modeled::RecordingBus<esp32s3::bus::SocBus>>",
+      "same": true,
+      "base_instructions": 5723,
+      "candidate_instructions": 5723
+    }
+  ]
+}
