@@ -178,6 +178,10 @@ fn aithinker_xclk_requires_live_routed_pwm_not_gpio_level() {
     assert!(bus.camera_frame().is_none());
 }
 
+#[cfg(test)]
+#[path = "camera_dma/cases.rs"]
+mod c7;
+
 fn dvp(bus: &mut SocBus) {
     // IDF v4.4.7 gpio_sig_map.h, io_mux_reg.h; AI-Thinker fixed wiring.
     for (signal, pin, mux) in [(140,5,0x6c),(141,18,0x70),(142,19,0x74),(143,21,0x7c),

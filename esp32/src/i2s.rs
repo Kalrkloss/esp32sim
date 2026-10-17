@@ -40,6 +40,7 @@ pub struct ClassicI2s {
     #[cfg(test)]
     pub(crate) step_calls: u64,
     camera_capable: bool,
+    pub(crate) camera: Option<Box<crate::camera_dma::Capture>>,
 }
 impl Default for ClassicI2s { fn default() -> Self { Self::new() } }
 impl ClassicI2s {
@@ -52,7 +53,7 @@ impl ClassicI2s {
         ram.write(0x24, 64);
         ram.write(0x60, LC_CONF_RESET);
         Self { inner: I2s::new(CPU_HZ), ram, dma: esp_periph::gdma::GdmaInCh { conf1: LC_CONF_RESET & CHECK_OWNER, ..Default::default() }, clock_enabled: false,
-            #[cfg(test)] step_calls: 0, camera_capable: port == 0 }
+            #[cfg(test)] step_calls: 0, camera_capable: port == 0, camera: None }
     }
     /// ESP-IDF v4.4.7 components/soc/esp32/include/soc/i2s_reg.h:
     /// CONF2 0xa8, LCD_EN bit 5 and CAMERA_EN bit 0 (1298-1346);
@@ -119,6 +120,13 @@ impl ClassicI2s {
         let signals = esp_periph::i2s::RxSignals { data, clock, input_select_bit: 7, output_mask: 0x3ff };
         self.inner.receive(cycles, now, false, &gpio.gpio, signals, sources)
     }
+    pub(crate) fn abort_camera_dma(&mut self) {
+        self.camera = None;
+        let mut irq = false;
+        self.dma.fail_receive(&mut irq);
+        self.raise(self.dma.int_raw, self.dma.eof_desc);
+        self.dma.int_raw = 0;
+    }
     /// Map the shared channel's GDMA-layout interrupt bits onto classic INT_RAW: IN_DONE 0,
     /// IN_SUC_EOF 1, IN_DSCR_ERR 3 and IN_DSCR_EMPTY 4 become bits 8, 9, 13 and 15.
     #[inline]
@@ -138,7 +146,24 @@ impl Device for ClassicI2s {
         }
     }
     fn write(&mut self, off: u32, value: u32) -> WriteEffect {
+        let previous = self.ram.read(off);
         self.ram.write(off, value);
+        if self.camera_rx().is_some() || self.camera.is_some() {
+            // Stop/restart, mode/FIFO reconfiguration and all native RX reset
+            // pulses discard the old frame. INLINK restarts begin at fresh VSYNC.
+            if (off == 8 && (previous ^ value) & 0xaa != 0)
+                || (off == 0x60 && value & 0xd != 0)
+                || (off == 0x34 && value & (7 << 28) != 0)
+                || (off == 0xa8 && previous != value)
+                || (off == 0x20 && previous != value) {
+                self.camera = None;
+            }
+            if (off == 8 && (value & 0xa != 0 || value & (1 << 5) == 0)) || (off == 0x60 && value & 0xd != 0) {
+                self.dma.running = false;
+                self.dma.buf_pos = 0;
+                self.dma.rx_eof_pos = 0;
+            }
+        }
         match off {
             0x14 | 0x18 => { Device::write(&mut self.inner, off, value); }
             0x34 => {
@@ -190,7 +215,11 @@ impl SocBus {
             #[cfg(test)] { self.periph.i2s[port].step_calls += 1; }
             // Pin-routed sources live on controller 0, as on the other chips.
             let mut bank = self.periph.i2s[0].inner.take_pcm_bank();
-            let data = self.periph.i2s[port].data(cycles, self.cycles, port, &self.periph.gpio, bank.as_deref_mut());
+            let data = if port == 0 {
+                self.camera_dma_data(cycles).unwrap_or_else(|| self.periph.i2s[port].data(cycles, self.cycles, port, &self.periph.gpio, bank.as_deref_mut()))
+            } else {
+                self.periph.i2s[port].data(cycles, self.cycles, port, &self.periph.gpio, bank.as_deref_mut())
+            };
             self.periph.i2s[0].inner.restore_pcm_bank(bank);
             let mut dma = self.periph.i2s[port].dma;
             let mut irq = false;

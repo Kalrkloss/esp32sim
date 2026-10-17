@@ -863,6 +863,11 @@ impl Peripherals {
             // IDF v5.5.4 register/soc/dport_reg.h:947,965 (I2S clocks),
             // 982,1000 (resets). Cache on writes, not in the per-tick DMA loop.
             for (port, bit) in [4, 21].into_iter().enumerate() {
+                // Camera DMA must not survive a peripheral reset. Keep the
+                // established PCM reset behavior unchanged in this slice.
+                if self.dport.ram.read(0xc4) & (1 << bit) != 0 && self.i2s[port].camera_rx().is_some() {
+                    self.i2s[port] = crate::i2s::ClassicI2s::for_port(port);
+                }
                 self.i2s[port].clock_enabled = self.dport.ram.read(0xc0) & (1 << bit) != 0
                     && self.dport.ram.read(0xc4) & (1 << bit) == 0;
             }
