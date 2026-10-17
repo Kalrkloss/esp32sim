@@ -292,3 +292,6 @@ fn rmw_stop(disable_rx: bool) {
         assert_eq!(bytes(&mut b,B,size),pattern.repeat(16));
     }
 }
+
+#[path = "arming.rs"]
+mod arming;

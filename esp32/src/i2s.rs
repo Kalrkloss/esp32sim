@@ -218,6 +218,13 @@ impl Bus for DramDma<'_> {
 }
 
 impl SocBus {
+    /// Observe the effective start on configuration writes, not at a later tick.
+    pub(crate) fn camera_dma_written(&mut self) {
+        let i2s = &mut self.periph.i2s[0];
+        if i2s.dma.running && i2s.camera_rx().is_some_and(|rx| rx.started) && i2s.camera.is_none() {
+            i2s.camera = Some(Box::new(crate::camera_dma::Capture::armed(self.cycles)));
+        }
+    }
     #[inline]
     pub(crate) fn i2s_step(&mut self, cycles: u64) {
         for port in 0..2 {

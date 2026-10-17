@@ -1,0 +1,737 @@
+[
+  {
+    "suite": "arming",
+    "mutation": "exclusive boundary",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_inclusive_window_boundary_and_exact_catchup"
+  },
+  {
+    "suite": "arming",
+    "mutation": "window disabled",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_driver_stop_reset_start_inside_window"
+  },
+  {
+    "suite": "arming",
+    "mutation": "unbounded window",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_inclusive_window_boundary_and_exact_catchup"
+  },
+  {
+    "suite": "arming",
+    "mutation": "delivery timed from start",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_driver_stop_reset_start_inside_window"
+  },
+  {
+    "suite": "arming",
+    "mutation": "forced low counted as start",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_forced_low_power_clock_stream_stop_never_starts_frame"
+  },
+  {
+    "suite": "arming",
+    "mutation": "frame claim replayed",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_second_start_cannot_replay_claimed_frame"
+  },
+  {
+    "suite": "arming",
+    "mutation": "route loss ignored",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_route_loss_and_restore_inside_window_requires_new_pulse"
+  },
+  {
+    "suite": "arming",
+    "mutation": "unqualified start aborts early",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_initially_invalid_route_waits_instead_of_aborting"
+  },
+  {
+    "suite": "arming",
+    "mutation": "unrelated pad bits close window",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_unrelated_pad_and_noroute_bit_writes_keep_window"
+  },
+  {
+    "suite": "c7",
+    "mutation": "peripheral reset preserves stale frame",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::c7_dport_reset_drops_capture_and_requires_fresh_inlink"
+  },
+  {
+    "suite": "c7",
+    "mutation": "camera-free board polling",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::c7_camera_free_active_pcm_does_not_poll_board_camera"
+  },
+  {
+    "suite": "c7",
+    "mutation": "camera dispatch cache missing",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_driver_stop_reset_start_inside_window"
+  },
+  {
+    "suite": "c7",
+    "mutation": "transport disabled",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_falling_edge_full_frame_and_tick_splits"
+  },
+  {
+    "suite": "c7",
+    "mutation": "ignore VSYNC arm",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_second_start_cannot_replay_claimed_frame"
+  },
+  {
+    "suite": "c7",
+    "mutation": "charge pulse as pixels",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_second_start_cannot_replay_claimed_frame"
+  },
+  {
+    "suite": "c7",
+    "mutation": "lose fractional word position",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_driver_stop_reset_start_inside_window"
+  },
+  {
+    "suite": "c7",
+    "mutation": "wrong frame rate",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_driver_stop_reset_start_inside_window"
+  },
+  {
+    "suite": "c7",
+    "mutation": "do not consume byte position",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::c7_ring_starvation_and_finite_guest_service_reuse"
+  },
+  {
+    "suite": "c7",
+    "mutation": "drop final boundary word",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_route_loss_and_restore_inside_window_requires_new_pulse"
+  },
+  {
+    "suite": "c7",
+    "mutation": "wrong FIFO mode",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_initially_invalid_route_waits_instead_of_aborting"
+  },
+  {
+    "suite": "c7",
+    "mutation": "route loss not terminal",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::c7_mid_frame_route_or_power_loss_is_terminal_until_rearm"
+  },
+  {
+    "suite": "c7",
+    "mutation": "RX resets keep DMA running",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::c7_stop_restart_and_every_rx_reset_discard_incomplete_frame"
+  },
+  {
+    "suite": "c7",
+    "mutation": "START command retained in readback",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start"
+  },
+  {
+    "suite": "c7",
+    "mutation": "inlink stop ignored",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::c7_rx_disable_rmw_stop_and_reenable_requires_fresh_start"
+  },
+  {
+    "suite": "c7",
+    "mutation": "wrong EOF count unit",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_route_loss_and_restore_inside_window_requires_new_pulse"
+  },
+  {
+    "suite": "c7",
+    "mutation": "wrong EOF descriptor register",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks"
+  },
+  {
+    "suite": "c7",
+    "mutation": "wrong classic IRQ mapping",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_falling_edge_full_frame_and_tick_splits"
+  },
+  {
+    "suite": "c7",
+    "mutation": "owner check bypassed",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::c7_bad_owner_forbidden_descriptor_and_buffer_never_eof"
+  },
+  {
+    "suite": "c7",
+    "mutation": "owner not returned",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_falling_edge_full_frame_and_tick_splits"
+  },
+  {
+    "suite": "c7",
+    "mutation": "length not written",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::c7_inlink_rmw_stop_must_remain_stopped_until_fresh_start"
+  },
+  {
+    "suite": "c7",
+    "mutation": "EOF flag not written",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_falling_edge_full_frame_and_tick_splits"
+  },
+  {
+    "suite": "c7",
+    "mutation": "wrong descriptor advance",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq"
+  },
+  {
+    "suite": "c7",
+    "mutation": "DRAM rule admits CPU-only prefix",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::c7_bad_owner_forbidden_descriptor_and_buffer_never_eof"
+  },
+  {
+    "suite": "c7",
+    "mutation": "mode1 sensor sample ordering",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::arming::c71_driver_stop_reset_start_inside_window"
+  },
+  {
+    "suite": "c7",
+    "mutation": "mode3 sensor sample lane",
+    "killed": true,
+    "assertion": true,
+    "test": "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq"
+  },
+  {
+    "suite": "c6",
+    "mutation": "vsync-pin",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+  },
+  {
+    "suite": "c6",
+    "mutation": "pulse-shorter-than-isr",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+  },
+  {
+    "suite": "c6",
+    "mutation": "missing-deadline",
+    "killed": true,
+    "assertion": false,
+    "test": "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+  },
+  {
+    "suite": "c6",
+    "mutation": "vsync-stuck-low",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+  },
+  {
+    "suite": "c6",
+    "mutation": "vsync-stuck-high",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+  },
+  {
+    "suite": "c6",
+    "mutation": "first-edge-too-early",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+  },
+  {
+    "suite": "c6",
+    "mutation": "capture-start-gates-vsync",
+    "killed": true,
+    "assertion": false,
+    "test": "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+  },
+  {
+    "suite": "c6",
+    "mutation": "no-gpio-delivery",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+  },
+  {
+    "suite": "c6",
+    "mutation": "no-board-deadline-in-scheduler",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+  },
+  {
+    "suite": "c6",
+    "mutation": "dma-write-before-transport",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_vsync_unarmed_stopped_irq_and_one_us_level_without_dma"
+  },
+  {
+    "suite": "c6",
+    "mutation": "vsync-power-ignored",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_power_clock_and_sensor_stop_cancel_and_restart_vsync"
+  },
+  {
+    "suite": "c6",
+    "mutation": "vsync-xclk-ignored",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_power_clock_and_sensor_stop_cancel_and_restart_vsync"
+  },
+  {
+    "suite": "c6",
+    "mutation": "vsync-stream-ignored",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_power_clock_and_sensor_stop_cancel_and_restart_vsync"
+  },
+  {
+    "suite": "c6",
+    "mutation": "stop-retains-high",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_power_clock_and_sensor_stop_cancel_and_restart_vsync"
+  },
+  {
+    "suite": "c6",
+    "mutation": "stop-retains-deadline",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_power_clock_and_sensor_stop_cancel_and_restart_vsync"
+  },
+  {
+    "suite": "c6",
+    "mutation": "edge-timestamps-lost",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_deadline_edges_preserve_timestamps_and_large_steps"
+  },
+  {
+    "suite": "c6",
+    "mutation": "skip-intermediate-edges",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_deadline_edges_preserve_timestamps_and_large_steps"
+  },
+  {
+    "suite": "c6",
+    "mutation": "data-wire-unqualified",
+    "killed": true,
+    "assertion": false,
+    "test": "c6_physical_routes_inversion_and_reconfiguration"
+  },
+  {
+    "suite": "c6",
+    "mutation": "clock-wire-unqualified",
+    "killed": true,
+    "assertion": false,
+    "test": "c6_physical_routes_inversion_and_reconfiguration"
+  },
+  {
+    "suite": "c6",
+    "mutation": "href-wire-unqualified",
+    "killed": true,
+    "assertion": false,
+    "test": "c6_physical_routes_inversion_and_reconfiguration"
+  },
+  {
+    "suite": "c6",
+    "mutation": "vsync-wire-unqualified",
+    "killed": true,
+    "assertion": false,
+    "test": "c6_physical_routes_inversion_and_reconfiguration"
+  },
+  {
+    "suite": "c6",
+    "mutation": "control-polarity-ignored",
+    "killed": true,
+    "assertion": false,
+    "test": "c6_physical_routes_inversion_and_reconfiguration"
+  },
+  {
+    "suite": "c6",
+    "mutation": "ignore-data-inversion",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_physical_routes_inversion_and_reconfiguration"
+  },
+  {
+    "suite": "c6",
+    "mutation": "ignore-enable",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_physical_routes_inversion_and_reconfiguration"
+  },
+  {
+    "suite": "c6",
+    "mutation": "pad-input-disable-ignored",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_physical_routes_inversion_and_reconfiguration"
+  },
+  {
+    "suite": "c6",
+    "mutation": "pad-function-ignored",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_physical_routes_inversion_and_reconfiguration"
+  },
+  {
+    "suite": "c6",
+    "mutation": "rx-start-ignored",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_receiver_unarmed_reset_and_modes_withhold_routed_frames"
+  },
+  {
+    "suite": "c6",
+    "mutation": "rx-slave-ignored",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_receiver_unarmed_reset_and_modes_withhold_routed_frames"
+  },
+  {
+    "suite": "c6",
+    "mutation": "rx-descriptor-ignored",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_receiver_unarmed_reset_and_modes_withhold_routed_frames"
+  },
+  {
+    "suite": "c6",
+    "mutation": "rx-force-ignored",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_receiver_unarmed_reset_and_modes_withhold_routed_frames"
+  },
+  {
+    "suite": "c6",
+    "mutation": "rx-fifo-mode-ignored",
+    "killed": true,
+    "assertion": true,
+    "test": "c6_receiver_unarmed_reset_and_modes_withhold_routed_frames"
+  },
+  {
+    "suite": "c6",
+    "mutation": "rx-clock-gate-ignored",
+    "killed": true,
+    "assertion": false,
+    "test": "c6_receiver_unarmed_reset_and_modes_withhold_routed_frames"
+  },
+  {
+    "suite": "c6",
+    "mutation": "camera-free-input-poll",
+    "killed": true,
+    "assertion": false,
+    "test": "c6_camera_free_has_no_producer_deadlines_or_steps"
+  },
+  {
+    "suite": "c6",
+    "mutation": "camera-free-deadline-poll",
+    "killed": true,
+    "assertion": false,
+    "test": "c6_camera_free_has_no_producer_deadlines_or_steps"
+  },
+  {
+    "suite": "c6",
+    "mutation": "non-camera-clock-poll",
+    "killed": true,
+    "assertion": false,
+    "test": "c6_active_non_camera_board_never_queries_camera_clock"
+  },
+  {
+    "suite": "c5",
+    "mutation": "mode1 sample ordering",
+    "killed": true,
+    "assertion": true,
+    "test": "camera_fifo::tests::camera_fifo_row_tail_is_not_next_row"
+  },
+  {
+    "suite": "c5",
+    "mutation": "mode3 sample lane",
+    "killed": true,
+    "assertion": true,
+    "test": "camera_fifo::tests::camera_fifo_row_tail_is_not_next_row"
+  },
+  {
+    "suite": "c5",
+    "mutation": "mode1 zero padding",
+    "killed": true,
+    "assertion": true,
+    "test": "camera_fifo::tests::camera_fifo_exact_little_endian_words"
+  },
+  {
+    "suite": "c5",
+    "mutation": "mode3 zero padding",
+    "killed": true,
+    "assertion": true,
+    "test": "camera_fifo::tests::camera_fifo_exact_little_endian_words"
+  },
+  {
+    "suite": "c5",
+    "mutation": "split carry",
+    "killed": true,
+    "assertion": true,
+    "test": "camera_fifo::tests::camera_fifo_arbitrary_splits_and_empty_chunks"
+  },
+  {
+    "suite": "c5",
+    "mutation": "row tail emission",
+    "killed": true,
+    "assertion": true,
+    "test": "camera_fifo::tests::camera_fifo_row_tail_is_not_next_row"
+  },
+  {
+    "suite": "c5",
+    "mutation": "row tail lane",
+    "killed": true,
+    "assertion": true,
+    "test": "camera_fifo::tests::camera_fifo_row_tail_is_not_next_row"
+  },
+  {
+    "suite": "c5",
+    "mutation": "row boundary consumes tail",
+    "killed": true,
+    "assertion": true,
+    "test": "camera_fifo::tests::camera_fifo_row_tail_is_not_next_row"
+  },
+  {
+    "suite": "c5",
+    "mutation": "reset discards tail",
+    "killed": true,
+    "assertion": true,
+    "test": "camera_fifo::tests::camera_fifo_reset_discards_partial_word"
+  },
+  {
+    "suite": "c5",
+    "mutation": "reject overlap mode zero",
+    "killed": true,
+    "assertion": true,
+    "test": "camera_fifo::tests::camera_fifo_rejects_every_unsupported_mode"
+  },
+  {
+    "suite": "c5",
+    "mutation": "reject mode two",
+    "killed": true,
+    "assertion": true,
+    "test": "camera_fifo::tests::camera_fifo_rejects_every_unsupported_mode"
+  },
+  {
+    "suite": "c5",
+    "mutation": "mode3 differs from mode1",
+    "killed": true,
+    "assertion": true,
+    "test": "camera_fifo::tests::camera_fifo_rgb565_yuv_and_grayscale"
+  },
+  {
+    "suite": "c4",
+    "mutation": "zero camera width",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm"
+  },
+  {
+    "suite": "c4",
+    "mutation": "camera audio clock validation",
+    "killed": true,
+    "assertion": false,
+    "test": "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm"
+  },
+  {
+    "suite": "c4",
+    "mutation": "port identity",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm"
+  },
+  {
+    "suite": "c4",
+    "mutation": "LCD required",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_requires_both_mode_bits_on_port_zero_only"
+  },
+  {
+    "suite": "c4",
+    "mutation": "CAMERA required",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_requires_both_mode_bits_on_port_zero_only"
+  },
+  {
+    "suite": "c4",
+    "mutation": "CONF2 offset",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+  },
+  {
+    "suite": "c4",
+    "mutation": "RX reset",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+  },
+  {
+    "suite": "c4",
+    "mutation": "RX FIFO reset",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+  },
+  {
+    "suite": "c4",
+    "mutation": "TX reset isolation",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+  },
+  {
+    "suite": "c4",
+    "mutation": "LC input reset",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+  },
+  {
+    "suite": "c4",
+    "mutation": "LC AHB FIFO reset",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+  },
+  {
+    "suite": "c4",
+    "mutation": "LC AHB reset",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+  },
+  {
+    "suite": "c4",
+    "mutation": "TX LC reset isolation",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+  },
+  {
+    "suite": "c4",
+    "mutation": "start bit",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+  },
+  {
+    "suite": "c4",
+    "mutation": "reset gates start",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+  },
+  {
+    "suite": "c4",
+    "mutation": "slave bit",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_driver_config_start_stop_trace"
+  },
+  {
+    "suite": "c4",
+    "mutation": "FIFO mode",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_reset_bits_and_fifo_fields_are_live"
+  },
+  {
+    "suite": "c4",
+    "mutation": "descriptor enable",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_driver_config_start_stop_trace"
+  },
+  {
+    "suite": "c4",
+    "mutation": "forced mode",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_driver_config_start_stop_trace"
+  },
+  {
+    "suite": "c4",
+    "mutation": "camera bypass",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm"
+  },
+  {
+    "suite": "c4",
+    "mutation": "audio rate disabled",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm"
+  },
+  {
+    "suite": "c4",
+    "mutation": "audio producer stopped",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm"
+  },
+  {
+    "suite": "c4",
+    "mutation": "mode write synchronizes",
+    "killed": true,
+    "assertion": true,
+    "test": "i2s::tests::camera_bypasses_audio_and_mode_exit_restores_pcm"
+  }
+]

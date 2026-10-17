@@ -245,6 +245,23 @@ impl SocBus {
         }
         let v = if size == 4 { value } else { merge(self.periph.read32(a), value, addr, size) };
         let old_enable = self.periph.gpio.gpio.enable;
+        // Configuration-only bookkeeping; no new work in ordinary ticks.
+        // Only physical DVP routing bits matter (IDF v4.4.7 gpio_reg.h,
+        // io_mux_reg.h and rtc_io_reg.h). Unrelated pad writes cannot close
+        // a valid window. Loss/restoration without elapsed time still does.
+        let camera_route_mask = match a {
+            a if ((140..148).chain([28, 190, 191, 192])).any(|s| a == 0x3ff4_4130 + 4 * s) => 0xff,
+            0x3ff4_906c | 0x3ff4_9070 | 0x3ff4_9074 | 0x3ff4_907c |
+            0x3ff4_9004 | 0x3ff4_9010 | 0x3ff4_9014 | 0x3ff4_9018 |
+            0x3ff4_9080 | 0x3ff4_908c | 0x3ff4_9024 => (7 << 12) | (1 << 9),
+            0x3ff4_847c => (1 << 27) | (1 << 24), // GPIO36/39
+            0x3ff4_8480 => (1 << 29) | (1 << 28), // GPIO34/35
+            0x3ff4_8484 => 1 << 17, // GPIO25
+            _ => 0,
+        };
+        if camera_route_mask != 0 && (self.periph.read32(a) ^ v) & camera_route_mask != 0 {
+            self.board.invalidate_camera_frame_start();
+        }
         if (0x3ff4_8800..=0x3ff4_88ff).contains(&a) { self.periph.adc.now_cycles = self.cycles; }
         self.periph.write32(a, v);
         if self.pins_active {
@@ -264,6 +281,7 @@ impl SocBus {
         // Clock, matrix and SCCB writes can start/stop autonomous sensor inputs
         // without changing an output GPIO. Reconcile at this same bus horizon.
         if self.pins_active { self.deliver_board_inputs(); }
+        if (0x3ff4_f000..0x3ff4_f100).contains(&a) { self.camera_dma_written(); }
         self.irq_dirty = true;
     }
     #[inline]

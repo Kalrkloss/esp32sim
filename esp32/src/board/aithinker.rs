@@ -13,6 +13,8 @@ pub const PIN_VSYNC: u8 = 25;
 /// must still see the pulse (esp32-camera v2.1.4 ll_cam.c:212-242).
 pub const FRAME_CYCLES: u64 = crate::periph::CPU_HZ / 10;
 pub const VSYNC_CYCLES: u64 = crate::periph::CPU_HZ / 1000;
+/// Approximate frame-start back porch; not an OV2640/PCLK timing claim.
+pub const ARM_WINDOW: u64 = VSYNC_CYCLES;
 
 pub const PIN_PWDN: u8 = 32;
 pub const PIN_XCLK: u8 = 0;
@@ -27,8 +29,9 @@ pub struct AiThinkerCam {
     next: Option<u64>,
     vsync: bool,
     edges: Vec<BoardEdge>,
+    frame_start: Option<u64>,
 }
-impl Default for AiThinkerCam { fn default() -> Self { Self { sensor: Default::default(), source: Default::default(), power: Arc::new(Mutex::new(true)), now: 0, next: None, vsync: false, edges: Vec::new() } } }
+impl Default for AiThinkerCam { fn default() -> Self { Self { sensor: Default::default(), source: Default::default(), power: Arc::new(Mutex::new(true)), now: 0, next: None, vsync: false, edges: Vec::new(), frame_start: None } } }
 
 struct Sccb { sensor: Ov2640, powered_down: Arc<Mutex<bool>> }
 // Power is shared with the SCCB device so a powered-down sensor does not ACK.
@@ -47,10 +50,15 @@ impl BoardModel for AiThinkerCam {
     fn next_deadline(&self) -> Option<u64> { self.next }
     fn take_edges(&mut self) -> Vec<BoardEdge> { std::mem::take(&mut self.edges) }
     fn camera_dvp_pins(&self) -> Option<[u8; 11]> { Some([5, 18, 19, 21, 36, 39, 34, 35, 22, 23, 25]) }
+    fn camera_frame_start(&mut self, claim: bool) -> Option<u64> {
+        if claim { self.frame_start.take() } else { self.frame_start }
+    }
+    fn invalidate_camera_frame_start(&mut self) { self.frame_start = None; }
     fn advance_to(&mut self, cycle: u64) {
         if cycle < self.now { return; }
         while let Some(at) = self.next.filter(|&at| at <= cycle) {
             self.vsync = !self.vsync;
+            if !self.vsync { self.frame_start = Some(at); }
             self.edges.push(BoardEdge { cycle: at, pin: PIN_VSYNC, level: self.vsync });
             self.next = at.checked_add(if self.vsync { VSYNC_CYCLES } else { FRAME_CYCLES - VSYNC_CYCLES });
         }
@@ -65,6 +73,7 @@ impl BoardModel for AiThinkerCam {
             self.advance_to(cycle);
         } else {
             self.next = None;
+            self.frame_start = None;
             if self.vsync {
                 self.vsync = false;
                 self.edges.push(BoardEdge { cycle, pin: PIN_VSYNC, level: false });

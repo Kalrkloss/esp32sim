@@ -132,6 +132,11 @@ pub trait BoardModel {
     fn advance_inputs_with_clock(&mut self, cycle: VirtualCycle, _clock: &dyn Fn(u8) -> Option<(f64, u32)>) { self.advance_to(cycle); }
     /// Parallel camera wiring: D0..D7, PCLK, HREF, VSYNC. None on camera-free boards.
     fn camera_dvp_pins(&self) -> Option<[u8; 11]> { None }
+    /// Most recent unclaimed scheduled camera falling edge, never a forced-low edge.
+    /// Claiming prevents restart from replaying the same physical frame.
+    fn camera_frame_start(&mut self, _claim: bool) -> Option<VirtualCycle> { None }
+    /// Physical route changes invalidate the fresh-frame opportunity.
+    fn invalidate_camera_frame_start(&mut self) {}
 }
 
 pub type Board = Box<dyn BoardModel>;

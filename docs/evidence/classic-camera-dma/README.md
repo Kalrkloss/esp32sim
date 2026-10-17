@@ -4,6 +4,9 @@ RMW INLINK STOP qualification is extended by [the remediation receipt](rmw-stop.
 The original qualification below predates that additional regression; use
 `rmw-stop-checks.json` for the remediation's executed checks.
 
+The scheduled falling-edge start window and retained native-driver qualification
+are documented in [arming-window.md](arming-window.md).
+
 # Scope and base
 
 Local-only C7, a new feature, not a reproduced production bug. The merge base is
