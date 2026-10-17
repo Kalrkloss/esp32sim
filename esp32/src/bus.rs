@@ -346,8 +346,10 @@ impl SocBus {
     }
     fn run_spi(&mut self) {
         self.periph.spi_exec = false;
-        self.periph.spi1.0.execute(&mut self.flash, &mut []);
-        for (_, off, len) in std::mem::take(&mut self.periph.spi1.0.dirty) { self.flash_written(off, len); }
+        self.periph.spi1.0.execute(&mut self.flash, &mut self.psram);
+        for (memory, off, len) in std::mem::take(&mut self.periph.spi1.0.dirty) {
+            if memory == esp_periph::DirtyMem::Flash { self.flash_written(off, len); }
+        }
     }
     /// Request sensor bytes using current physical XCLK routing, without polling
     /// the camera from the ordinary bus tick. I2S transport is a separate adapter.
