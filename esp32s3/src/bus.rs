@@ -592,8 +592,8 @@ impl SocBus {
     /// Write one received frame into the next RX descriptor (rx_ctrl header + frame + FCS) and raise the RX event.
     #[allow(clippy::identity_op, reason = "rx_state zero remains visible in the packed descriptor layout")]
     fn wifi_rx_deliver(&mut self, frame: &[u8], now_us: u64) {
+        if self.periph.wifi.rx_next == 0 { self.periph.wifi.link.drop_rx_unarmed(); return; }
         let desc = self.periph.wifi.rx_next | crate::periph::DMA_ADDR_BASE;
-        if desc == 0 { self.periph.wifi.link.drop_rx(); return; }
         let dw0 = self.read32_unpriced(desc).unwrap_or(0); let buf = self.read32_unpriced(desc + 4).unwrap_or(0); let next = self.read32_unpriced(desc + 8).unwrap_or(0);
         let size = (dw0 & 0xfff) as usize;
         let total = 48 + frame.len() + 4;
