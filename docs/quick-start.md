@@ -42,7 +42,7 @@ binaries in `target/release/`.
 
 Every run boots the chip's own mask ROM, exactly as the silicon does. The ROM is Espressif's
 (Apache-2.0, [espressif/esp-rom-elfs](https://github.com/espressif/esp-rom-elfs)) and is not in
-the tarball. One command fetches all four, pinned by SHA-256:
+the tarball. One command fetches all five, pinned by SHA-256:
 
 ```sh
 tools/fetch-rom-elfs.sh roms
