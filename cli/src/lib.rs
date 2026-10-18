@@ -33,6 +33,8 @@ fn help(chip: &str, code: i32) -> ! {
     eprintln!("  --trace-fn PREFIX, --break PC, --watch ADDR, --peek ADDR,N, --profile, --vcd F, --debug AREAS, --no-jit");
     eprintln!("                        debugging; --no-jit is the oracle when a result looks wrong");
     eprintln!("  --adc PIN, --adc-raw PIN=N   last ADC sample at exit / a 12-bit count into that pad");
+    eprintln!("  --sd IMG, --sd-rw IMG (P4) a card in the SD socket, copy-on-write / write-through;");
+    eprintln!("                        --sd-prg-us N, --sd-serial HEX for its programming time and serial");
     eprintln!("  --no-dump             skip the register dump at exit");
     eprintln!();
     eprintln!("Every flag: docs/cli.md. First run: docs/quick-start.md. Both are in the tarball and at github.com/mikroverk/esp32sim.");
@@ -101,6 +103,9 @@ pub struct Opts {
     /// `--flash-octal`: an octal SPI flash (ESP32-S3-WROOM-2)
     pub flash_octal: bool,
     pub mac: Option<[u8; 6]>, pub strap: Option<u32>, pub reset_cause: Option<u32>, pub efuse_regs: Option<String>, pub regs_init: Option<String>,
+    /// `--sd IMAGE` (copy-on-write) or `--sd-rw IMAGE` (write-through): a card in the SD socket,
+    /// with `--sd-prg-us` and `--sd-serial`
+    pub sd: Option<(String, bool)>, pub sd_prg_us: Option<u64>, pub sd_serial: Option<u32>,
     pub board: String, pub wifi: Option<String>, pub wifi_nearby: Vec<String>, pub ble: bool, pub ble_full: bool, pub ble_observe: bool, pub ble_scan: bool, pub net: String, pub cam_image: Option<String>, pub cam_stream: Option<String>, pub cam_size: Option<String>, pub cam_fps: f64,
     pub spi2_timing: bool, pub measured_te: bool,
     pub max_insns: u64, pub max_seconds: Option<f64>, pub script: Option<String>, pub serial: Option<String>,
@@ -138,6 +143,10 @@ pub fn parse(args: &[String], default_chip: &str) -> Opts {
             "--flash-mb" => o.flash_mb = Some(next().parse().expect("mb")),
             "--psram-mb" => o.psram_mb = Some(next().parse().expect("mb")),
             "--flash-octal" => o.flash_octal = true,
+            "--sd" => o.sd = Some((next(), false)),
+            "--sd-rw" => o.sd = Some((next(), true)),
+            "--sd-prg-us" => o.sd_prg_us = Some(next().parse().unwrap_or_else(|_| usage_error("--sd-prg-us: expected microseconds"))),
+            "--sd-serial" => o.sd_serial = Some(hex(&next(), "sd-serial")),
             "--mac" => { let v = next(); let b: Vec<u8> = v.split(':').filter_map(|x| u8::from_str_radix(x, 16).ok()).collect(); if b.len() != 6 { eprintln!("--mac wants xx:xx:xx:xx:xx:xx"); std::process::exit(2); } let mut m = [0u8; 6]; m.copy_from_slice(&b); o.mac = Some(m); }
             "--strap" => o.strap = Some(hex(&next(), "strap")),
             "--reset-cause" => o.reset_cause = Some(hex(&next(), "reset-cause")),
@@ -532,6 +541,12 @@ fn prepare<S: Soc>(m: &mut Machine<S>, o: &Opts) -> String {
         refuse(path, S::check_image(&data));
         m.write_flash(off, &data).unwrap_or_else(|e| { eprintln!("--flash-at: {}", e); std::process::exit(2) });
         eprintln!("[emu] flash {:#x}: {} ({} bytes)", off, path, data.len());
+    }
+    if let Some((path, rw)) = &o.sd {
+        let image = if *rw { esp_periph::sdmmc::FileStore::write_through(path) } else { esp_periph::sdmmc::FileStore::copy_on_write(path) };
+        let image = image.unwrap_or_else(|e| usage_error(&format!("--sd {path}: {e}")));
+        let config = esp_periph::sdmmc::SdCardConfig { prg_ns: o.sd_prg_us.unwrap_or(0).saturating_mul(1000), serial: o.sd_serial, ..Default::default() };
+        match m.bus.attach_sd_card(Box::new(image), config) { Ok(w) => eprintln!("[emu] SD card: {w}"), Err(e) => usage_error(&format!("--sd: {e}")) }
     }
     let mut ble_elf = esp_soc::elf::Elf::default();
     for p in &o.elfs {
