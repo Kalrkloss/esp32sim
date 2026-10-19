@@ -67,7 +67,6 @@ read-modify-write masks with preserved unrelated bits, wake IDs, battery
 reads, the reset pulse with uninterrupted rail power and shutdown ordering.
 
 Unmodeled registers are zero-initialized register RAM, not implementations of
-ADC conversion, PWM, IRQs or timers. No StopWatch board is registered here.
-Board assembly still needs bus-0 attachment, retaining both state handles,
-panel power/reset gating and shutdown handling. CO5300, touch routing, BMI270,
-RX8130, UI and networking are outside this device-only change.
+ADC conversion, PWM, IRQs or timers. The [`stopwatch` board](boards.md#stopwatch--m5stack-stopwatch-esp32-s3)
+attaches these devices on bus 0 and retains both state handles for panel
+power/reset gating and shutdown handling. BMI270 and RX8130 are not modeled.
