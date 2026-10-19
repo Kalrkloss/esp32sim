@@ -169,6 +169,7 @@ pub fn parse(args: &[String], default_chip: &str) -> Opts {
             "--cooja-verbose" => o.cooja_verbose = true,
             "--cooja-rx-timing" => o.cooja_rx_at_end = match next().as_str() { "start" => false, "end" => true, x => { eprintln!("--cooja-rx-timing {}: start or end", x); std::process::exit(2) } },
             "-h" | "--help" => usage(default_chip),
+            "-V" | "--version" => { println!("esp32sim {}", env!("CARGO_PKG_VERSION")); std::process::exit(0) }
             _ => { eprintln!("unknown arg {}", a); usage(default_chip) }
         }
         i += 1;
