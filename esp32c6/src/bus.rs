@@ -282,14 +282,14 @@ impl SocBus {
         let mac = &self.periph.wifi_mac;
         if mac.rx_next == 0 { self.periph.wifi_mac.link.drop_rx(); return; }
         let desc = mac.addr(mac.rx_next);
-        let log = mac.link.ap().is_some_and(|ap| ap.log);
+        let log = mac.link.log();
         let (dw0, buf, next) = (self.sram32(desc), self.sram32(desc.wrapping_add(4)), self.sram32(desc.wrapping_add(8)));
         let total = RX_CTRL + frame.len() + 4;
         // hardware-owned, empty, and big enough (size is the low 14 bits)
         if dw0 & (1 << 31) == 0 || dw0 & (1 << 30) != 0 || ((dw0 & 0x3fff) as usize) < total { self.periph.wifi_mac.link.drop_rx(); return; }
         let group = frame.len() >= 5 && frame[4] & 1 == 1;
         let mut words = [0u32; RX_CTRL / 4];
-        words[0] = 0xd8 | 1 << 28 | if group { 0 } else { 1 << 29 };   // rssi -40 dBm, 1 Mbps legacy; match 0, and match 1 for our own address
+        words[0] = 0xd8 | mac.link.rx_match(group);   // rssi -40 dBm, 1 Mbps legacy; the address filter's verdict
         words[3] = now_us as u32;                                       // timestamp
         words[5] = 0xa6;                                                // noise floor -90 dBm
         words[21] = (frame.len() as u32 + 4) & 0x3fff;                  // byte 84: the frame's length with its FCS
@@ -540,7 +540,8 @@ impl SocBus {
         if self.periph.spi2.dma_tx_pending.is_some() { self.spi2_dma_tx(); }
         if self.periph.aes.dma_pending { self.aes_dma_step(); }
         if !self.periph.wifi_mac.tx_pending.is_empty() { self.wifi_tx_step(); }
-        if self.periph.wifi_mac.link.ap().is_some() { self.wifi_air_step(); let now_us = self.now_us(); self.periph.wifi_mac.link.net_step(now_us); }
+        if self.periph.wifi_mac.link.on_air() { self.wifi_air_step(); }
+        if self.periph.wifi_mac.link.net().is_some() { let now_us = self.now_us(); self.periph.wifi_mac.link.net_step(now_us); }
         self.deliver_board_events();
     }
 }

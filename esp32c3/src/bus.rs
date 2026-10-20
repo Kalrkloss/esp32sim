@@ -307,13 +307,12 @@ impl SocBus {
         let size = (dw0 & 0xfff) as usize;
         let total = 48 + frame.len() + 4;
         if dw0 & (3 << 30) != 1 << 31 || buf == 0 || size < total { self.periph.wifi.link.drop_rx(); return; }
-        let (chan, log) = { let ap = self.periph.wifi.link.ap().unwrap(); (ap.cfg.channel as u32, ap.log) };
+        let chan = self.periph.wifi.link.channel().unwrap_or(1) as u32;
+        let log = self.periph.wifi.link.log();
         let mut b = Vec::with_capacity(total);
         let bcast = frame.len() >= 5 && frame[4] & 1 == 1;
-        // filter-match nibble: bit 28 is the "accepted by the address filter" bit the blob's RX path
-        // requires in the C3 blob; inherited from the S3 model, not measured on C3 silicon.
-        let fm = if bcast { 1u32 << 28 } else { (1u32 << 28) | (1u32 << 29) };
-        let w0: u32 = fm | 0xd8u32;   // rssi -40 dBm, 1 Mbps, legacy
+        // filter-match nibble: inherited from the S3 model, not measured on C3 silicon.
+        let w0: u32 = self.periph.wifi.link.rx_match(bcast) | 0xd8u32;   // rssi -40 dBm, 1 Mbps, legacy
         let w2: u32 = (chan << 16) | (chan << 20);                                        // channel, secondary
         let w5: u32 = 0xa6;                                                                // noise floor -90
         let w11: u32 = (frame.len() + 4) as u32 & 0xfff;                    // sig_len (incl. FCS), rx_state OK
@@ -382,7 +381,8 @@ impl SocBus {
         if self.periph.spi_exec { self.run_spi(); }
         if self.periph.aes.dma_pending { self.aes_dma_step(); }
         if !self.periph.wifi.tx_pending.is_empty() { self.wifi_tx_step(); }
-        if self.periph.wifi.link.ap().is_some() { self.wifi_air_step(); let now_us = self.now_us(); self.periph.wifi.link.net_step(now_us); }
+        if self.periph.wifi.link.on_air() { self.wifi_air_step(); }
+        if self.periph.wifi.link.net().is_some() { let now_us = self.now_us(); self.periph.wifi.link.net_step(now_us); }
         self.periph.refresh_work();
     }
 
