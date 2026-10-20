@@ -107,6 +107,19 @@ Things that cost real time to find out, recorded so they do not have to be found
   `esp_periph::crypto` PMK/PTK/MIC/key-wrap primitives serve both roles, and the supplicant's test
   drives it against the model's own authenticator (`VirtualAp`), so a mismatch between the halves
   fails a unit test instead of an integration run.
+- **Both roles can be on the air at once, and each role keeps its own network.** A firmware in its
+  setup-AP mode offers a scan; the user picks a network from that list, saves it, and the guest comes
+  back as that network's station. With one role at a time the scan sees nothing and the reboot ends
+  the test, so the link carries the access point the guest joins *and* the join to the access point
+  the guest runs. One network cannot serve both: behind the access point it is a DHCP/ARP/DNS/NTP
+  server, on the join it is a client of the guest's DHCP server. Frames are routed by their
+  addresses — the emulated BSSID in addr1 or addr3 is the access point's, a broadcast probe request
+  is the access point's too (that is the frame a scan needs answered), everything else the join's —
+  and both links' due frames merge into one receive ring by emulated time, because there is one
+  radio. The filter-match rule follows the *guest's* mode rather than the frame's link: while the
+  guest's access point beacons, its MAC reports bit 29 alone, which is what makes a scan in its setup
+  UI accept the emulated access point's probe responses; after the reboot the join hears no access
+  point and the station convention applies again.
 - **On a join link the forward's addresses come from the lease, not from the model.** The guest is
   the access point, so there is no 10.0.2.x subnet: the peer is the address the guest's DHCP server
   handed out and the guest side is the AP itself (or the address a `--hostfwd` specification names).
