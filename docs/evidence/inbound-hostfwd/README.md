@@ -33,8 +33,10 @@ would not have proved.
 
 ## Measurements
 
-Host: Linux x86_64, emulator at the fork's `main` (`cfb710e`) plus this branch, no JIT for S3 (so the
-guest's instruction stream is cycle-deterministic), bench run at ≈0.7–0.8× real time.
+Host: Linux x86_64, emulator cut from `s3-rx-dma-base-handover` (`cfb710e`) plus this change, no JIT
+for S3 (so the guest's instruction stream is cycle-deterministic), bench run at ≈0.7–0.8× real time.
+That base is needed: the firmware used here is an Arduino-ESP32 build (IDF 5.1) whose station does
+not associate without it.
 
 Guest firmware (unmodified, released): `HeishaMon.ino.esp32-v4.2.2.bin`
 `sha256 627aa40588f9cf4c58ffe2cb1188ac47ada72b6ce2e9a4a0e2b80862a5f06099`,

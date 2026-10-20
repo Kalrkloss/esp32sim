@@ -4,6 +4,15 @@ A server inside the guest is not reachable from the host: `--net nat` only carri
 flows out. Firmware that serves HTTP (or anything else) on the emulated link can therefore only be
 exercised through its console. This adds QEMU-compatible inbound forwarding:
 
+## Branch base
+
+This branch is cut from `s3-rx-dma-base-handover` (its two receive-list commits, `d84f87d` and
+`cfb710e`), not from `main`: the firmware used for the acceptance runs is an Arduino-ESP32 build
+(IDF 5.1) whose station does not associate without that fix, so a `main`-based branch could not have
+produced the end-to-end evidence. The change itself is the last four commits and touches nothing the
+receive-list fix touches (`esp32s3/src/{bus,periph}.rs`); if you would rather review it on `main`,
+rebase those four commits — the only conflict is a row in `docs/experiments.md`.
+
 ```sh
 esp32sim --chip s3 --boot rom ... --wifi ssid=demo,psk=demo-pass \
          --hostfwd tcp:127.0.0.1:8080-:80
