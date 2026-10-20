@@ -196,6 +196,9 @@ impl Supplicant {
     }
     /// The channel the guest's AP beacons on, once one has been heard.
     pub fn channel(&self) -> Option<u8> { self.ap.as_ref().map(|a| a.channel) }
+    /// The address of the access point this side joined, once a beacon has been heard: on the join
+    /// link the guest *is* the access point, so its frames are addressed to this MAC.
+    pub fn ap_mac(&self) -> Option<[u8; 6]> { self.ap.as_ref().map(|a| a.bssid) }
     /// The guest address the forward must aim at: the AP itself, from the lease's router.
     pub fn guest_ip(&self) -> Option<[u8; 4]> {
         self.lease.and_then(|l| l.router).or_else(|| self.ap.as_ref().map(|_| [192, 168, 4, 1]))

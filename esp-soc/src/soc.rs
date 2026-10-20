@@ -131,6 +131,10 @@ pub trait SocBus: Bus {
     /// a station, taking its address from the guest's DHCP server. Replaces any virtual access
     /// point; the link survives a guest reboot by joining again.
     fn attach_wifi_join(&mut self, _cfg: crate::wifi::JoinConfig, _nat: Option<crate::nat::Nat>) -> Result<(), String> { Err("this chip has no WiFi".into()) }
+    /// Bind the `--hostfwd` listeners whose guest address `guest` is: with both radio roles on the
+    /// air each link has its own network, and the address decides which one the forward rides
+    /// (`StationLink::net_for_guest`).
+    fn attach_hostfwd_for(&mut self, _guest: [u8; 4], _specs: &[crate::nat::HostFwdSpec]) -> Result<(), String> { Err("this chip has no WiFi".into()) }
     /// Select host Ethernet transport instead of the built-in virtual network. Off by default.
     /// Changing modes clears queued Ethernet frames; the selection survives chip reset.
     fn set_ethernet_relay(&mut self, _enabled: bool) -> Result<(), String> { Err("this chip has no Ethernet transport".into()) }

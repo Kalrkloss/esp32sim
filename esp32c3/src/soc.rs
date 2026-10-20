@@ -57,6 +57,20 @@ impl esp_soc::SocBus for SocBus {
         self.periph.refresh_work();
         Ok(())
     }
+    /// Attach the `--hostfwd` listeners that name `guest`: the address decides which of the two
+    /// links' networks the forward rides (`StationLink::net_for_guest`), and each network holds its
+    /// own listeners in its NAT.
+    fn attach_hostfwd_for(&mut self, guest: [u8; 4], specs: &[esp_soc::nat::HostFwdSpec]) -> Result<(), String> {
+        self.periph.refresh_work();
+        let net = self.periph.wifi.link.net_for_guest(guest)
+            .ok_or("--hostfwd needs --wifi or --wifi-join: a forward rides the emulated 802.11 link")?;
+        let nat = net.nat.as_mut().ok_or("--hostfwd requires --net nat")?;
+        for spec in specs {
+            let bound = nat.listen(spec).map_err(|e| format!("--hostfwd: {e}"))?;
+            eprintln!("[emu] hostfwd tcp {} -> {}.{}.{}.{}:{}", bound, spec.guest_ip[0], spec.guest_ip[1], spec.guest_ip[2], spec.guest_ip[3], spec.guest_port);
+        }
+        Ok(())
+    }
     fn set_ethernet_relay(&mut self, enabled: bool) -> Result<(), String> {
         self.periph.wifi.link.set_relay(enabled);
         self.periph.refresh_work();

@@ -12,7 +12,7 @@ const SSID: &str = "guest-ap";
 const PSK: &str = "bench-passphrase";
 
 fn guest_ap(psk: Option<&str>) -> ApConfig {
-    ApConfig { ssid: SSID.into(), bssid: [0x46, 0x1b, 0xf6, 0x75, 0xdc, 0xe0], channel: 6, psk: psk.map(str::to_string) }
+    ApConfig { ssid: SSID.into(), bssid: [0x46, 0x1b, 0xf6, 0x75, 0xdc, 0xe0], channel: 6, psk: psk.map(str::to_string), epoch_s: None }
 }
 
 /// Both halves of the air, pumped against each other in emulated time.
