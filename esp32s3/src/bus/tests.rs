@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 const SPI2: u32 = 0x6002_4000;
 const GDMA: u32 = 0x6003_f000;
 const FIRST_DESC: u32 = 0x3fc9_0100;
+const PIN_TFT_DC: u32 = 40;   // the board's D/C line (board/atech14.rs)
 
 struct ProbeBoard {
     events: Arc<Mutex<Vec<String>>>,
@@ -1590,4 +1591,45 @@ fn rmt_dma_ring_waits_for_a_cpu_owned_node_and_resumes_after_restart() {
     assert_eq!(bus.periph.rmt.dma_fifo_len(), 2);
     assert_eq!(bus.periph.gdma.out[0].eof_desc, n1);
     assert!(!bus.periph.gdma.out[0].running);
+}
+
+/// A `spi_master` transfer on SPI2 reaches the board: `CMD.USR` makes the CPU-fed W registers one
+/// transaction, the board decodes D/C from its GPIO and the panel sees the command and pixels.
+/// This is the path every display driver on this host takes; the bit-banged pins are an
+/// alternative, not the only way to feed the panel.
+#[test]
+fn spi2_cpu_transfer_reaches_the_panel_board() {
+    const GPIO_OUT1: u32 = 0x6000_4010;                                  // pins 32..48
+    const GPIO_ENABLE1_W1TS: u32 = 0x6000_4030;
+    const DC_BIT: u32 = 1 << (PIN_TFT_DC - 32);
+    fn write_spi2(bus: &mut SocBus, bytes: &[u8]) {
+        bus.write32(SPI2 + 0x30, 0).unwrap();                            // DMA_CONF: no DMA, data from W
+        bus.write32(SPI2 + 0x10, 1 << 27).unwrap();                      // USER: USR_MOSI only
+        for (i, chunk) in bytes.chunks(4).enumerate() {
+            let word = chunk.iter().enumerate().fold(0u32, |w, (j, &b)| w | ((b as u32) << (8 * j)));
+            bus.write32(SPI2 + 0x98 + 4 * i as u32, word).unwrap();
+        }
+        bus.write32(SPI2 + 0x1c, (bytes.len() as u32) * 8 - 1).unwrap(); // MS_DLEN
+        bus.write32(SPI2, (1 << 24) | (1 << 23)).unwrap();               // CMD: USR, with UPDATE as spi_master writes it
+    }
+
+    let mut bus = SocBus::new(16 << 20, 0, [0x02; 6]);
+    fn level(bus: &mut SocBus, high: bool) { bus.write32(GPIO_OUT1, if high { DC_BIT } else { 0 }).unwrap(); }
+    fn command(bus: &mut SocBus, c: u8) { level(bus, false); write_spi2(bus, &[c]); }
+    fn data(bus: &mut SocBus, bytes: &[u8]) { level(bus, true); write_spi2(bus, bytes); }
+
+    bus.write32(GPIO_ENABLE1_W1TS, DC_BIT).unwrap();                     // D/C is an output
+    bus.write32(SPI2 + 0x34, 1 << 12).unwrap();                          // INT_ENA: TRANS_DONE, as spi_master sets it
+    command(&mut bus, 0x29);                                             // DISPON
+    command(&mut bus, 0x2a); data(&mut bus, &[0, 26, 0, 27]);            // CASET: the visible window
+    command(&mut bus, 0x2b); data(&mut bus, &[0, 1, 0, 1]);              // RASET: row 1
+    command(&mut bus, 0x2c);                                             // RAMWR
+    data(&mut bus, &[0xff, 0xff, 0xff, 0xff]);                           // two white pixels
+
+    let (w, h, frame, written) = bus.board.display().expect("the board has a panel");
+    assert_eq!((w, h), (160, 80));
+    assert_eq!(bus.periph.spi2.transfers, 7, "one transaction per CMD.USR");
+    assert_eq!(written, 2, "the panel took two pixels");
+    assert_eq!(frame.iter().filter(|&&p| p != 0).count(), 2, "both landed in the visible frame");
+    assert!(bus.periph.spi2.irq(), "TRANS_DONE is pending for the driver");
 }
