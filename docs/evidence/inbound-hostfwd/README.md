@@ -116,6 +116,22 @@ Host-side counters that vary with wall-clock time: none in the forward — its o
 flows, refusals) are updated only from emulator-tick work; the wall-clock dependent parts are the
 kernel's socket delivery and the guest's reaction to it.
 
+## Reproduction scripts
+
+The end-to-end runs above need a firmware image, so they live with an external bench rather than in
+this repository. Their scripts are `smoke.sh` (scenario 5: start a forward, wait for the guest's DHCP
+lease, fetch the page, assert a string from it and the accounting line), `hostfwd-stress.sh` +
+`stress_client.py` (32 parallel GETs, aborted connections, a half-closed client, then the accounting
+line) and `determinism.sh` (the four-run family above). All three take the emulator binary from `EMU`.
+
+The five-scenario run needs the bench's UART injection command (`uart1hex`, which feeds frame bytes
+into UART1), and that command is not on this branch: it lives on a separate bench branch built on top
+of this one. The run was therefore made with a local branch `hostfwd-bench` = that bench branch +
+this change (its only difference from this branch is the script command and the receive-list commit
+it carries), and the binary under test is the same code. Result: `smoke: PASS` — boot, UART replay,
+reset-cause gate, WiFi+MQTT (155 MQTT lines) and the forward scenario, with `GET /` returning the
+43 104-byte page and every accounting assertion green.
+
 ## Commands
 
 ```sh
