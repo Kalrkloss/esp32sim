@@ -96,8 +96,12 @@ was not modified (these hashes are the inputs to every number above):
 78c4be5d9f8fe7f2979b5aa5411e130fa5716e8f322ef9e534ef625e4e99bdbf  littlefs.img (131072 bytes; config.json + rules.txt)
 ```
 
-Host: x86_64 Linux, 4 cores, Rust stable, esp32sim release build. The run is cycle-deterministic: the
-same scenario twice produces the same frame and byte counts (the numbers above are from that pair).
+Host: x86_64 Linux, 4 cores, Rust stable, esp32sim release build. The guest's own execution is
+cycle-deterministic: repeated runs match on instructions, frames sent and frames delivered. The frames
+that carry host-relayed traffic, and the NAT byte counters, move by a frame or two between runs because
+the relay runs on a host thread (569 vs 570 frames received in two otherwise identical runs; 113 vs 161
+bytes in). The numbers above are from one run of that pair; the two runs quoted in
+`docs/experiments.md` (EX230) are before and after the change.
 
 ## Limits
 
