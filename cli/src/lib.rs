@@ -212,7 +212,7 @@ pub fn run_cli(default_chip: &str) {
         "s3" | "esp32s3" => { let m = setup_s3(&o); run(m, &o) }
         "c3" | "esp32c3" => { let m = setup_c3(&o); run(m, &o) }
         "c6" | "esp32c6" => { let m = setup_c6(&o); run(m, &o) }
-        c => { eprintln!("--chip {}: s3, c3 or c6", c); std::process::exit(2) }
+        c => { eprintln!("--chip {}: esp32, s3, c3 or c6", c); std::process::exit(2) }
     }
 }
 
