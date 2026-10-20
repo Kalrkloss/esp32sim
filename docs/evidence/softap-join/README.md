@@ -99,7 +99,7 @@ restart: connection closed         # POST /config?restart=yes: the guest reboots
 the guest's web server is back     # the join re-associates and the lease returns
 --- cmd:gethelp
 __pong__
-HELP_URL:https://cicciocb.com/annex32help/V1.482/
+HELP_URL:<the guest's own help URL>
 ```
 
 `GET /config` answers `200` with the gzipped page the guest serves (2 870 bytes `output.html`), the
@@ -153,16 +153,17 @@ curl -sS http://127.0.0.1:18080/config
 curl -sS -X POST -H 'Content-type: application/x-www-form-urlencoded' \
      --data 'MODULE=1&DISPLAY=4&ORIENTATION=1&PINS=1,-1,2,41,40,-1,-1,-1,-1,-1,-1,-1' \
      http://127.0.0.1:18080/_kfg_
-# the guest's own WebSocket console (annex-ui.py: handshake, masked text frames)
-python3 annex-ui.py 18080 2 --config 'tft.init 1' 'tft.fill 0xF800'
+# the guest's own WebSocket console (guest-ui.py: handshake, masked text frames)
+python3 guest-ui.py 18080 2 --config 'tft.init 1' 'tft.fill 0xF800'
 #   --config posts the display form and restarts the guest; then waits for the server to return
 
 # unit tests
 cargo test -p esp-soc --release wifi::join
 ```
 
-[annex-ui.py](annex-ui.py) is that WebSocket/HTTP client and [run-softap.sh](run-softap.sh) is the
-emulator command line with the image paths taken from the environment.
+[guest-ui.py](guest-ui.py) is that WebSocket/HTTP client and [run-softap.sh](run-softap.sh) is the
+emulator command line with the image paths taken from the environment. The guest's console lines are
+quoted as they came out, with the product URL in its help answer replaced by a placeholder.
 
 ## Limits
 
