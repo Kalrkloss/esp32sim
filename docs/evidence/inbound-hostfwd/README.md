@@ -168,15 +168,18 @@ cargo test -p esp-soc --release hostfwd:: nat::
 
 The partition table is not published as a binary: the flasher generates it in JavaScript
 (`allPartitions_V2`, `memorySizeMB "4MB"`: nvs `0x9000`, otadata `0xe000`, app0 `0x10000`+`0x260000`,
-app1 `0x270000`+`0x90000`, ffat `0x300000`+`0x100000`). It was rebuilt byte-for-byte from that table
-(177 bytes, the four entries plus the MD5 entry).
+app1 `0x270000`+`0x90000`, ffat `0x300000`+`0x100000`). It was rebuilt from that table in the standard
+encoding (five 32-byte entries plus the `0xEBEB` MD5 entry, 176 bytes,
+`sha256 039b9f28410606430f95ed8f6614426f5a554c82d30d95e7066cc41df933b236`; an earlier attempt used a
+177-byte table with the MD5 entry left out and behaved identically). The builder is
+[annex_ptable.py](annex_ptable.py).
 
 Where it stopped: the ROM loads the bootloader and jumps to the app (`entry 0x403c98d8`), the app
 runs for about 9 s (its SHA accelerator works — the stop dump lands inside `ets_sha_process`), and
-then it software-resets itself and loops: `9 914` `chip reset at … cause 0x3 (RTC_SW_SYS_RESET)` in a
-40 s run, the same with 8 MB of emulated PSRAM (6 272 resets in 20 s, first at 5.8 s). It prints
-nothing on UART0 or USB, and `[emu] net:` shows 0 DHCP leases, so it never joins the virtual access
-point and there is no web UI to forward to.
+then it software-resets itself and loops: `9 305` `chip reset at … cause 0x3 (RTC_SW_SYS_RESET)` in a
+40 s run, the first at 8.7 s (9 914 resets in the earlier 40 s run with the malformed table, 6 272 in
+20 s with 8 MB of emulated PSRAM). It prints nothing on UART0 or USB, and `[emu] net:` shows 0 DHCP
+leases, so it never joins the virtual access point and there is no web UI to forward to.
 
 Why that is not a forwarding result: reaching it would need two things this time box did not
 cover — (a) a reason for the reset loop, which has no diagnostic output to work from (the app is
