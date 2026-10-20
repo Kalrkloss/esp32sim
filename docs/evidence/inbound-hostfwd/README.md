@@ -118,11 +118,13 @@ kernel's socket delivery and the guest's reaction to it.
 
 ## Reproduction scripts
 
-The end-to-end runs above need a firmware image, so they live with an external bench rather than in
-this repository. Their scripts are `smoke.sh` (scenario 5: start a forward, wait for the guest's DHCP
-lease, fetch the page, assert a string from it and the accounting line), `hostfwd-stress.sh` +
-`stress_client.py` (32 parallel GETs, aborted connections, a half-closed client, then the accounting
-line) and `determinism.sh` (the four-run family above). All three take the emulator binary from `EMU`.
+The end-to-end runs above need a firmware image, so the shell scripts live with an external bench
+rather than in this repository; the client that drives the concurrency phases is
+[stress_client.py](stress_client.py). Their scripts are `smoke.sh` (scenario 5: start a forward, wait
+for the guest's DHCP lease, fetch the page, assert a string from it and the accounting line),
+`hostfwd-stress.sh` + `stress_client.py` (32 parallel GETs, aborted connections, a half-closed client,
+then the accounting line) and `determinism.sh` (the four-run family above). All three take the
+emulator binary from `EMU`.
 
 The five-scenario run needs the bench's UART injection command (`uart1hex`, which feeds frame bytes
 into UART1), and that command is not on this branch: it lives on a separate bench branch built on top
