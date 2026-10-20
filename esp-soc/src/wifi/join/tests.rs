@@ -79,16 +79,16 @@ fn dhcp_reply(request: &[u8], reply_type: u8, yiaddr: [u8; 4], server: [u8; 4]) 
 
 #[test]
 fn join_options_name_what_the_join_accepts() {
-    let cfg = JoinConfig::parse("ssid=annex,psk=bench-passphrase,bssid=46:1b:f6:75:dc:e0").unwrap();
-    assert_eq!(cfg.ssid.as_deref(), Some("annex"));
+    let cfg = JoinConfig::parse("ssid=bench,psk=bench-passphrase,bssid=46:1b:f6:75:dc:e0").unwrap();
+    assert_eq!(cfg.ssid.as_deref(), Some("bench"));
     assert_eq!(cfg.psk.as_deref(), Some("bench-passphrase"));
     assert_eq!(cfg.bssid, Some([0x46, 0x1b, 0xf6, 0x75, 0xdc, 0xe0]));
-    assert!(cfg.describe().contains("annex"));
+    assert!(cfg.describe().contains("bench"));
     // No filter means "the first AP that beacons, as long as its security fits".
     let any = JoinConfig::parse("").unwrap();
     assert_eq!(any, JoinConfig::default());
     // A misspelled key or a passphrase WPA2 cannot use must not silently weaken the join.
-    assert!(JoinConfig::parse("ssdi=annex").unwrap_err().contains("unknown join option"));
+    assert!(JoinConfig::parse("ssdi=bench").unwrap_err().contains("unknown join option"));
     assert!(JoinConfig::parse("psk=short").unwrap_err().contains("at least 8 characters"));
     assert!(JoinConfig::parse("bssid=46:1b:f6:75:dc").unwrap_err().contains("six hexadecimal octets"));
 }

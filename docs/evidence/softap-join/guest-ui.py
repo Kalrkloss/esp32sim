@@ -6,7 +6,7 @@ The guest serves a WebSocket (`/ws`, subprotocol `Output`) that carries its cons
 page in a browser talks to it, so this script is the browser: handshake, masked text frames, and
 every server frame printed.
 
-usage: annex-ui.py PORT [seconds-between-commands] [--config] command [command ...]
+usage: guest-ui.py PORT [seconds-between-commands] [--config] command [command ...]
 
 The form in `--config` is the one the guest's config page posts (module CUSTOM, an ST7735 with the
 pin set of the board model used in the receipt); change it for another guest.
