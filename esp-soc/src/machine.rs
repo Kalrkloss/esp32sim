@@ -1170,7 +1170,7 @@ impl<S: Soc> Machine<S> {
                     for chunk in rest.split('|') {
                         let hex: String = chunk.chars().filter(|ch| !ch.is_whitespace() && *ch != '_').collect();
                         if hex.is_empty() { continue; }
-                        if hex.len() % 2 != 0 { return Err(format!("line {}: {} needs an even number of hex digits", ln + 1, cmd)); }
+                        if !hex.len().is_multiple_of(2) { return Err(format!("line {}: {} needs an even number of hex digits", ln + 1, cmd)); }
                         let mut bytes = Vec::with_capacity(hex.len() / 2);
                         for i in (0..hex.len()).step_by(2) {
                             bytes.push(u8::from_str_radix(&hex[i..i + 2], 16).map_err(|e| format!("line {}: {}: {}", ln + 1, cmd, e))?);
