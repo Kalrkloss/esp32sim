@@ -14,7 +14,7 @@ mod modeled;
 mod web;
 
 #[derive(Clone, Debug)]
-pub enum ScriptAction { Gpio(u8, bool), Serial(String), Uart(usize, String), Stop, Touch(u16, u16, bool), Poke(u32, u32), TouchPad(u8, bool), Ble(String), Analog(u8, esp_periph::AnalogSource),
+pub enum ScriptAction { Gpio(u8, bool), Serial(String), Uart(usize, String), UartBytes(usize, Vec<u8>), Stop, Touch(u16, u16, bool), Poke(u32, u32), TouchPad(u8, bool), Ble(String), Analog(u8, esp_periph::AnalogSource),
     /// `waituart0 <timeout_s> <text>`: hold the rest of the script until UART0 prints `text` (or the
     /// timeout passes), then shift every later action by the time actually waited. Fields: text,
     /// timeout in cycles, the cycle the script placed it at.
@@ -1041,6 +1041,7 @@ impl<S: Soc> Machine<S> {
                 ScriptAction::Gpio(pin, level) => { self.bus.gpio_set_input(pin, level); *self.bus.irq_dirty() = true; }
                 ScriptAction::Serial(text) => self.bus.serial_input(text.as_bytes()),
                 ScriptAction::Uart(n, text) => self.bus.uart_input(n, text.as_bytes()),
+                ScriptAction::UartBytes(n, bytes) => self.bus.uart_input(n, &bytes),
                 ScriptAction::Stop => { self.max_cycles = 0; stopped = true; }
                 ScriptAction::TouchPad(pin, touched) => self.bus.set_touch_input(pin, touched),
                 ScriptAction::Touch(x, y, d) => { self.bus.touch_input(x, y, d); }
@@ -1157,6 +1158,27 @@ impl<S: Soc> Machine<S> {
                                let samples: Vec<f32> = text.split(|ch: char| ch == ',' || ch.is_whitespace()).filter(|s| !s.is_empty()).map(|s| s.parse::<f32>()).collect::<Result<_, _>>().map_err(|e| format!("line {}: {}: {}", ln + 1, f, e))?;
                                ev.push((c, ScriptAction::Analog(pn, esp_periph::AnalogSource::Wave { samples: std::sync::Arc::new(samples), rate_hz: rate, start_cycles: c }))); }
                 "uart0" | "uart1" => ev.push((c, ScriptAction::Uart(if cmd == "uart0" { 0 } else { 1 }, format!("{}\n", rest)))),
+                // uart0hex|uart1hex|uart2hex <hex bytes> [| <hex bytes> ...]: raw bytes into that UART's
+                // receive FIFO, no trailing newline. Frames longer than the 128-byte FIFO are given as
+                // several chunks separated by `|`, each delivered at the same script time in order, so
+                // byte-for-byte binary protocols (a heat-pump CN-CNT datagram) can be replayed.
+                "uart0hex" | "uart1hex" | "uart2hex" => {
+                    let n = (cmd.as_bytes()[4] - b'0') as usize;
+                    let step = (hz / 1000.0) as u64 * 2;   // 2 ms of emulated time between chunks: the guest
+                                                           // drains the 128-byte FIFO well inside that
+                    let mut at = c;
+                    for chunk in rest.split('|') {
+                        let hex: String = chunk.chars().filter(|ch| !ch.is_whitespace() && *ch != '_').collect();
+                        if hex.is_empty() { continue; }
+                        if hex.len() % 2 != 0 { return Err(format!("line {}: {} needs an even number of hex digits", ln + 1, cmd)); }
+                        let mut bytes = Vec::with_capacity(hex.len() / 2);
+                        for i in (0..hex.len()).step_by(2) {
+                            bytes.push(u8::from_str_radix(&hex[i..i + 2], 16).map_err(|e| format!("line {}: {}: {}", ln + 1, cmd, e))?);
+                        }
+                        ev.push((at, ScriptAction::UartBytes(n, bytes)));
+                        at += step;
+                    }
+                }
                 "knob" => {
                     let mut p = rest.split_whitespace(); let dir = p.next().unwrap_or("cw"); let n: usize = p.next().map(|x| x.parse().unwrap_or(1)).unwrap_or(1);
                     let (clk, dt) = board.encoder().ok_or_else(|| format!("line {}: this board has no encoder", ln + 1))?;
