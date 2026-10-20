@@ -76,12 +76,52 @@ The network backend keeps its shape: `VirtualNet` runs in a client role (`client
 where the DHCP server, gateway, resolver and NTP of the emulated subnet do not exist, ARP and DHCP
 are answered by the join, and the only thing left on the host side is a forwarded connection. On
 that link the forward's peer is the address the guest leased, and its guest address is the AP
-itself — `--hostfwd tcp:127.0.0.1:8080-192.168.4.1:80` (or the station address, or nothing, on a
-`--wifi` link, which still refuses any other address).
+itself — `--hostfwd tcp:127.0.0.1:8080-192.168.4.1:80`. On a `--wifi` link the address may be the
+station's, or left empty for it; a join-only run has no station address to default to, so it must
+name the guest's own.
 
 Not modelled: 802.11n/ac rates (frames are built as legacy), channel switching, a scan that reports
-every AP, PMF/802.11w, and TKIP. A guest that runs both a station and its own AP can only be joined
-through the AP one.
+every AP, PMF/802.11w, and TKIP.
+
+## Both roles at once: the setup-AP flow
+
+The two directions above are the same link seen from either end, and a firmware that is configured
+through its own soft AP needs both ends in one run. Its setup page offers a scan so the user picks a
+network; the user types the passphrase, saves, and the guest restarts as that network's station. With
+one role at a time the scan lists nothing and the restart ends the test.
+
+```sh
+esp32sim ... --wifi ssid=bench,chan=6,psk=bench-password --wifi-join '' \
+  --hostfwd tcp:127.0.0.1:8080-192.168.4.1:80 --hostfwd tcp:127.0.0.1:8081-10.0.2.15:80
+```
+
+`StationLink` keeps `ap: Option<(VirtualAp, VirtualNet)>` and `join: Option<(Supplicant,
+VirtualNet)>` — two links, two networks — and one radio:
+
+- **Two networks, because they are not the same link.** Behind the access point the network is a
+  server (DHCP, ARP, DNS, NTP, station 10.0.2.15); on the join it is a client of the guest's DHCP
+  server and only the forward answers. A guest that reboots into station mode takes its address from
+  the *access point's* network, which is why one network cannot serve both roles.
+- **Received frames are routed by their addresses.** The emulated BSSID in addr1 (or addr3, for a
+  data frame to the DS) belongs to the access point; a broadcast management frame — a scan's probe
+  request — goes to it as well, because that is the one frame a scan needs answered; everything else
+  the guest transmits as an access point belongs to the join. Both links' due frames merge into one
+  receive ring in emulated time, one airtime gap apart, because there is one radio.
+- **The filter-match bits follow the guest's mode, not the frame's link.** While the guest's own
+  access point beacons (it is the AP this side joins, or the frame came over that link) its MAC
+  reports a match by address alone — bit 29 without bit 28 — so a scan in its setup UI accepts the
+  emulated access point's probe responses and beacons. After the reboot the join hears no access
+  point and the station convention (28 for group, 28|29 for its own unicast) applies again.
+- **The forward picks its link by the guest address it names.** `--hostfwd` specifications are
+  grouped by guest address: one in the access point's subnet (the station default 10.0.2.15
+  included) rides the access point's network, anything else rides the join's; a specification that
+  names no address means the station and goes to the access point's network.
+  `StationLink::net_for_guest` is the address-to-network map the bus uses for that.
+
+The end-of-run report keeps the roles apart: the `[emu] wifi:` line carries the access point's
+counters, `[emu] wifi-join:` the join's, and each network gets its own line — `[emu] net:` for the
+access point and `[emu] net (join):` for the join's when both are up. Station-only and join-only runs
+print exactly what they printed before.
 
 ## Not there yet
 

@@ -243,7 +243,10 @@ pub fn parse(args: &[String], default_chip: &str) -> Opts {
     if !o.hostfwd.is_empty() && o.wifi.is_none() && o.wifi_join.is_none() { usage_error("--hostfwd requires --wifi or --wifi-join"); }
     if !o.hostfwd.is_empty() && !matches!(o.net.split(',').next(), Some("nat" | "user")) { usage_error("--hostfwd requires --net nat"); }
     for spec in &o.hostfwd {
-        if let Err(e) = esp_soc::nat::HostFwdSpec::parse(spec) { usage_error(&format!("--hostfwd: {e}")); }
+        let parsed = esp_soc::nat::HostFwdSpec::parse(spec).unwrap_or_else(|e| usage_error(&format!("--hostfwd: {e}")));
+        if o.wifi.is_none() && parsed.uses_default_guest() {
+            usage_error("--hostfwd on a --wifi-join link needs the guest's own address (its access point, e.g. 192.168.4.1): there is no station of an emulated access point to default to");
+        }
     }
     if (o.ble_observe || o.ble_scan) && !o.ble_full { usage_error("BLE central/observer use requires --ble full"); }
     if o.ble_full && o.ble { usage_error("--ble full and --ble are mutually exclusive"); }

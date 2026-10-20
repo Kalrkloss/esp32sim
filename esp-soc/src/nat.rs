@@ -82,6 +82,9 @@ pub struct HostFwdSpec {
 
 impl HostFwdSpec {
     /// `tcp:[hostaddr]:hostport-[guestaddr]:guestport`. Empty host binds loopback; empty guest is 10.0.2.15.
+    /// True when the specification names no guest address, i.e. it aims at the station of the
+    /// emulated access point (10.0.2.15) — the one address a join-only run does not have.
+    pub fn uses_default_guest(&self) -> bool { self.guest_ip == STATION_IP }
     pub fn parse(spec: &str) -> Result<Self, String> {
         let rest = match spec.strip_prefix("tcp:") {
             Some(rest) => rest,
