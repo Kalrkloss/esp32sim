@@ -163,6 +163,7 @@ impl esp_soc::SocBus for SocBus {
         p.gpio.restore_external(&old.gpio);
         p.gpio.strap = old.gpio.strap;
         p.misc.log_unknown = old.misc.log_unknown;
+        p.misc.mmio_log = old.misc.mmio_log.take();   // an attached MMIO observer keeps recording
         p.spi0.jedec = old.spi0.jedec; p.spi1.jedec = old.spi1.jedec;   // the flash chip is not reset: its ID keeps the --flash-mb capacity
         p.rtc.ram = old.rtc.ram; p.rtc.slow_ticks = old.rtc.slow_ticks;
         p.rtc.ram.write(0x38, cause | (cause << 6));

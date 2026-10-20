@@ -135,6 +135,7 @@ impl esp_soc::SocBus for SocBus {
         p.adc.analog = old.adc.analog;
         p.adc.analog.set_stream_clock_offset(self.cycles); // the new peripheral clock starts at zero
         p.misc.log_unknown = old.misc.log_unknown;
+        p.misc.mmio_log = old.misc.mmio_log.take();   // an attached MMIO observer keeps recording
         p.usb.connected = old.usb.connected;
         p.rtc.reset_cause = cause;
         // The flash chip is on the board, not in the chip: its JEDEC capacity survives a reset.

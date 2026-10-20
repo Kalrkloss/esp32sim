@@ -124,6 +124,7 @@ impl esp_soc::SocBus for SocBus {
         self.periph.wifi.link = old.wifi.link.surviving_reboot();
         self.periph.wifi.log = old.wifi.log;
         self.periph.misc.log_unknown = old.misc.log_unknown;
+        self.periph.misc.mmio_log = old.misc.mmio_log.take();   // an attached MMIO observer keeps recording
         self.periph.gpio.gpio.strap = old.gpio.gpio.strap;
         self.periph.rtc.0.ram = old.rtc.0.ram;
         self.periph.rtc.0.slow_ticks = old.rtc.0.slow_ticks;

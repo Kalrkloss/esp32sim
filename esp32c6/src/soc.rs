@@ -113,6 +113,7 @@ impl esp_soc::SocBus for SocBus {
         p.adc.analog = old.adc.analog;
         p.adc.analog.set_stream_clock_offset(self.cycles); // the new peripheral clock starts at zero
         p.misc.log_unknown = old.misc.log_unknown;
+        p.misc.mmio_log = old.misc.mmio_log.take();   // an attached MMIO observer keeps recording
         p.usb.connected = old.usb.connected;
         // The LP domain is not reset by a CPU or system reset: the STORE registers, the RTC
         // timer and the watchdog keep running, and the ROM reads the cause from LP_CLKRST.
