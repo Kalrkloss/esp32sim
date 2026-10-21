@@ -23,12 +23,14 @@ import threading
 import time
 import zlib
 
-HERE = "/root/annex-basic"
-ROOT = "/root"
-EMU = "/root/esp32sim-lcd2/target-bench/release/esp32sim"
-APP = f"{HERE}/Annex32-S3_2.99.27_qio_qspi.bin"
-FLASH = "/tmp/annex-lcd2.img"
-LOG = "/tmp/annex-lcd2.log"
+# Everything local is a caller-supplied path: the image directory, the ROM file, the emulator.
+HOME_DIR = os.path.expanduser("~")
+HERE = os.environ.get("ANNEX_DIR", os.path.join(HOME_DIR, "annex-basic"))
+ROM = os.environ.get("ESP32SIM_ROM", os.path.join(HOME_DIR, "esp32sim", "roms", "esp32s3_rev0_rom.elf"))
+EMU = os.environ.get("ESP32SIM", os.path.join(HOME_DIR, "esp32sim-lcd2", "target-bench", "release", "esp32sim"))
+APP = os.environ.get("ANNEX_APP", os.path.join(HERE, "Annex32-S3_2.99.27_qio_qspi.bin"))
+FLASH = os.environ.get("ANNEX_FLASH", "/tmp/annex-lcd2.img")
+LOG = os.environ.get("ANNEX_LOG", "/tmp/annex-lcd2.log")
 
 
 def http(port, method, path, body=b"", ctype="text/plain", timeout=60.0):
@@ -112,7 +114,7 @@ def bbox(raw, w, h):
 def base_cmd(extra):
     return [
         EMU, "--chip", "s3", "--boot", "rom",
-        "--rom", f"{ROOT}/esp32sim/roms/esp32s3_rev0_rom.elf",
+        "--rom", ROM,
         "--bootloader", f"{HERE}/bootloader_opi_80m.bin",
         "--ptable", f"{HERE}/ptable-16mb.bin",
         "--app", APP,

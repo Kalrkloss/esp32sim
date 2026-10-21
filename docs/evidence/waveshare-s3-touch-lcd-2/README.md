@@ -97,8 +97,8 @@ End-of-run report from the board:
 `bbox` covers the whole 240×320 RAM and the most common colour is `0x0c1d` (the splash's blue), so the
 frame is neither a window inside the glass nor a single flat fill. `--tft-png` writes
 `annex-lcd2-105.png`: 240×320, 230 803 B, SHA-256
-`c23feebb96195c6f42b50ae568256882bf0d452bc6b21273fe4a30d53195c87b` — two independent runs of the
-capture produced the same hash, so the frame is deterministic. It shows the blue splash with the bee,
+`c23feebb96195c6f42b50ae568256882bf0d452bc6b21273fe4a30d53195c87b` — three independent runs of the
+capture (two at `--max-seconds 22`, one at 6) produced the same hash, so the frame is deterministic. It shows the blue splash with the bee,
 the copyright line, `ACCESS POINT`, `IP : 192.168.4.1` and the QR code, all complete: no edge is cut.
 The image file is not committed; `annex-lcd2.py` in this directory reproduces it.
 
@@ -196,9 +196,15 @@ Readings:
 
 The two scripts that produce the two halves of this receipt are next to this file: `annex-lcd2.py`
 (configure through the web UI, then capture the frame) and `annex-touch.py` (save the BASIC program,
-run it, inject the tap and the swipe, print the firmware's console lines). Both take the emulator from `/root/esp32sim-lcd2/target-bench/release/esp32sim` — a build of the
-`lcd2-board` branch, i.e. this change on top of the `splash2` bench commits — and the image inputs from
-`/root/annex-basic`; change `EMU`/`HERE` at the top for another machine.
+run it, inject the tap and the swipe, read the firmware's report). Everything local is a
+caller-supplied path, so nothing machine-specific is baked in:
+
+| Variable | Meaning |
+| --- | --- |
+| `ANNEX_DIR` | directory with the image, `bootloader_opi_80m.bin`, `ptable-16mb.bin`, `boot_app0.bin` (default `~/annex-basic`) |
+| `ANNEX_APP` | the application image (default `$ANNEX_DIR/Annex32-S3_2.99.27_qio_qspi.bin`) |
+| `ESP32SIM` | the emulator binary — it must be a build with the join, `--hostfwd` and `--flash-file` (the `splash2` bench plus this change) |
+| `ESP32SIM_ROM` | the S3 ROM ELF (default `~/esp32sim/roms/esp32s3_rev0_rom.elf`) |
 
 The workspace suite and both Clippy runs are recorded in the pull request; no golden output changed.
 
