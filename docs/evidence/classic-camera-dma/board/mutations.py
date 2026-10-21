@@ -29,6 +29,10 @@ rows = [
  ('picture-invalidation', c, 'self.picture = Some(p); self.invalidate(); Ok(())', 'self.picture = Some(p); Ok(())', 'host_and_register_updates_invalidate_shared_cache'),
  ('register-invalidation', c, 'self.cached.as_ref().is_none_or(|(old, _)| *old != config)', 'self.cached.is_none()', 'host_and_register_updates_invalidate_shared_cache'),
 ]
+selected = set(sys.argv[3:])
+if selected:
+ rows = [row for row in rows if row[0] in selected]
+ assert len(rows) == len(selected), 'unknown mutation name'
 results = []
 for name, file, old, new, test in rows:
  p = root / file; original = p.read_text()
