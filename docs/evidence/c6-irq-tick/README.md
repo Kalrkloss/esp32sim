@@ -16,6 +16,9 @@ instruction is skipped, no refresh is deferred across a source transition. This
 is not EX134/EX157 tick-deferral widening, EX028 source caching or an instruction
 cache. It is a C6-specific use of the existing EX090 invalidation contract.
 No new fields, allocation, feature flag or shared per-chip work is introduced.
+The record extends EX090 rather than adding a new experiment row because it
+applies that same interrupt-invalidation contract to C6, including the
+read-driven source correction; it is not a new scheduling mechanism.
 
 Invalidation audit:
 
@@ -160,6 +163,9 @@ deadline code are unchanged. This selector is scoped, not whole-binary identity.
 
 `checks.json` retains command results; `test-totals.json` has parsed totals.
 All Rust commands use `cargo +1.99.0`, nice 10 and an external target directory.
+These historical 988/960 totals exclude the three later read-side regressions;
+[the corrected tree's checks](read-side.md#fresh-required-checks) include them
+and report 991/963 under the same CI-policy/plain configurations.
 
 - Native workspace/all-target Clippy with warnings denied: PASS.
 - Release WASM Clippy with jit-tests and warnings denied: PASS.

@@ -94,6 +94,10 @@ as simulator input configuration. The plain run has no ROM environment.
 - `node tools/check-evidence-privacy.mjs`: PASS, including final tracked evidence.
 - `cargo +1.99.0 build --release --bins`: PASS on both arms.
 
+The README's historical 988/960 totals predate the three `irq_read.rs`
+regressions; the corrected tree includes them, hence 991/963 with the same
+CI-policy/plain test configurations and the same 50 plain-run ignored tests.
+
 No goldens or JIT code changed; wasm-jit-test is not applicable.
 
 ## Fresh exact execution
@@ -140,8 +144,12 @@ static evidence, not whole-binary identity or an absence-of-cost timing claim.
 
 ## CPU comparison
 
-PENDING
-
-No new timing result is collected or claimed for this correction. Exact-work
-runs check retirement, console and interrupts only. The original loaded-machine
-smoke did not prove correctness and is not a formal CPU table.
+The corrected candidate's measured October 17, 2026 table is in
+[README.md — CPU comparison](README.md#cpu-comparison), also linked from
+[EX090](../../experiments.md#ex090). It compares `2f0cbb09` with pinned main
+`142805d5`: one warmup and seven alternating measured pairs, identical work
+and console hashes. C6 hello-delay uses 3.200214 → 1.630844 user CPU seconds
+(-49.040%, slower 0/7); the public display starter uses 12.530602 → 10.924238
+(-12.820%, slower 0/7). The table includes the other-chip controls and limits.
+The exact-work runs above are correctness checks, not additional CPU samples;
+the earlier loaded-machine smoke remains historical only.
