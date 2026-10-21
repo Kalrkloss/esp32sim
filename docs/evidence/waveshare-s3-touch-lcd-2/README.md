@@ -221,3 +221,9 @@ The workspace suite and both Clippy runs are recorded in the pull request; no go
 - I2C pin routing is not modelled: the controller answers on bus 0 whatever pins the driver routes,
   which is why the firmware's own `I2C PORT for TOUCH CTS816: 0 48 47` line matters as the check that
   the configured bus is the one the model answers on.
+- The gesture register's slides are the model's interpretation of the pointer stream, not a measurement
+  of the controller's own gesture detection.
+
+## Experiment entry
+
+[EX235](../experiments.md#ex235), on top of EX234 (the GP-SPI2 feed a board's panel takes).
