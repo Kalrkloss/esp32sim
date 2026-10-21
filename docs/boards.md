@@ -107,7 +107,7 @@ the SoC at its next existing bus tick.
 
 | Device | Bus | Model |
 | --- | --- | --- |
-| ST7789T3 240×320 IPS panel | GP-SPI2 (SCLK 39, MOSI 38, MISO 40, CS 45, D/C 42, no reset line) | `DcsPanel::st7789()`: the controller's commands and its whole 240×320 GRAM; every GP-SPI2 transaction reaches it in order, framed by the D/C line the driver toggles on GPIO 42. `lcd_visible` is what the glass shows: the full frame, and nothing while the controller sleeps or the display is off. INVON is not applied — the module is IPS and the driver sets it to compensate the panel's polarity, so the RGB565 sent is the colour the glass shows |
+| ST7789T3 240×320 IPS panel | GP-SPI2 (SCLK 39, MOSI 38, MISO 40, CS 45, D/C 42, no reset line); either GP-SPI host reaches it, since the panel is the only device on the bus | `DcsPanel::st7789()`: the controller's commands and its whole 240×320 GRAM; every GP-SPI2 transaction reaches it in order, framed by the D/C line the driver toggles on GPIO 42. `lcd_visible` is what the glass shows: the full frame, and nothing while the controller sleeps or the display is off. INVON is not applied — the module is IPS and the driver sets it to compensate the panel's polarity, so the RGB565 sent is the colour the glass shows |
 | CST816D touch at 0x15 | I2C0 (SDA 48, SCL 47) | chip id 0xB6 at 0xA7 (the vendor BSP's probe), finger count at 0x02, one point at 0x03..0x06, gestures at 0x01; browser/script pointer events are latched until the driver reads them |
 | QMI8658 IMU at 0x6B | I2C0 | initialization-compatible register stub, not a behavioral model; `set_imu_motion` selects the scripted motion |
 | Backlight GPIO 1 | GPIO | level tracked and reported. The battery divider (GPIO 5), the TF card and the camera header are not modelled |
