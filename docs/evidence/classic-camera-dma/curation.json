@@ -29,8 +29,6 @@
     "builds_tests_or_cpu_timing_run": false,
     "harness_edits": "Relocation paths only; historical selector bodies preserved."
   },
-  "changed_file_list": "changed-files.txt",
-  "change_counts": {"M":29,"D":75,"A":79},
   "retained_files": {
     "docs/evidence/classic-camera-dma/c4-mutations.json": "docs/evidence/classic-camera-dma/mode/mutations.json",
     "docs/evidence/classic-camera-dma/c5-mutations.json": "docs/evidence/classic-camera-dma/fifo/mutations.json",

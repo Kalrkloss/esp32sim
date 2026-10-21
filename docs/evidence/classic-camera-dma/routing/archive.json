@@ -56,7 +56,8 @@
       "bytes": 6724,
       "sha256": "5aab6d32a44f7f8d9a740c66e1c23a5d4f119fcc714d7c60901612c5be5734a4",
       "curated": "mutate.py",
-      "curated_sha256": "5aab6d32a44f7f8d9a740c66e1c23a5d4f119fcc714d7c60901612c5be5734a4"
+      "curated_sha256": "1502cd447284e44381c4ef16e7ee4b0af3997d9112a30da91650ed5d3f1fa4ac",
+      "initial_curated_sha256": "5aab6d32a44f7f8d9a740c66e1c23a5d4f119fcc714d7c60901612c5be5734a4"
     },
     "mutations.json": {
       "bytes": 20286,

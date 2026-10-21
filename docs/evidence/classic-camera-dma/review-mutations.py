@@ -23,6 +23,10 @@ rows = [
     ('inverted mask stays stale', 'esp32/src/camera_dma.rs', '*old_mask == mask &&', 'true &&', 'esp32', 'aithinker', 'c7::inverted_route_reuses_capture_cache_and_invalidates_source_and_mask'),
     ('inverted source stays stale', 'esp32/src/camera_dma.rs', 'Arc::ptr_eq(old, &source)', 'true', 'esp32', 'aithinker', 'c7::inverted_route_reuses_capture_cache_and_invalidates_source_and_mask'),
 ]
+selected = set(sys.argv[3:])
+if selected:
+    rows = [row for row in rows if row[0] in selected]
+    assert len(rows) == len(selected), 'unknown mutation name'
 original = {f: (root/f).read_text() for _,f,*_ in rows}
 results = []
 try:
@@ -32,7 +36,13 @@ try:
         for baseline in [True, False]:
             (root/file).write_text(original[file] if baseline else original[file].replace(before, after, 1))
             run = subprocess.run(cmd, cwd=root, env=os.environ, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=300)
-            killed = run.returncode != 0 and f'test {case} ... FAILED' in run.stdout and 'assertion' in run.stdout and 'error[E' not in run.stdout
+            # assert!(status, "{stdout}...") emits only its custom message;
+            # require this fixture's panic marker and reject unwrap failures.
+            assertion = 'assertion' in run.stdout or (
+                'panicked at cli/tests/classic_camera.rs:' in run.stdout
+                and 'called `Result::unwrap()`' not in run.stdout
+                and 'called `Option::unwrap()`' not in run.stdout)
+            killed = run.returncode != 0 and f'test {case} ... FAILED' in run.stdout and assertion and 'error[E' not in run.stdout
             label = name.replace(' ', '-') + ('-baseline' if baseline else '-mutant')
             (out/(label+'.log')).write_text(run.stdout)
             results.append(dict(name=name,baseline=baseline,command=cmd,exit=run.returncode,assertion_killed=killed))

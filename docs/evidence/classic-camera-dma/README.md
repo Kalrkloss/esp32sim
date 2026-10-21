@@ -1,5 +1,7 @@
 # Classic camera evidence
 
+Current integrated-head checks and review fixes: [PR243 review qualification](review.md).
+
 [Curated receipt index and archive provenance](CURATION.md) covers the board,
 shared sensor state, SCCB, receiver mode, FIFO, routing, DMA and lifecycle receipts
 now consolidated here. Historical results below were not rerun by this curation.
@@ -84,7 +86,7 @@ camera-free active PCM without board-camera polling. Existing PCM tests are not
 changed. C6's camera-free scheduler/producer assertions remain in force.
 
 C7's 25 semantic mutants are assertion-killed, not compile-error kills; see
-mutations.md and mutations.json. The baseline passes. Reproduction:
+[the table](mutations.md) and [summary](c7-mutations.json). The baseline passes. Reproduction:
 
     python3 docs/evidence/classic-camera-dma/mutate.py TREE OUTPUT/c7
     python3 docs/evidence/classic-camera-dma/fifo/mutate.py TREE OUTPUT/c5
@@ -93,7 +95,7 @@ mutations.md and mutations.json. The baseline passes. Reproduction:
 
 All cargo invocations use cargo +1.99.0, nice -n 10 and isolated targets.
 
-# Qualification
+# Historical C7 qualification
 
 Final qualification passes: 1,027 ROM-enabled tests and 999 plain tests (50
 ignored); native/WASM Clippy, WASM build and all eight demos pass. All 95 semantic

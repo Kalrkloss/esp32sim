@@ -50,7 +50,8 @@
       "bytes": 3743,
       "sha256": "fb9fc62769d44fcb47a99da6c83def6e960e6bf3dec2f3641450cb612dcf8bdc",
       "curated": "mutations.py",
-      "curated_sha256": "fb9fc62769d44fcb47a99da6c83def6e960e6bf3dec2f3641450cb612dcf8bdc"
+      "curated_sha256": "f357ca15397d036907b72b22476ccb7826110aacb0ac2b012333a15c7cea2af3",
+      "initial_curated_sha256": "fb9fc62769d44fcb47a99da6c83def6e960e6bf3dec2f3641450cb612dcf8bdc"
     },
     "qualify.py": {
       "bytes": 2340,

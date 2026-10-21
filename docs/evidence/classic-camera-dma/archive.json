@@ -8,7 +8,8 @@
       "bytes": 9166,
       "sha256": "043411aa5a994418be7d7e9bc2c8f60d64c7c44e4b2be16180305ac0d85e6a97",
       "curated": "README.md",
-      "curated_sha256": "89ee0e095fa43551caf57e7607a05ef5908ac17759098a248023e84d03607d07"
+      "curated_sha256": "853e92aacc24d78bbad68c3f8acffee1dbdeae50e3bc422c00c0f2ce6aada403",
+      "initial_curated_sha256": "89ee0e095fa43551caf57e7607a05ef5908ac17759098a248023e84d03607d07"
     },
     "arming-checks.json": {
       "bytes": 22688,
@@ -218,7 +219,8 @@
       "bytes": 4720,
       "sha256": "1894a910cb4c8777b7e1297ab6861d1aa4b9f5e134cee6d354c47c33004d8f92",
       "curated": "fixture.md",
-      "curated_sha256": "4dc2b1df6097a75f0f5c340111aaebbc23647a56742958b484d9fb39e5dd1067"
+      "curated_sha256": "69b91a663fe4356fa825ea2e125b910d2cff441d6bdcd1bc90cd285dee837da9",
+      "initial_curated_sha256": "4dc2b1df6097a75f0f5c340111aaebbc23647a56742958b484d9fb39e5dd1067"
     },
     "goldens.json": {
       "bytes": 11949,
