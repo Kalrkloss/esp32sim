@@ -1,0 +1,228 @@
+{
+  "code": "80d22688b73a0da0cc610d1f32fec1982b3e3ce2",
+  "base": "f1b5c5d5ee218842de82af6ee5abda33429c97f7",
+  "build_jobs": 4,
+  "rust": "1.99.0",
+  "checks": [
+    {
+      "name": "assets",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "bash",
+        "tools/fetch-demo-assets.sh",
+        "--no-linux"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "assets-p4",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "bash",
+        "tools/fetch-p4-firmware.sh"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "assets-micropython",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "bash",
+        "tools/fetch-micropython.sh"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "clippy-native",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "cargo",
+        "+1.99.0",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "clippy-wasm",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "cargo",
+        "+1.99.0",
+        "clippy",
+        "--release",
+        "--target",
+        "wasm32-unknown-unknown",
+        "-p",
+        "esp32sim-wasm",
+        "--features",
+        "jit-tests",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "ci-tests",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "cargo",
+        "+1.99.0",
+        "test",
+        "--release",
+        "--workspace",
+        "--",
+        "--include-ignored",
+        "--skip",
+        "external_"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "plain-tests",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "cargo",
+        "+1.99.0",
+        "test",
+        "--release",
+        "--workspace"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "wasm-build",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "bash",
+        "tools/wasm-build.sh"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "wasm-demos",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "node",
+        "tools/wasm-test.mjs",
+        "hello",
+        "c3-hello",
+        "c6-hello",
+        "c6-energy-scan",
+        "c6-contiki",
+        "c6-contiki-net",
+        "c6-rpl-net",
+        "panel"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "wasm-demos-ci-extra",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "node",
+        "tools/wasm-test.mjs",
+        "p4-hello",
+        "tdisplay-prices"
+      ],
+      "exit_code": 0,
+      "env": "ESP32SIM_ROM_DIR=<checkout>/web/wasm/fw"
+    },
+    {
+      "name": "mutations",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "python3",
+        "docs/evidence/nat-tcp-counts/mutate.py",
+        "$OUT/mutations"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "restored",
+      "command": [
+        "bash",
+        "-c",
+        "git diff --exit-code -- esp-soc && git diff --exit-code 80d22688b73a0da0cc610d1f32fec1982b3e3ce2 HEAD -- esp-soc"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "release-bins",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "cargo",
+        "+1.99.0",
+        "build",
+        "--release",
+        "--bins"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "base-release-bins",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "cargo",
+        "+1.99.0",
+        "build",
+        "--release",
+        "--bins"
+      ],
+      "exit_code": 0,
+      "cwd": "exact-base checkout, separate CARGO_TARGET_DIR"
+    },
+    {
+      "name": "privacy",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "node",
+        "tools/check-evidence-privacy.mjs"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "f1b5c5d5ee218842de82af6ee5abda33429c97f7"
+      ],
+      "exit_code": 0
+    }
+  ]
+}

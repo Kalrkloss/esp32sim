@@ -1,0 +1,12 @@
+{
+  "ci-tests": {
+    "passed": 1245,
+    "failed": 0,
+    "ignored": 0
+  },
+  "plain-tests": {
+    "passed": 1195,
+    "failed": 0,
+    "ignored": 73
+  }
+}
