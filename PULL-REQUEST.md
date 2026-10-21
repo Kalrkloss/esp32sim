@@ -48,9 +48,10 @@ table), configured through its own web UI:
 - **Touch reaches the firmware.** The firmware's own BASIC loop polls the controller and prints what it
   reads; emulator script actions injected a tap at (120,160) and a swipe from (60,200) to (230,200).
   The firmware printed `RAW z=1 x=120 y=160`, then `x=60 y=200` while the press was held and
-  `x=230 y=200` before the lift; the board counted 4119 CST816D register reads. `TOUCH.READ` (the
-  calibrated reading) returns 0,0 in this image because no calibration is stored — `TOUCH.RAW` is the
-  controller's own answer and is what the receipt quotes.
+  `x=230 y=200` before the lift; the same points came back over the web UI's own editor socket as
+  `GETVAR:` frames read from the program's variables, and the board counted 4119 CST816D register
+  reads. `TOUCH.READ` (the calibrated reading) returns 0,0 in this image because no calibration is
+  stored — `TOUCH.RAW` is the controller's own answer and is what the receipt quotes.
 
 Receipt with the commands, the settings record, the preset table, the console output and the limits:
 [docs/evidence/waveshare-s3-touch-lcd-2](docs/evidence/waveshare-s3-touch-lcd-2/README.md), experiment

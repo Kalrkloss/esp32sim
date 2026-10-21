@@ -130,6 +130,9 @@ print "TOUCHMON up"
 do
   touch.raw
   if touch.z > 0 then
+    tx=touch.x
+    ty=touch.y
+    tz=touch.z
     print "RAW z=";touch.z;" x=";touch.x;" y=";touch.y
   endif
   touch.read
@@ -140,7 +143,7 @@ do
 loop
 ```
 
-The firmware's console, from its own UART:
+Two channels read the same run. The firmware's console, from its own UART:
 
 ```
 Program Running
@@ -148,7 +151,16 @@ TOUCHMON up
 RAW z=1 x=120 y=160        (x8, the tap)
 RAW z=1 x=60 y=200         (x5, the swipe's press)
 RAW z=1 x=230 y=200        (x4, the swipe's end)
-CAL z=1 x=0 y=0            (x8, the tap through TOUCH.READ)
+CAL z=1 x=0 y=0            (x17, TOUCH.READ over the same presses)
+```
+
+and the web UI's editor socket, asked for the program's own variables with `cmd:getvars tx_^-ty_^-tz`
+(the page's own watch mechanism), answers frames carrying the point:
+
+```
+GETVAR:120_^-160_^-1_^-120      (x25)
+GETVAR:60_^-200_^-1_^-60        (x1)
+GETVAR:230_^-200_^-1_^-230      (x29)
 ```
 
 Readings:
@@ -159,11 +171,14 @@ Readings:
 - `TOUCH.READ` returns 0,0 because it returns *calibrated* coordinates and no calibration has been
   stored in this image; `TOUCH.RAW` is the controller's own answer. That is a property of the image's
   calibration state, not of the transport, and it is why the receipt quotes `TOUCH.RAW`.
-- The board's end-of-run report counts the driver's register reads (4119 in the run above), which is
-  the quantitative form of the same claim: the firmware polls this controller, it does not read a
-  stub answered by the bus model.
+- The board's end-of-run report counts the driver's register reads (4119 in the console run, 4089 in the
+  `GETVAR` run — the extra web round trip changes the polling, not the points), which is the
+  quantitative form of the same claim: the firmware polls this controller, it does not read a stub
+  answered by the bus model.
 - The swipe's intermediate coordinate (230,200) is read while the press is still down, i.e. the model
   reports a held point and its movement, not only press/release edges.
+- The same numbers arrive on the browser channel as `GETVAR:` frames, so the firmware's report is not a
+  property of the UART capture: the guest computed them and the web UI reads them back.
 
 ## Tests
 
@@ -181,9 +196,9 @@ Readings:
 
 The two scripts that produce the two halves of this receipt are next to this file: `annex-lcd2.py`
 (configure through the web UI, then capture the frame) and `annex-touch.py` (save the BASIC program,
-run it, inject the tap and the swipe, print the firmware's console lines). Both take the emulator from
-`/root/esp32sim-lcd2/target/release/esp32sim` and the image inputs from `/root/annex-basic`; change
-`EMU`/`HERE` at the top for another machine.
+run it, inject the tap and the swipe, print the firmware's console lines). Both take the emulator from `/root/esp32sim-lcd2/target-bench/release/esp32sim` — a build of the
+`lcd2-board` branch, i.e. this change on top of the `splash2` bench commits — and the image inputs from
+`/root/annex-basic`; change `EMU`/`HERE` at the top for another machine.
 
 The workspace suite and both Clippy runs are recorded in the pull request; no golden output changed.
 
@@ -200,7 +215,3 @@ The workspace suite and both Clippy runs are recorded in the pull request; no go
 - I2C pin routing is not modelled: the controller answers on bus 0 whatever pins the driver routes,
   which is why the firmware's own `I2C PORT for TOUCH CTS816: 0 48 47` line matters as the check that
   the configured bus is the one the model answers on.
-
-## Experiment entry
-
-[EX235](../experiments.md#ex235), on top of EX234 (the GP-SPI2 feed a board's panel takes).

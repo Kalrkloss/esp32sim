@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Annex 2.99.27 on the emulated Waveshare ESP32-S3-Touch-LCD-2 (receipt: docs/evidence/waveshare-s3-touch-lcd-2).
+"""Annex 2.99.27 on the emulated Waveshare ESP32-S3-Touch-LCD-2.
 
 Phase A boots the image, joins its soft AP through --wifi-join, reads the settings record from
 `/_kfg_` (an empty POST is the read), writes MODULE=CUSTOM, the display preset, the panel pins,
@@ -25,7 +25,7 @@ import zlib
 
 HERE = "/root/annex-basic"
 ROOT = "/root"
-EMU = "/root/esp32sim-lcd2/target/release/esp32sim"
+EMU = "/root/esp32sim-lcd2/target-bench/release/esp32sim"
 APP = f"{HERE}/Annex32-S3_2.99.27_qio_qspi.bin"
 FLASH = "/tmp/annex-lcd2.img"
 LOG = "/tmp/annex-lcd2.log"

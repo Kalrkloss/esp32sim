@@ -28,6 +28,9 @@ PROGRAM = """print "TOUCHMON up"
 do
   touch.raw
   if touch.z > 0 then
+    tx=touch.x
+    ty=touch.y
+    tz=touch.z
     print "RAW z=";touch.z;" x=";touch.x;" y=";touch.y
   endif
   touch.read
@@ -189,7 +192,17 @@ def main():
     # drain both sockets until the run ends or the window closes
     deadline = time.time() + args.seconds * 16
     texts = []
+    last_poll = 0.0
     while time.time() < deadline and emu.poll() is None:
+        if time.time() - last_poll > 2.0:
+            # the console page pulls with "$"; the editor reads the program's own variables with
+            # cmd:getvars, which is how the page shows what the guest computed
+            try:
+                output.send("$")
+                editor.send("cmd:getvars tx_^-ty_^-tz_^-tx")
+            except OSError:
+                pass
+            last_poll = time.time()
         for ws in (editor, output):
             try:
                 text = ws.recv(timeout=0.5)
@@ -207,12 +220,16 @@ def main():
         emu.kill()
 
     guest = open("/tmp/annex-touch.log", encoding="utf-8", errors="replace").read()
-    printed = [l.strip() for l in guest.splitlines() if "TOUCH" in l]
-    print(f"\nwebsocket frames with TOUCH: {sum(1 for t in texts if 'TOUCH' in t)}")
-    print(f"guest console lines with TOUCH: {len(printed)}")
-    for line in printed[:12]:
+    printed = [l.strip() for l in guest.splitlines() if "TOUCHMON" in l or l.strip().startswith(("RAW", "CAL"))]
+    watched = [t.strip() for t in texts if t.startswith("GETVAR:")]
+    hits = [w for w in watched if not w.startswith("GETVAR:0_^-0_^-0")]
+    print(f"\nwebsocket GETVAR frames: {len(watched)}, with a point: {len(hits)}")
+    for w in (hits or watched)[:8]:
+        print("   ", w[:120])
+    print(f"guest console lines about touch: {len(printed)}")
+    for line in printed[:6]:
         print("   ", line[:140])
-    return 0 if printed else 1
+    return 0 if printed and watched else 1
 
 
 if __name__ == "__main__":
