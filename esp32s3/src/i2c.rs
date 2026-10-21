@@ -199,12 +199,13 @@ pub struct Cst816d {
     /// where the current press started, while one is down
     press: Option<(u16, u16)>,
     gesture: u8,
-    pub reads: u64,
+    /// register reads the driver made, shared with the board for its end-of-run report
+    reads: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl Cst816d {
-    pub fn new(touch: std::sync::Arc<std::sync::Mutex<TouchState>>) -> Self {
-        Cst816d { ptr: 0, first: true, touch, press: None, gesture: CST816_GESTURE_NONE, reads: 0 }
+    pub fn new(touch: std::sync::Arc<std::sync::Mutex<TouchState>>, reads: std::sync::Arc<std::sync::atomic::AtomicU64>) -> Self {
+        Cst816d { ptr: 0, first: true, touch, press: None, gesture: CST816_GESTURE_NONE, reads }
     }
 
     /// Update the gesture the way the controller does, from the point report the driver reads.
@@ -258,7 +259,12 @@ impl I2cDevice for Cst816d {
         if self.first { self.ptr = byte; self.first = false; } else { self.ptr = self.ptr.wrapping_add(1); }
         true
     }
-    fn read(&mut self) -> u8 { let value = self.reg(self.ptr); self.ptr = self.ptr.wrapping_add(1); self.reads += 1; value }
+    fn read(&mut self) -> u8 {
+        let value = self.reg(self.ptr);
+        self.ptr = self.ptr.wrapping_add(1);
+        self.reads.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        value
+    }
 }
 
 #[cfg(test)]
@@ -291,14 +297,14 @@ mod tests {
             *state = TouchState::default();
             state.update(x, y, down);
         }
-        Cst816d::new(touch.clone())
+        Cst816d::new(touch.clone(), Default::default())
     }
 
     /// The vendor BSP probes 0xA7 for 0xB6, then reads the finger count and one point.
     #[test]
     fn cst816d_answers_the_vendor_probe_and_reports_one_point() {
         let touch = std::sync::Arc::new(std::sync::Mutex::new(TouchState::default()));
-        let mut idle = Cst816d::new(touch.clone());
+        let mut idle = Cst816d::new(touch.clone(), Default::default());
         assert_eq!(read_registers(&mut idle, 0xa7, 3), [0xb6, 0x01, 0x01]);
         assert_eq!(read_registers(&mut idle, 0x02, 5), [0, 0, 0, 0, 0], "no finger, no point");
 
@@ -337,8 +343,10 @@ mod tests {
     fn cst816d_keeps_a_tap_the_driver_never_sampled() {
         let touch = std::sync::Arc::new(std::sync::Mutex::new(TouchState::default()));
         { touch.lock().unwrap().update(50, 60, true); touch.lock().unwrap().update(50, 60, false); }
-        let mut device = Cst816d::new(touch.clone());
+        let reads = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let mut device = Cst816d::new(touch.clone(), reads.clone());
         assert_eq!(read_registers(&mut device, 0x02, 1), [1], "the press is reported first");
+        assert_eq!(reads.load(std::sync::atomic::Ordering::Relaxed), 1, "reads reach the board's counter");
         assert_eq!(read_registers(&mut device, 0x02, 1), [0], "then the lift the driver asked for");
         assert_eq!(read_registers(&mut device, 0x01, 1), [CST816_GESTURE_SINGLE_CLICK]);
     }

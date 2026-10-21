@@ -41,6 +41,8 @@ pub struct WaveshareS3TouchLcd2 {
     pub gpio_events: u64,
     /// pointer state the CST816D reports
     pub touch_state: std::sync::Arc<std::sync::Mutex<crate::i2c::TouchState>>,
+    /// register reads the touch driver made, for the end-of-run report
+    pub touch_reads: std::sync::Arc<std::sync::atomic::AtomicU64>,
     /// board clock and motion selection seen by the QMI8658
     pub imu: std::sync::Arc<crate::i2c::ImuMotion>,
 }
@@ -54,6 +56,7 @@ impl WaveshareS3TouchLcd2 {
             backlight: false,
             gpio_events: 0,
             touch_state: Default::default(),
+            touch_reads: Default::default(),
             imu: Default::default(),
         }
     }
@@ -82,7 +85,7 @@ impl BoardModel for WaveshareS3TouchLcd2 {
     fn i2c_devices(&mut self) -> Vec<(u8, u8, Box<dyn crate::i2c::I2cDevice>)> {
         use crate::i2c::*;
         vec![
-            (0, TOUCH_ADDRESS, Box::new(Cst816d::new(self.touch_state.clone()))),
+            (0, TOUCH_ADDRESS, Box::new(Cst816d::new(self.touch_state.clone(), self.touch_reads.clone()))),
             (0, IMU_ADDRESS, Box::new(Qmi8658::new(self.imu.clone()))),
         ]
     }
@@ -100,8 +103,9 @@ impl BoardModel for WaveshareS3TouchLcd2 {
     fn imu_motion(&self) -> u32 { self.imu.mode.load(std::sync::atomic::Ordering::Relaxed) }
     fn report(&self) -> String {
         let p = &self.panel;
-        format!("[emu] lcd2: {} RAMWR, {} pixels, madctl={:#x} colmod={:#x} inverted={} on={} sleeping={} backlight={} bbox={:?} top colours {:x?}; gpio events {}",
-                p.frames, p.pixels_written, p.madctl, p.colmod, p.inverted, p.on, p.sleeping, self.backlight, p.bbox(), p.histogram(5), self.gpio_events)
+        format!("[emu] lcd2: {} RAMWR, {} pixels, madctl={:#x} colmod={:#x} inverted={} on={} sleeping={} backlight={} bbox={:?} top colours {:x?}; cst816d {} register reads; gpio events {}",
+                p.frames, p.pixels_written, p.madctl, p.colmod, p.inverted, p.on, p.sleeping, self.backlight, p.bbox(), p.histogram(5),
+                self.touch_reads.load(std::sync::atomic::Ordering::Relaxed), self.gpio_events)
     }
 }
 
@@ -191,6 +195,7 @@ mod lcd2_tests {
         use crate::i2c::I2cDevice;
         let mut board = WaveshareS3TouchLcd2::new();
         board.touch(300, 400, true);
+        let reads = board.touch_reads.clone();
         let mut device = board.i2c_devices().into_iter().next().expect("touch controller").2;
 
         fn read_at(device: &mut Box<dyn I2cDevice>, reg: u8) -> u8 {
@@ -204,5 +209,6 @@ mod lcd2_tests {
         assert_eq!(read_at(&mut device, 0x04), 239, "x clamped to the glass");
         assert_eq!(read_at(&mut device, 0x05), 1, "y high nibble");
         assert_eq!(read_at(&mut device, 0x06), 0x3f, "y clamped to the glass, low byte");
+        assert_eq!(reads.load(std::sync::atomic::Ordering::Relaxed), 5, "the board counts the driver's register reads");
     }
 }
