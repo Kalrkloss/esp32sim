@@ -9,7 +9,7 @@ fn public_driver_captures_host_frame() {
         .unwrap();
     let roms = std::env::var_os("ESP32SIM_ROM_DIR").expect("set ESP32SIM_ROM_DIR");
     fixture::capture(
-        &root.join("web/wasm/fw/public/classic-camera"),
+        &root.join("esp32/tests/fixtures/classic-camera"),
         &std::path::PathBuf::from(roms).join("esp32_rev300_rom.elf"),
     );
 }

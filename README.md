@@ -11,6 +11,11 @@ projects end to end. No cloud, no accounts. MIT.
 
 The [classic ESP32](docs/esp32.md) also boots its ECO3 ROM on dual LX6 cores, with GPIO, UART and timers; `--board ttgo-tdisplay` adds the LilyGO TTGO T-Display's ST7789 and buttons.
 
+`--chip esp32 --board ai-thinker-cam --cam-image image.ppm` supplies the AI-Thinker
+ESP32-CAM's OV2640 with a BMP/PPM still image. Capture supports raw RGB565/YUV422
+into internal DRAM at a fixed approximate 10 FPS; the usual JPEG+PSRAM
+CameraWebServer path is unsupported. See the [camera scope and example](docs/esp32.md#the-camera---board-ai-thinker-cam).
+
 | | **ESP32-S3** | **ESP32-C3** | **ESP32-C6** |
 | --- | --- | --- | --- |
 | CPU | 2 × Xtensa LX7 @ 240 MHz | 1 × RISC-V RV32IMC @ 160 MHz | 1 × RISC-V RV32IMAC @ 160 MHz |

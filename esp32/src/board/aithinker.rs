@@ -24,14 +24,15 @@ pub const PIN_RESET: Option<u8> = None;
 pub struct AiThinkerCam {
     sensor: Arc<Mutex<Ov2640State>>,
     source: HostFrameSource,
-    power: Arc<Mutex<bool>>,
+    powered_down: Arc<Mutex<bool>>,
     now: u64,
     next: Option<u64>,
     vsync: bool,
     edges: Vec<BoardEdge>,
     frame_start: Option<u64>,
+    unsupported_reported: bool,
 }
-impl Default for AiThinkerCam { fn default() -> Self { Self { sensor: Default::default(), source: Default::default(), power: Arc::new(Mutex::new(true)), now: 0, next: None, vsync: false, edges: Vec::new(), frame_start: None } } }
+impl Default for AiThinkerCam { fn default() -> Self { Self { sensor: Default::default(), source: Default::default(), powered_down: Arc::new(Mutex::new(true)), now: 0, next: None, vsync: false, edges: Vec::new(), frame_start: None, unsupported_reported: false } } }
 
 struct Sccb { sensor: Ov2640, powered_down: Arc<Mutex<bool>> }
 // Power is shared with the SCCB device so a powered-down sensor does not ACK.
@@ -68,7 +69,7 @@ impl BoardModel for AiThinkerCam {
         if cycle < self.now { return; }
         let streaming = self.sensor.lock().unwrap().streaming;
         let live = clock(PIN_XCLK).is_some_and(|(hz, duty)| hz.is_finite() && hz > 0.0 && duty > 0 && duty < 65535);
-        if !*self.power.lock().unwrap() && streaming && live {
+        if !*self.powered_down.lock().unwrap() && streaming && live {
             if self.next.is_none() { self.next = cycle.checked_add(FRAME_CYCLES); }
             self.advance_to(cycle);
         } else {
@@ -84,23 +85,29 @@ impl BoardModel for AiThinkerCam {
     fn gpio_output_at(&mut self, _: u64, _: &[(u8, bool)], enabled: u64, output: u64) {
         // A floating/unconfigured PWDN is conservatively inactive. The guest must
         // explicitly drive it low; no reset GPIO is attached on this board.
-        *self.power.lock().unwrap() = enabled & (1 << PIN_PWDN) == 0 || output & (1 << PIN_PWDN) != 0;
+        *self.powered_down.lock().unwrap() = enabled & (1 << PIN_PWDN) == 0 || output & (1 << PIN_PWDN) != 0;
     }
     fn i2c_devices(&mut self) -> Vec<(u8, u8, Box<dyn I2cDevice>)> {
-        vec![(0, 0x30, Box::new(Sccb { sensor: Ov2640::new(self.sensor.clone()), powered_down: self.power.clone() }))]
+        vec![(0, 0x30, Box::new(Sccb { sensor: Ov2640::new(self.sensor.clone()), powered_down: self.powered_down.clone() }))]
     }
     fn set_camera_picture(&mut self, p: Picture) -> Result<(), &'static str> { self.source.set_camera_picture(p) }
     fn camera_preview(&self, w: u32, h: u32) -> Option<Vec<u8>> { self.source.camera_preview(w, h) }
     fn camera_frame_with_clock(&mut self, clock: &dyn Fn(u8) -> Option<(f64, u32)>) -> Option<(u32, u32, Arc<Vec<u8>>)> {
         let config = *self.sensor.lock().unwrap();
         let (hz, duty) = clock(PIN_XCLK)?;
-        if *self.power.lock().unwrap() || !config.streaming || !hz.is_finite() || hz <= 0.0 || duty == 0 || duty >= 65535 { return None; }
+        if *self.powered_down.lock().unwrap() || !config.streaming || !hz.is_finite() || hz <= 0.0 || duty == 0 || duty >= 65535 { return None; }
         // esp32-camera v2.1.4 ov2640_settings.h: grayscale requests use
         // ov2640_settings_yuv422, exactly the same two-byte wire format as YUV.
         let format = match config.image_mode {
             0 => PixelFormat::Yuyv,
             8 => PixelFormat::Rgb565,
-            _ => return None, // JPEG/raw/byte-order variants are not implemented.
+            _ => {
+                if !self.unsupported_reported {
+                    eprintln!("[camera] unsupported sensor output: IMAGE_MODE {:#x}; classic ESP32-CAM supports raw RGB565/YUV422 in DRAM, not JPEG/PSRAM CameraWebServer", config.image_mode);
+                    self.unsupported_reported = true;
+                }
+                return None;
+            }
         };
         self.source.frame(config.width, config.height, format, None)
     }

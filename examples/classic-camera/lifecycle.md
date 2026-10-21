@@ -27,7 +27,7 @@ C9_LIFECYCLE=ON bash examples/classic-camera/build.sh "$BUILD_A"
 nice -n 10 idf.py -C "$SOURCE_B" -B "$BUILD_B" \
   -D SDKCONFIG="$BUILD_B/sdkconfig" -D C9_LIFECYCLE=ON build
 python3 examples/classic-camera/check-builds.py "$BUILD_A" "$BUILD_B" \
-  web/wasm/fw/public/classic-camera-lifecycle
+  esp32/tests/fixtures/classic-camera lifecycle.bin
 python3 examples/classic-camera/expected-frame.py
 python3 examples/classic-camera/expected-frame.py --replacement
 ESP32SIM_ROM_DIR="$PWD/web/wasm/fw" nice -n 10 cargo +1.99.0 test \
@@ -60,7 +60,7 @@ ESP32SIM_ROM_DIR="$PWD/web/wasm/fw" python3 examples/classic-camera/mutate-lifec
   "$PWD" "$MUTATIONS" "$BUILD_A"
 C9_LIFECYCLE=ON bash examples/classic-camera/build.sh "$BUILD_A"
 python3 examples/classic-camera/check-builds.py "$BUILD_A" "$BUILD_B" \
-  web/wasm/fw/public/classic-camera-lifecycle
+  esp32/tests/fixtures/classic-camera lifecycle.bin
 ```
 
 The runner restores source files and the test's image even on failure. The

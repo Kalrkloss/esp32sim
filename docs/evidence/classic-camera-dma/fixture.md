@@ -13,7 +13,7 @@ public driver source or DMA path changes are made by C8.
 [The build/run recipe](../../../examples/classic-camera/README.md) pins
 ESP-IDF v5.4.3 (`ea1c174c1cbb7348bd8ba0ff1eb306246938dd80`), public
 esp32-camera (`b817e9b81041980608d1a3d3e0b08d86e3666382`), Xtensa GCC
-`esp-14.2.0_20241119` and esp_jpeg 1.3.1's registry hash. The 107 unmodified
+`esp-14.2.0_20250730` and esp_jpeg 1.3.1's registry hash. The 107 unmodified
 driver files are fingerprinted in [fixture-driver-sources.json](fixture-driver-sources.json).
 The lockfile is committed; fetched components and SDK/tools are not.
 

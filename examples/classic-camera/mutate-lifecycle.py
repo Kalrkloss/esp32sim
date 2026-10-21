@@ -22,7 +22,7 @@ rows = [
     ('reboot keeps live I2S', 'esp32/src/soc.rs', 'for port in 0..2 { self.periph.i2s[port].inner.keep_rx_input(&mut old.i2s[port].inner); }', 'std::mem::swap(&mut self.periph.i2s, &mut old.i2s);', False),
 ]
 original = {file: (root/file).read_text() for _,file,_,_,_ in rows}
-image = root/'web/wasm/fw/public/classic-camera-lifecycle/classic_camera.bin'
+image = root/'esp32/tests/fixtures/classic-camera/lifecycle.bin'
 original_image = image.read_bytes()
 cmd = ['nice','-n','10','cargo','+1.99.0','test','--release','-p','esp32','--test','camera_lifecycle','--','--ignored','--nocapture']
 results = []

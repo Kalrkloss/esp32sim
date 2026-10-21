@@ -1,116 +1,14 @@
-[
-  {
-    "name": "baseline",
-    "file": "esp32/src/camera_dma.rs",
-    "before": null,
-    "after": null,
-    "exit": 0,
-    "killed": false,
-    "failed_tests": []
-  },
-  {
-    "name": "exclusive boundary",
-    "file": "esp32/src/camera_dma.rs",
-    "before": "capture.armed_at - at <= ARM_WINDOW",
-    "after": "capture.armed_at - at < ARM_WINDOW",
-    "exit": 101,
-    "killed": true,
-    "failed_tests": [
-      "c7::arming::c71_inclusive_window_boundary_and_exact_catchup"
-    ]
-  },
-  {
-    "name": "window disabled",
-    "file": "esp32/src/camera_dma.rs",
-    "before": "capture.armed_at - at <= ARM_WINDOW",
-    "after": "capture.armed_at - at <= 0",
-    "exit": 101,
-    "killed": true,
-    "failed_tests": [
-      "c7::arming::c71_driver_stop_reset_start_inside_window",
-      "c7::arming::c71_falling_edge_full_frame_and_tick_splits",
-      "c7::arming::c71_inclusive_window_boundary_and_exact_catchup"
-    ]
-  },
-  {
-    "name": "unbounded window",
-    "file": "esp32/src/camera_dma.rs",
-    "before": "capture.armed_at - at <= ARM_WINDOW",
-    "after": "capture.armed_at - at <= u64::MAX",
-    "exit": 101,
-    "killed": true,
-    "failed_tests": [
-      "c7::arming::c71_inclusive_window_boundary_and_exact_catchup"
-    ]
-  },
-  {
-    "name": "delivery timed from start",
-    "file": "esp32/src/camera_dma.rs",
-    "before": "self.cycles.saturating_sub(capture.frame_at?)",
-    "after": "self.cycles.saturating_sub(capture.frame_at?.max(capture.armed_at))",
-    "exit": 101,
-    "killed": true,
-    "failed_tests": [
-      "c7::arming::c71_driver_stop_reset_start_inside_window",
-      "c7::arming::c71_falling_edge_full_frame_and_tick_splits",
-      "c7::arming::c71_inclusive_window_boundary_and_exact_catchup"
-    ]
-  },
-  {
-    "name": "forced low counted as start",
-    "file": "esp32/src/board/aithinker.rs",
-    "before": "self.next = None;\n            self.frame_start = None;",
-    "after": "self.next = None;\n            self.frame_start = Some(cycle);",
-    "exit": 101,
-    "killed": true,
-    "failed_tests": [
-      "c7::arming::c71_forced_low_power_clock_stream_stop_never_starts_frame",
-      "c7::arming::c71_route_loss_and_restore_inside_window_requires_new_pulse"
-    ]
-  },
-  {
-    "name": "frame claim replayed",
-    "file": "esp32/src/board/aithinker.rs",
-    "before": "self.frame_start.take()",
-    "after": "self.frame_start",
-    "exit": 101,
-    "killed": true,
-    "failed_tests": [
-      "c7::arming::c71_second_start_cannot_replay_claimed_frame"
-    ]
-  },
-  {
-    "name": "route loss ignored",
-    "file": "esp32/src/board/aithinker.rs",
-    "before": "fn invalidate_camera_frame_start(&mut self) { self.frame_start = None; }",
-    "after": "fn invalidate_camera_frame_start(&mut self) {}",
-    "exit": 101,
-    "killed": true,
-    "failed_tests": [
-      "c7::arming::c71_route_loss_and_restore_inside_window_requires_new_pulse",
-      "c7::arming::c71_initially_invalid_route_waits_instead_of_aborting"
-    ]
-  },
-  {
-    "name": "unqualified start aborts early",
-    "file": "esp32/src/camera_dma.rs",
-    "before": "self.periph.i2s[0].camera.as_ref().is_some_and(|c| c.qualified)",
-    "after": "self.periph.i2s[0].camera.is_some()",
-    "exit": 101,
-    "killed": true,
-    "failed_tests": [
-      "c7::arming::c71_initially_invalid_route_waits_instead_of_aborting"
-    ]
-  },
-  {
-    "name": "unrelated pad bits close window",
-    "file": "esp32/src/bus.rs",
-    "before": "=> (7 << 12) | (1 << 9),",
-    "after": "=> u32::MAX,",
-    "exit": 101,
-    "killed": true,
-    "failed_tests": [
-      "c7::arming::c71_unrelated_pad_and_noroute_bit_writes_keep_window"
-    ]
-  }
-]
+{
+  "recorded_rows": 10,
+  "outcome_counts": {"killed":{"false":1,"true":9}},
+  "groups": [
+    {"count":1,"outcome":{"exit":0,"killed":false,"failed_test_count":0},"names":["baseline"]},
+    {
+      "count": 5,
+      "outcome": {"exit":101,"killed":true,"failed_test_count":1},
+      "names": ["exclusive boundary","unbounded window","frame claim replayed","unqualified start aborts early","unrelated pad bits close window"]
+    },
+    {"count":2,"outcome":{"exit":101,"killed":true,"failed_test_count":3},"names":["window disabled","delivery timed from start"]},
+    {"count":2,"outcome":{"exit":101,"killed":true,"failed_test_count":2},"names":["forced low counted as start","route loss ignored"]}
+  ]
+}

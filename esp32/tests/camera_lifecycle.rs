@@ -31,12 +31,12 @@ fn public_driver_camera_lifecycle() {
     for (offset, name) in [
         (0x1000, "bootloader/bootloader.bin"),
         (0x8000, "partition_table/partition-table.bin"),
-        (0x10000, "classic_camera.bin"),
+        (0x10000, "lifecycle.bin"),
     ] {
         m.write_flash(
             offset,
             &fs::read(
-                root.join("web/wasm/fw/public/classic-camera-lifecycle")
+                root.join("esp32/tests/fixtures/classic-camera")
                     .join(name),
             )
             .unwrap(),

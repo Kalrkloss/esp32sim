@@ -1,15 +1,7 @@
 {
   "base": "8f3a9eaa4ab2e4ba0d58721c0abe9fcf7428ecd6",
   "main": "142805d5399e0c3cf25995fe21ba524e75a2b3cb",
-  "required_checks": {
-    "clippy": 0,
-    "wasm-clippy": 0,
-    "rom": 0,
-    "plain": 0,
-    "wasm-build": 0,
-    "demos": 0,
-    "privacy": 0
-  },
+  "required_checks": {"clippy":0,"wasm-clippy":0,"rom":0,"plain":0,"wasm-build":0,"demos":0,"privacy":0},
   "empty_home": true,
   "toolchain": "1.99.0",
   "nice": 10,
@@ -25,20 +17,8 @@
     "esp32/tests/camera_dma/cases.rs": "215120a846b3414ef21edb4a12fcfe7926f96df7bec90fced3d5547fb93b899a"
   },
   "tests": {
-    "rom": {
-      "passed": 1027,
-      "failed": 0,
-      "ignored": 0,
-      "measured": 0,
-      "filtered": 22
-    },
-    "plain": {
-      "passed": 999,
-      "failed": 0,
-      "ignored": 50,
-      "measured": 0,
-      "filtered": 0
-    }
+    "rom": {"passed":1027,"failed":0,"ignored":0,"measured":0,"filtered":22},
+    "plain": {"passed":999,"failed":0,"ignored":50,"measured":0,"filtered":0}
   },
   "c7_assertion_kills": 25,
   "c5_assertion_kills": 12,
@@ -48,14 +28,5 @@
   "retained_c_filter_partial_group_negatives": 3,
   "s3_frames": 7,
   "s3_console_sha256": "b0011b04b138834fd6d6697ed6a9cfd328065f5af87b1a68d7eb146f6ba01bd2",
-  "codegen": {
-    "base": {
-      "equal": 10,
-      "total": 21
-    },
-    "main": {
-      "equal": 10,
-      "total": 21
-    }
-  }
+  "codegen": {"base":{"equal":10,"total":21},"main":{"equal":10,"total":21}}
 }

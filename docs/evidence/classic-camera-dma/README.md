@@ -1,4 +1,16 @@
-Feed classic camera frames through native I2S RX DMA
+# Classic camera evidence
+
+[Curated receipt index and archive provenance](CURATION.md) covers the board,
+shared sensor state, SCCB, receiver mode, FIFO, routing, DMA and lifecycle receipts
+now consolidated here. Historical results below were not rerun by this curation.
+
+Supported guest-capture scope is raw RGB565/YUV422 in internal DRAM. JPEG and
+adjustable FPS are parked; FIFO mode 3 is unit-tested, not guest-driver-qualified.
+CPU comparison remains pending for classic ESP32; no CPU timing was run here.
+Route-loss `IN_DSCR_ERR` is an intentional partial-frame cancellation policy,
+not a claim about what the hardware reports for a disconnected route.
+
+## Feed classic camera frames through native I2S RX DMA
 
 RMW INLINK STOP qualification is extended by [the remediation receipt](rmw-stop.md).
 The original qualification below predates that additional regression; use
@@ -75,9 +87,9 @@ C7's 25 semantic mutants are assertion-killed, not compile-error kills; see
 mutations.md and mutations.json. The baseline passes. Reproduction:
 
     python3 docs/evidence/classic-camera-dma/mutate.py TREE OUTPUT/c7
-    python3 docs/evidence/classic-camera-fifo/mutate.py TREE OUTPUT/c5
-    python3 docs/evidence/classic-camera-fifo/verify-driver.py TREE OUTPUT/driver
-    python3 docs/evidence/classic-camera-routing/mutate.py TREE OUTPUT/c6
+    python3 docs/evidence/classic-camera-dma/fifo/mutate.py TREE OUTPUT/c5
+    python3 docs/evidence/classic-camera-dma/fifo/verify-driver.py TREE OUTPUT/driver
+    python3 docs/evidence/classic-camera-dma/routing/mutate.py TREE OUTPUT/c6
 
 All cargo invocations use cargo +1.99.0, nice -n 10 and isolated targets.
 
@@ -102,7 +114,7 @@ Final commands and numeric outcomes are in checks.json. The required commands
     RUSTUP_TOOLCHAIN=1.99.0 tools/wasm-build.sh
     node tools/wasm-test.mjs hello c3-hello c6-hello c6-energy-scan c6-contiki c6-contiki-net c6-rpl-net panel
     node tools/check-evidence-privacy.mjs
-    python3 docs/evidence/camera-shared-state/fixture.py TREE OUTPUT PINNED_PUBLIC_FIRMWARE
+    python3 docs/evidence/classic-camera-dma/shared-state/fixture.py TREE OUTPUT PINNED_PUBLIC_FIRMWARE
     python3 docs/evidence/classic-camera-dma/codegen.py TREE BASE_BINARY CANDIDATE_BINARY OUTPUT/codegen-base 8f3a9eaa4ab2e4ba0d58721c0abe9fcf7428ecd6
     python3 docs/evidence/classic-camera-dma/codegen.py TREE MAIN_BINARY CANDIDATE_BINARY OUTPUT/codegen-main 142805d5399e0c3cf25995fe21ba524e75a2b3cb
     python3 docs/evidence/classic-camera-dma/explain-codegen.py TREE OUTPUT EXPLANATION_JSON

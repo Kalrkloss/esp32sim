@@ -45,16 +45,8 @@
       "sha256": "6f232c4aafe7d21239a1c59404723ca2cfdca063ef73501a21126a8cef39f432",
       "bytes": 19984
     },
-    {
-      "filename": "CameraFixture.ino.partitions.bin",
-      "sha256": "1d9cca96de0fe07ad7fc0648b9878ddecd9ce565e38b589ad20fea698ed4c80c",
-      "bytes": 3072
-    },
-    {
-      "filename": "CameraFixture.ino.bin",
-      "sha256": "f577967ab70b72a0dae84da0ca7e325b05a761330169079fc61ed9a7d9cf233f",
-      "bytes": 359840
-    }
+    {"filename":"CameraFixture.ino.partitions.bin","sha256":"1d9cca96de0fe07ad7fc0648b9878ddecd9ce565e38b589ad20fea698ed4c80c","bytes":3072},
+    {"filename":"CameraFixture.ino.bin","sha256":"f577967ab70b72a0dae84da0ca7e325b05a761330169079fc61ed9a7d9cf233f","bytes":359840}
   ],
   "rom_sha256": "c0ce0f338d1de1bdc6efbef1591779a2a42c1ab7d759d3c6ae8ae63a7dd34cfd",
   "console_equal": true,

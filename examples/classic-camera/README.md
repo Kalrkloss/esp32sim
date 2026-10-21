@@ -12,7 +12,7 @@ claimed.
 - ESP-IDF v5.4.3: `ea1c174c1cbb7348bd8ba0ff1eb306246938dd80`
 - esp32-camera: `b817e9b81041980608d1a3d3e0b08d86e3666382`
 - esp_jpeg 1.3.1: dependency hash in `dependencies.lock` (not linked)
-- Xtensa GCC `esp-14.2.0_20241119`, installed by the pinned IDF installer
+- Xtensa GCC `esp-14.2.0_20250730`, installed by the pinned IDF installer
 
 From the repository root, choose a caller-owned scratch directory:
 
@@ -37,12 +37,12 @@ nice -n 10 idf.py -C "$PWD/.camera-tools/source-b" \
   -B "$PWD/.camera-tools/build-b" \
   -D SDKCONFIG="$PWD/.camera-tools/build-b/sdkconfig" build
 python3 examples/classic-camera/check-builds.py .camera-tools/build-a \
-  .camera-tools/build-b web/wasm/fw/public/classic-camera
+  .camera-tools/build-b esp32/tests/fixtures/classic-camera
 ```
 
 Both clean builds must match each other and all three committed input images.
 Recorded hashes and licence inventory accompany the fixture in
-`web/wasm/fw/public/`; no SDK, driver source tree or local ELF is committed.
+`esp32/tests/fixtures/`; no SDK, driver source tree or local ELF is committed.
 
 ## Exercise
 

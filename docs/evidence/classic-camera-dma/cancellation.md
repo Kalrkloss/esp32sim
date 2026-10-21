@@ -11,7 +11,9 @@ at that later tick misses a real loss. Reconciliation now runs after a periphera
 write has applied its GPIO, clock and board effects. Only an existing qualified
 capture requests the routed source. If unavailable, the existing native abort
 operation drops the packed frame, stops DMA, resets receive progress and raises
-the existing descriptor error. It does not write guest memory or manufacture EOF.
+the existing descriptor error. `IN_DSCR_ERR` on route loss is the emulator's
+intentional partial-frame cancellation policy, not a hardware behavior claim.
+It does not write guest memory or manufacture EOF.
 
 Restoring the source, clearing the error, and benign receiver writes cannot
 restart DMA. A fresh explicit INLINK and a full physical pulse recover. A start
@@ -42,9 +44,9 @@ bodies and the eight arming-window bodies are byte-identical.
     python3 docs/evidence/classic-camera-dma/mutate-cancellation.py TREE OUTPUT/new
     python3 docs/evidence/classic-camera-dma/mutate-arming.py TREE OUTPUT/arming
     python3 docs/evidence/classic-camera-dma/mutate.py TREE OUTPUT/c7
-    python3 docs/evidence/classic-camera-routing/mutate.py TREE OUTPUT/c6
-    python3 docs/evidence/classic-camera-fifo/mutate.py TREE OUTPUT/c5
-    python3 docs/evidence/classic-camera-mode/mutate.py TREE OUTPUT/c4
+    python3 docs/evidence/classic-camera-dma/routing/mutate.py TREE OUTPUT/c6
+    python3 docs/evidence/classic-camera-dma/fifo/mutate.py TREE OUTPUT/c5
+    python3 docs/evidence/classic-camera-dma/mode/mutate.py TREE OUTPUT/c4
 
 Mutation results are retained in cancellation-mutations-*.json. Compile errors
 or timeouts do not count as kills. The old tick-only terminal-loss mutant

@@ -3,31 +3,8 @@
   "pinned_main": "142805d5399e0c3cf25995fe21ba524e75a2b3cb",
   "remediates": "4f74bad97bbae8b7211c5f7ca6a5ee010384c0e7",
   "commands": [
-    {
-      "name": "fetch",
-      "command": [
-        "tools/fetch-demo-assets.sh",
-        "--no-linux"
-      ],
-      "exit": 0
-    },
-    {
-      "name": "clippy",
-      "command": [
-        "nice",
-        "-n",
-        "10",
-        "cargo",
-        "+1.99.0",
-        "clippy",
-        "--workspace",
-        "--all-targets",
-        "--",
-        "-D",
-        "warnings"
-      ],
-      "exit": 0
-    },
+    {"name":"fetch","command":["tools/fetch-demo-assets.sh","--no-linux"],"exit":0},
+    {"name":"clippy","command":["nice","-n","10","cargo","+1.99.0","clippy","--workspace","--all-targets","--","-D","warnings"],"exit":0},
     {
       "name": "wasm-clippy",
       "command": [
@@ -52,137 +29,27 @@
     },
     {
       "name": "rom",
-      "command": [
-        "nice",
-        "-n",
-        "10",
-        "cargo",
-        "+1.99.0",
-        "test",
-        "--release",
-        "--workspace",
-        "--",
-        "--include-ignored",
-        "--skip",
-        "external_"
-      ],
+      "command": ["nice","-n","10","cargo","+1.99.0","test","--release","--workspace","--","--include-ignored","--skip","external_"],
       "exit": 0
     },
-    {
-      "name": "plain",
-      "command": [
-        "nice",
-        "-n",
-        "10",
-        "cargo",
-        "+1.99.0",
-        "test",
-        "--release",
-        "--workspace"
-      ],
-      "exit": 0
-    },
-    {
-      "name": "wasm-build",
-      "command": [
-        "nice",
-        "-n",
-        "10",
-        "tools/wasm-build.sh"
-      ],
-      "exit": 0
-    },
+    {"name":"plain","command":["nice","-n","10","cargo","+1.99.0","test","--release","--workspace"],"exit":0},
+    {"name":"wasm-build","command":["nice","-n","10","tools/wasm-build.sh"],"exit":0},
     {
       "name": "demos",
-      "command": [
-        "node",
-        "tools/wasm-test.mjs",
-        "hello",
-        "c3-hello",
-        "c6-hello",
-        "c6-energy-scan",
-        "c6-contiki",
-        "c6-contiki-net",
-        "c6-rpl-net",
-        "panel"
-      ],
+      "command": ["node","tools/wasm-test.mjs","hello","c3-hello","c6-hello","c6-energy-scan","c6-contiki","c6-contiki-net","c6-rpl-net","panel"],
       "exit": 0
     },
-    {
-      "name": "privacy",
-      "command": [
-        "node",
-        "tools/check-evidence-privacy.mjs"
-      ],
-      "exit": 0
-    },
+    {"name":"privacy","command":["node","tools/check-evidence-privacy.mjs"],"exit":0},
     {
       "name": "candidate-build",
-      "command": [
-        "nice",
-        "-n",
-        "10",
-        "cargo",
-        "+1.99.0",
-        "build",
-        "--release",
-        "-p",
-        "esp32sim",
-        "--bin",
-        "esp32sim"
-      ],
+      "command": ["nice","-n","10","cargo","+1.99.0","build","--release","-p","esp32sim","--bin","esp32sim"],
       "exit": 0
     },
-    {
-      "name": "c7-mutations",
-      "command": [
-        "python3",
-        "docs/evidence/classic-camera-dma/mutate.py",
-        "TREE",
-        "OUTPUT/c7"
-      ],
-      "exit": 0
-    },
-    {
-      "name": "c4-mutations",
-      "command": [
-        "python3",
-        "docs/evidence/classic-camera-mode/mutate.py",
-        "TREE",
-        "OUTPUT/c4"
-      ],
-      "exit": 0
-    },
-    {
-      "name": "c5-mutations",
-      "command": [
-        "python3",
-        "docs/evidence/classic-camera-fifo/mutate.py",
-        "TREE",
-        "OUTPUT/c5"
-      ],
-      "exit": 0
-    },
-    {
-      "name": "c6-mutations",
-      "command": [
-        "python3",
-        "docs/evidence/classic-camera-routing/mutate.py",
-        "TREE",
-        "OUTPUT/c6"
-      ],
-      "exit": 0
-    },
-    {
-      "name": "driver",
-      "command": [
-        "python3",
-        "docs/evidence/classic-camera-fifo/verify-driver.py",
-        "TREE",
-        "OUTPUT/driver"
-      ],
-      "exit": 0
-    },
+    {"name":"c7-mutations","command":["python3","docs/evidence/classic-camera-dma/mutate.py","TREE","OUTPUT/c7"],"exit":0},
+    {"name":"c4-mutations","command":["python3","docs/evidence/classic-camera-dma/mode/mutate.py","TREE","OUTPUT/c4"],"exit":0},
+    {"name":"c5-mutations","command":["python3","docs/evidence/classic-camera-dma/fifo/mutate.py","TREE","OUTPUT/c5"],"exit":0},
+    {"name":"c6-mutations","command":["python3","docs/evidence/classic-camera-dma/routing/mutate.py","TREE","OUTPUT/c6"],"exit":0},
+    {"name":"driver","command":["python3","docs/evidence/classic-camera-dma/fifo/verify-driver.py","TREE","OUTPUT/driver"],"exit":0},
     {
       "name": "codegen-base",
       "command": [
@@ -225,165 +92,46 @@
     },
     {
       "name": "fixture",
-      "command": [
-        "python3",
-        "docs/evidence/camera-shared-state/fixture.py",
-        "TREE/../wt",
-        "OUTPUT",
-        "PINNED_PUBLIC_FIRMWARE"
-      ],
+      "command": ["python3","docs/evidence/classic-camera-dma/shared-state/fixture.py","TREE/../wt","OUTPUT","PINNED_PUBLIC_FIRMWARE"],
       "exit": 0
     },
     {
       "name": "final-clippy",
-      "command": [
-        "nice",
-        "-n",
-        "10",
-        "cargo",
-        "+1.99.0",
-        "clippy",
-        "--workspace",
-        "--all-targets",
-        "--",
-        "-D",
-        "warnings"
-      ],
+      "command": ["nice","-n","10","cargo","+1.99.0","clippy","--workspace","--all-targets","--","-D","warnings"],
       "exit": 0
     },
-    {
-      "name": "final-c7",
-      "command": [
-        "nice",
-        "-n",
-        "10",
-        "cargo",
-        "+1.99.0",
-        "test",
-        "--release",
-        "-p",
-        "esp32",
-        "--test",
-        "aithinker",
-        "c7::"
-      ],
-      "exit": 0
-    },
+    {"name":"final-c7","command":["nice","-n","10","cargo","+1.99.0","test","--release","-p","esp32","--test","aithinker","c7::"],"exit":0},
     {
       "name": "final-unit",
-      "command": [
-        "nice",
-        "-n",
-        "10",
-        "cargo",
-        "+1.99.0",
-        "test",
-        "--release",
-        "-p",
-        "esp32",
-        "--lib",
-        "inlink_start_self_clears"
-      ],
+      "command": ["nice","-n","10","cargo","+1.99.0","test","--release","-p","esp32","--lib","inlink_start_self_clears"],
       "exit": 0
     },
-    {
-      "name": "final-plain",
-      "command": [
-        "nice",
-        "-n",
-        "10",
-        "cargo",
-        "+1.99.0",
-        "test",
-        "--release",
-        "--workspace"
-      ],
-      "exit": 0
-    }
+    {"name":"final-plain","command":["nice","-n","10","cargo","+1.99.0","test","--release","--workspace"],"exit":0}
   ],
   "toolchain": "1.99.0",
   "nice": 10,
   "empty_home": true,
   "tests": {
-    "rom": {
-      "passed": 1030,
-      "failed": 0,
-      "ignored": 0,
-      "measured": 0,
-      "filtered": 22
-    },
-    "plain": {
-      "passed": 1002,
-      "failed": 0,
-      "ignored": 50,
-      "measured": 0,
-      "filtered": 0
-    },
-    "final-plain": {
-      "passed": 1002,
-      "failed": 0,
-      "ignored": 50,
-      "measured": 0,
-      "filtered": 0
-    },
-    "final-c7": {
-      "passed": 12,
-      "failed": 0,
-      "ignored": 0,
-      "measured": 0,
-      "filtered": 14
-    },
-    "final-unit": {
-      "passed": 1,
-      "failed": 0,
-      "ignored": 0,
-      "measured": 0,
-      "filtered": 131
-    }
+    "rom": {"passed":1030,"failed":0,"ignored":0,"measured":0,"filtered":22},
+    "plain": {"passed":1002,"failed":0,"ignored":50,"measured":0,"filtered":0},
+    "final-plain": {"passed":1002,"failed":0,"ignored":50,"measured":0,"filtered":0},
+    "final-c7": {"passed":12,"failed":0,"ignored":0,"measured":0,"filtered":14},
+    "final-unit": {"passed":1,"failed":0,"ignored":0,"measured":0,"filtered":131}
   },
   "mutations": {
-    "c4": {
-      "killed": 23,
-      "total": 23,
-      "compile_error_kills": 0
-    },
-    "c5": {
-      "killed": 12,
-      "total": 12,
-      "compile_error_kills": 0
-    },
-    "c6": {
-      "killed": 35,
-      "total": 35,
-      "compile_error_kills": 0
-    },
-    "c7": {
-      "killed": 26,
-      "total": 26,
-      "compile_error_kills": 0
-    }
+    "c4": {"killed":23,"total":23,"compile_error_kills":0},
+    "c5": {"killed":12,"total":12,"compile_error_kills":0},
+    "c6": {"killed":35,"total":35,"compile_error_kills":0},
+    "c7": {"killed":26,"total":26,"compile_error_kills":0}
   },
   "total_semantic_kills": 96,
-  "original_regression": {
-    "expected_eof": 0,
-    "actual_eof": 512,
-    "exit": 101
-  },
-  "expanded_regression": {
-    "expected_raw": 0,
-    "actual_raw": 768,
-    "exit": 101
-  },
+  "original_regression": {"expected_eof":0,"actual_eof":512,"exit":101},
+  "expanded_regression": {"expected_raw":0,"actual_raw":768,"exit":101},
   "codegen": {
     "base": {
       "equal": 10,
       "total": 21,
-      "tick": [
-        {
-          "base": 2207,
-          "candidate": 2237
-        }
-      ],
+      "tick": [{"base":2207,"candidate":2237}],
       "artifacts": [
         {
           "label": "base",
@@ -400,12 +148,7 @@
     "main": {
       "equal": 10,
       "total": 21,
-      "tick": [
-        {
-          "base": 2207,
-          "candidate": 2237
-        }
-      ],
+      "tick": [{"base":2207,"candidate":2237}],
       "artifacts": [
         {
           "label": "base",
@@ -427,11 +170,7 @@
     "stderr_normalized_equal": true,
     "serial_sha256": "b0011b04b138834fd6d6697ed6a9cfd328065f5af87b1a68d7eb146f6ba01bd2"
   },
-  "goldens": {
-    "payloads": 55,
-    "harness_files": 2,
-    "unchanged_vs_both_controls": true
-  },
+  "goldens": {"payloads":55,"harness_files":2,"unchanged_vs_both_controls":true},
   "cpu_timing": "NOT RUN",
   "published": false,
   "source_sha256": {

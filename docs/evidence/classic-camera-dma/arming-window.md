@@ -100,9 +100,9 @@ The boundary+1 test verifies recovery at the next full pulse.
     cargo +1.99.0 test --release -p esp32 --test aithinker
     python3 docs/evidence/classic-camera-dma/mutate-arming.py TREE OUTPUT/arming
     python3 docs/evidence/classic-camera-dma/mutate.py TREE OUTPUT/c7
-    python3 docs/evidence/classic-camera-routing/mutate.py TREE OUTPUT/c6
-    python3 docs/evidence/classic-camera-fifo/mutate.py TREE OUTPUT/c5
-    python3 docs/evidence/classic-camera-mode/mutate.py TREE OUTPUT/c4
+    python3 docs/evidence/classic-camera-dma/routing/mutate.py TREE OUTPUT/c6
+    python3 docs/evidence/classic-camera-dma/fifo/mutate.py TREE OUTPUT/c5
+    python3 docs/evidence/classic-camera-dma/mode/mutate.py TREE OUTPUT/c4
 
 The C7 mutation script's three elapsed/arming anchors are updated for the new
 absolute-edge implementation, retaining those semantic rules. Every mutation

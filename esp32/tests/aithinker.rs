@@ -66,6 +66,26 @@ fn clock(bus: &mut SocBus) {
 fn picture(rgb: [u8; 3]) -> Picture { Picture { w: 1, h: 1, rgb: rgb.to_vec() } }
 
 #[test]
+fn unsupported_sensor_output_warns_once() {
+    const CHILD: &str = "ESP32SIM_CAMERA_WARNING_CHILD";
+    if std::env::var_os(CHILD).is_some() {
+        let mut bus = board(); configure(&mut bus); clock(&mut bus);
+        for mode in [0x10, 0x10, 8, 0x10, 0x18] {
+            write(&mut bus, 0xda, mode);
+            assert_eq!(bus.camera_frame().is_some(), mode == 8);
+        }
+        return;
+    }
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "unsupported_sensor_output_warns_once", "--nocapture"])
+        .env(CHILD, "1").output().unwrap();
+    assert!(output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert_eq!(stderr.matches("[camera] unsupported sensor output").count(), 1, "{stderr}");
+    assert!(stderr.contains("raw RGB565/YUV422 in DRAM, not JPEG/PSRAM CameraWebServer"), "{stderr}");
+}
+
+#[test]
 fn aithinker_selection_and_only_sensor_attachment() {
     for alias in ["ai-thinker-cam", "esp32cam"] {
         let mut board = esp32::board::make_board(alias).unwrap();

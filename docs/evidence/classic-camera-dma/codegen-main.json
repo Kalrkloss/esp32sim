@@ -14,7 +14,8 @@
       "disassembly_sha256": "f557ad0c08ab8b894833af7403e1e1317c2f10ec965f2919106d99e66b6d1366"
     }
   ],
-  "rows": [
+  "body_totals": {"selected":{"compared":21,"identical":10,"base_instructions":27888,"candidate_instructions":27918}},
+  "different_bodies": [
     {
       "name": "<esp32::bus::SocBus as emu_core::bus::Bus>::fetch",
       "same": false,
@@ -97,18 +98,6 @@
       "diff_retention": "Full normalized diff retained in local raw receipt; compact counts/hash retained here."
     },
     {
-      "name": "<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus> as emu_core::bus::Bus>::read32",
-      "same": true,
-      "base_instructions": 37,
-      "candidate_instructions": 37
-    },
-    {
-      "name": "<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus> as emu_core::bus::Bus>::write32",
-      "same": true,
-      "base_instructions": 40,
-      "candidate_instructions": 40
-    },
-    {
       "name": "<xtensa_lx7::state::Cpu as emu_core::core::Core>::run::<esp32::bus::SocBus>",
       "same": false,
       "base_instructions": 706,
@@ -125,54 +114,6 @@
       "normalized_diff_sha256": "35bd846d3fc25c7cfbf36ab7aa68ffbeb254c8d146adad1e0318f1dae2c0f0e8",
       "normalized_diff_lines": 24,
       "diff_retention": "Full normalized diff retained in local raw receipt; compact counts/hash retained here."
-    },
-    {
-      "name": "xtensa_lx7::exec::exec_insn::<esp32::bus::SocBus>",
-      "same": true,
-      "base_instructions": 2566,
-      "candidate_instructions": 2566
-    },
-    {
-      "name": "xtensa_lx7::exec::exec_insn::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
-      "same": true,
-      "base_instructions": 2562,
-      "candidate_instructions": 2562
-    },
-    {
-      "name": "xtensa_lx7::exec::exec_mac16::<esp32::bus::SocBus>",
-      "same": true,
-      "base_instructions": 208,
-      "candidate_instructions": 208
-    },
-    {
-      "name": "xtensa_lx7::exec::exec_mac16::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
-      "same": true,
-      "base_instructions": 261,
-      "candidate_instructions": 261
-    },
-    {
-      "name": "xtensa_lx7::pie::exec::<esp32::bus::SocBus>",
-      "same": true,
-      "base_instructions": 468,
-      "candidate_instructions": 468
-    },
-    {
-      "name": "xtensa_lx7::pie::exec::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
-      "same": true,
-      "base_instructions": 776,
-      "candidate_instructions": 776
-    },
-    {
-      "name": "xtensa_lx7::pie::exec_table::<esp32::bus::SocBus>",
-      "same": true,
-      "base_instructions": 4774,
-      "candidate_instructions": 4774
-    },
-    {
-      "name": "xtensa_lx7::pie::exec_table::<esp_soc::machine::modeled::RecordingBus<esp32::bus::SocBus>>",
-      "same": true,
-      "base_instructions": 5721,
-      "candidate_instructions": 5721
     }
   ]
 }

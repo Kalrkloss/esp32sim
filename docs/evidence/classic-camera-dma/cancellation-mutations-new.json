@@ -1,135 +1,32 @@
-[
-  {
-    "name": "baseline",
-    "file": "esp32/src/bus.rs",
-    "before": null,
-    "after": null,
-    "exit": 0,
-    "assertion_killed": false,
-    "failed_tests": []
-  },
-  {
-    "name": "ignore transient loss",
-    "file": "esp32/src/bus.rs",
-    "before": "self.periph.i2s[0].camera.as_ref().is_some_and(|c| c.qualified())",
-    "after": "false",
-    "exit": 101,
-    "assertion_killed": true,
-    "failed_tests": [
-      "c7::cancellation::cancellation_iomux",
-      "c7::cancellation::cancellation_ledc_gate",
-      "c7::cancellation::cancellation_i2s_gate",
-      "c7::cancellation::cancellation_matrix",
-      "c7::cancellation::cancellation_power",
-      "c7::cancellation::cancellation_rtc",
-      "c7::cancellation::cancellation_streaming",
-      "c7::cancellation::cancellation_xclk"
-    ],
-    "failure_class": "assertion"
-  },
-  {
-    "name": "only route-mask writes cancel",
-    "file": "esp32/src/bus.rs",
-    "before": "self.periph.i2s[0].camera.as_ref().is_some_and(|c| c.qualified())",
-    "after": "camera_route_mask != 0 && self.periph.i2s[0].camera.as_ref().is_some_and(|c| c.qualified())",
-    "exit": 101,
-    "assertion_killed": true,
-    "failed_tests": [
-      "c7::cancellation::cancellation_ledc_gate",
-      "c7::cancellation::cancellation_i2s_gate",
-      "c7::cancellation::cancellation_power",
-      "c7::cancellation::cancellation_streaming",
-      "c7::cancellation::cancellation_xclk",
-      "c7::cancellation::cancellation_qualified_waiting"
-    ],
-    "failure_class": "assertion"
-  },
-  {
-    "name": "only I2S writes cancel",
-    "file": "esp32/src/bus.rs",
-    "before": "self.periph.i2s[0].camera.as_ref().is_some_and(|c| c.qualified())",
-    "after": "(0x3ff4_f000..0x3ff4_f100).contains(&a) && self.periph.i2s[0].camera.as_ref().is_some_and(|c| c.qualified())",
-    "exit": 101,
-    "assertion_killed": true,
-    "failed_tests": [
-      "c7::cancellation::cancellation_i2s_gate",
-      "c7::cancellation::cancellation_iomux",
-      "c7::cancellation::cancellation_ledc_gate",
-      "c7::cancellation::cancellation_power",
-      "c7::cancellation::cancellation_matrix",
-      "c7::cancellation::cancellation_streaming",
-      "c7::cancellation::cancellation_qualified_waiting",
-      "c7::cancellation::cancellation_rtc",
-      "c7::cancellation::cancellation_xclk"
-    ],
-    "failure_class": "assertion"
-  },
-  {
-    "name": "clear frame but leave DMA running",
-    "file": "esp32/src/bus.rs",
-    "before": "self.periph.i2s[0].abort_camera_dma();",
-    "after": "self.periph.i2s[0].camera = None;",
-    "exit": 101,
-    "assertion_killed": true,
-    "failed_tests": [
-      "c7::c7_mid_frame_route_or_power_loss_is_terminal_until_rearm",
-      "c7::cancellation::cancellation_i2s_gate",
-      "c7::cancellation::cancellation_ledc_gate",
-      "c7::cancellation::cancellation_power",
-      "c7::cancellation::cancellation_matrix",
-      "c7::cancellation::cancellation_rtc",
-      "c7::cancellation::cancellation_xclk",
-      "c7::cancellation::cancellation_streaming",
-      "c7::cancellation::cancellation_qualified_waiting"
-    ],
-    "failure_class": "assertion"
-  },
-  {
-    "name": "qualified waiting capture ignored",
-    "file": "esp32/src/camera_dma.rs",
-    "before": "pub(crate) fn qualified(&self) -> bool { self.qualified }",
-    "after": "pub(crate) fn qualified(&self) -> bool { self.qualified && !self.packed.is_empty() }",
-    "exit": 101,
-    "assertion_killed": true,
-    "failed_tests": [
-      "c7::cancellation::cancellation_qualified_waiting"
-    ],
-    "failure_class": "assertion"
-  },
-  {
-    "name": "valid configuration cancels capture",
-    "file": "esp32/src/bus.rs",
-    "before": "&& self.camera_routed_frame().is_none()",
-    "after": "&& self.camera_routed_frame().is_some()",
-    "exit": 101,
-    "assertion_killed": true,
-    "failed_tests": [
-      "c7::c7_exact_native_descriptors_two_eofs_and_classic_irq",
-      "c7::c7_reacquire_next_image_on_reused_ring",
-      "c7::c7_ring_starvation_and_finite_guest_service_reuse",
-      "c7::c7_qqvga_pattern_twenty_descriptors_ten_serviced_eof_chunks",
-      "c7::cancellation::cancellation_iomux",
-      "c7::cancellation::cancellation_i2s_gate",
-      "c7::cancellation::cancellation_ledc_gate",
-      "c7::cancellation::cancellation_matrix",
-      "c7::cancellation::cancellation_power",
-      "c7::cancellation::cancellation_qualified_waiting",
-      "c7::cancellation::cancellation_rtc",
-      "c7::cancellation::cancellation_valid_changes_preserve_active_capture",
-      "c7::cancellation::cancellation_xclk"
-    ],
-    "failure_class": "assertion"
-  },
-  {
-    "name": "initially unavailable capture cancelled",
-    "file": "esp32/src/bus.rs",
-    "before": "self.periph.i2s[0].camera.as_ref().is_some_and(|c| c.qualified())",
-    "after": "self.periph.i2s[0].camera.is_some()",
-    "exit": 101,
-    "assertion_killed": true,
-    "failed_tests": [
-      "c7::arming::c71_initially_invalid_route_waits_instead_of_aborting"
-    ],
-    "failure_class": "assertion"
-  }
-]
+{
+  "recorded_rows": 8,
+  "outcome_counts": {"assertion_killed":{"false":1,"true":7}},
+  "groups": [
+    {"count":1,"outcome":{"exit":0,"assertion_killed":false,"failed_test_count":0},"names":["baseline"]},
+    {
+      "count": 1,
+      "outcome": {"exit":101,"assertion_killed":true,"failure_class":"assertion","failed_test_count":8},
+      "names": ["ignore transient loss"]
+    },
+    {
+      "count": 1,
+      "outcome": {"exit":101,"assertion_killed":true,"failure_class":"assertion","failed_test_count":6},
+      "names": ["only route-mask writes cancel"]
+    },
+    {
+      "count": 2,
+      "outcome": {"exit":101,"assertion_killed":true,"failure_class":"assertion","failed_test_count":9},
+      "names": ["only I2S writes cancel","clear frame but leave DMA running"]
+    },
+    {
+      "count": 2,
+      "outcome": {"exit":101,"assertion_killed":true,"failure_class":"assertion","failed_test_count":1},
+      "names": ["qualified waiting capture ignored","initially unavailable capture cancelled"]
+    },
+    {
+      "count": 1,
+      "outcome": {"exit":101,"assertion_killed":true,"failure_class":"assertion","failed_test_count":13},
+      "names": ["valid configuration cancels capture"]
+    }
+  ]
+}
