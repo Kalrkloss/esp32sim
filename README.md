@@ -77,7 +77,8 @@ WiFi, scripts, the browser build and debugging.
 ## Contributing
 
 Bug fixes, peripherals, boards and new chips are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) lists
-what a pull request needs; these are the same checks CI runs.
+what a pull request needs; these are the same checks CI runs. Security problems go through
+[SECURITY.md](SECURITY.md), not the public issue tracker.
 
 ## Credits and license
 
