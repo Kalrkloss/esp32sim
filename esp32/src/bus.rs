@@ -362,7 +362,13 @@ impl SocBus {
             if inverted { invert |= 1 << bit; }
         }
         let (w, h, mut frame) = self.camera_frame()?;
-        if invert != 0 { for byte in std::sync::Arc::make_mut(&mut frame) { *byte ^= invert; } }
+        if invert != 0 {
+            if let Some(capture) = &mut self.periph.i2s[0].camera {
+                frame = capture.inverted_frame(frame, invert);
+            } else {
+                for byte in std::sync::Arc::make_mut(&mut frame) { *byte ^= invert; }
+            }
+        }
         Some((w, h, frame))
     }
     pub fn attach_board_devices(&mut self) {

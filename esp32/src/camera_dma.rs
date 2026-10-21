@@ -1,6 +1,9 @@
 //! Scheduled classic camera transport. Uses the native I2S channel and its one
 //! internal-DRAM adapter; no S3 GDMA registers or second descriptor walker.
 use crate::{board::aithinker::{ARM_WINDOW, FRAME_CYCLES, VSYNC_CYCLES}, bus::SocBus, camera_fifo::CameraFifo};
+use std::sync::Arc;
+
+type Frame = Arc<Vec<u8>>;
 
 pub(crate) struct Capture {
     armed_at: u64,
@@ -9,11 +12,22 @@ pub(crate) struct Capture {
     pos: usize,
     frame_at: Option<u64>,
     qualified: bool,
+    // Cold capture-only cache: no new field in the bus or ordinary PCM path.
+    inverted: Option<(Frame, u8, Frame)>,
 }
 impl Capture {
     pub(crate) fn qualified(&self) -> bool { self.qualified }
     pub(crate) fn armed(armed_at: u64) -> Self {
-        Self { armed_at, saw_vsync: false, packed: Vec::new(), pos: 0, frame_at: None, qualified: false }
+        Self { armed_at, saw_vsync: false, packed: Vec::new(), pos: 0, frame_at: None, qualified: false, inverted: None }
+    }
+    pub(crate) fn inverted_frame(&mut self, source: Frame, mask: u8) -> Frame {
+        match &self.inverted {
+            Some((old, old_mask, frame)) if *old_mask == mask && Arc::ptr_eq(old, &source) => return frame.clone(),
+            _ => {}
+        }
+        let frame = Arc::new(source.iter().map(|byte| byte ^ mask).collect::<Vec<_>>());
+        self.inverted = Some((source, mask, frame.clone()));
+        frame
     }
 }
 impl SocBus {

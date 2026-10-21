@@ -33,7 +33,7 @@ project version is fixed to `c8-fixture-1`.
 
 The application and bootloader link-map archive inventories are in
 [fixture-linked-archives.json](fixture-linked-archives.json). The
-[NOTICE](../../../web/wasm/fw/public/classic-camera-NOTICE.txt) identifies
+[NOTICE](../../../esp32/tests/fixtures/classic-camera/NOTICE) identifies
 linked licences and points to their accompanying full texts. No Wi-Fi/BT
 controller or JPEG decoder is linked. The ROM is fetched, not redistributed.
 

@@ -40,6 +40,29 @@ fn bytes(b: &mut SocBus, addr: u32, len: u32) -> Vec<u8> {
 }
 fn raw(b: &mut SocBus) -> u32 { b.read32(I + 0xc).unwrap() }
 #[test]
+fn inverted_route_reuses_capture_cache_and_invalidates_source_and_mask() {
+    let mut b = setup(1);
+    descriptor(&mut b, 0, 64, D);
+    arm(&mut b, 16);
+    put(&mut b, 0x3ff4_4130 + 4 * 140, 0x80 | 5 | (1 << 6));
+    let original = b.camera_frame().unwrap().2;
+    let first = b.camera_routed_frame().unwrap().2;
+    assert_eq!(*first, [249, 1].repeat(16));
+    for _ in 0..3 {
+        put(&mut b, 0x3ff4_4530 + 4 * 2, 256); // unrelated MMIO write
+        assert!(Arc::ptr_eq(&first, &b.camera_routed_frame().unwrap().2));
+    }
+    assert_eq!(*original, [248, 0].repeat(16), "inversion must not alter the sensor cache");
+    b.board.set_camera_picture(picture([0,255,0])).unwrap();
+    let replacement = b.camera_routed_frame().unwrap().2;
+    assert!(!Arc::ptr_eq(&first, &replacement));
+    assert_eq!(*replacement, [6, 225].repeat(16));
+    put(&mut b, 0x3ff4_4130 + 4 * 141, 0x80 | 18 | (1 << 6));
+    let mask_changed = b.camera_routed_frame().unwrap().2;
+    assert!(!Arc::ptr_eq(&replacement, &mask_changed));
+    assert_eq!(*mask_changed, [4, 227].repeat(16));
+}
+#[test]
 fn c7_exact_native_descriptors_two_eofs_and_classic_irq() {
     for mode in [1,3] {
         let mut b = setup(mode);
