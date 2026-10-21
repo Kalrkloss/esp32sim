@@ -176,11 +176,96 @@ impl I2cDevice for Cst820 {
     fn read(&mut self) -> u8 { let value = self.reg(self.ptr); self.ptr = self.ptr.wrapping_add(1); self.reads += 1; value }
 }
 
+/// Hynitron CST816D capacitive touch controller (Waveshare ESP32-S3-Touch-LCD-2, address 0x15).
+/// An 8-bit register pointer with auto-increment: the vendor BSP probes the chip id at 0xA7 for
+/// 0xB6, then reads the finger count at 0x02 and one point at 0x03..0x06 (x and y, high nibble
+/// first). 0x01 carries the gesture code the controller derives from the same pointer stream: a
+/// press that travels at least `CST816_SLIDE_MIN` pixels reports that slide when it lifts,
+/// anything shorter a single click.
+pub const CST816_CHIP_ID: u8 = 0xb6;
+pub const CST816_GESTURE_NONE: u8 = 0x00;
+pub const CST816_GESTURE_SLIDE_UP: u8 = 0x01;
+pub const CST816_GESTURE_SLIDE_DOWN: u8 = 0x02;
+pub const CST816_GESTURE_SLIDE_LEFT: u8 = 0x03;
+pub const CST816_GESTURE_SLIDE_RIGHT: u8 = 0x04;
+pub const CST816_GESTURE_SINGLE_CLICK: u8 = 0x05;
+/// Distance in panel pixels that separates a slide from a click.
+pub const CST816_SLIDE_MIN: u16 = 40;
+
+pub struct Cst816d {
+    ptr: u8,
+    first: bool,
+    touch: std::sync::Arc<std::sync::Mutex<TouchState>>,
+    /// where the current press started, while one is down
+    press: Option<(u16, u16)>,
+    gesture: u8,
+    pub reads: u64,
+}
+
+impl Cst816d {
+    pub fn new(touch: std::sync::Arc<std::sync::Mutex<TouchState>>) -> Self {
+        Cst816d { ptr: 0, first: true, touch, press: None, gesture: CST816_GESTURE_NONE, reads: 0 }
+    }
+
+    /// Update the gesture the way the controller does, from the point report the driver reads.
+    /// A new press pins the origin; the lift turns the travel since then into a gesture.
+    fn track(&mut self, state: TouchState) {
+        match (state.down, self.press) {
+            (true, None) => { self.press = Some((state.x, state.y)); self.gesture = CST816_GESTURE_NONE; }
+            (false, Some((x0, y0))) => {
+                let (dx, dy) = (state.x as i32 - x0 as i32, state.y as i32 - y0 as i32);
+                self.gesture = if dx.abs().max(dy.abs()) < CST816_SLIDE_MIN as i32 {
+                    CST816_GESTURE_SINGLE_CLICK
+                } else if dx.abs() > dy.abs() {
+                    if dx > 0 { CST816_GESTURE_SLIDE_RIGHT } else { CST816_GESTURE_SLIDE_LEFT }
+                } else if dy > 0 {
+                    CST816_GESTURE_SLIDE_DOWN
+                } else {
+                    CST816_GESTURE_SLIDE_UP
+                };
+                self.press = None;
+            }
+            _ => {}
+        }
+    }
+
+    fn reg(&mut self, addr: u8) -> u8 {
+        let state = {
+            let mut touch = self.touch.lock().expect("CST816D touch state mutex poisoned");
+            if addr == 0x02 { touch.observe(); }
+            *touch
+        };
+        self.track(state);
+        match addr {
+            0x01 => self.gesture,
+            0x02 => u8::from(state.down),
+            0x03 => ((state.x >> 8) as u8) & 0x0f,
+            0x04 => state.x as u8,
+            0x05 => ((state.y >> 8) as u8) & 0x0f,
+            0x06 => state.y as u8,
+            0xa7 => CST816_CHIP_ID,
+            0xa8 => 0x01,                  // project id
+            0xa9 => 0x01,                  // firmware version
+            0xec => 0x07,                  // motion mask: the gestures above are enabled
+            _ => 0,
+        }
+    }
+}
+
+impl I2cDevice for Cst816d {
+    fn start(&mut self, read: bool) -> bool { if !read { self.first = true; } true }
+    fn write(&mut self, byte: u8) -> bool {
+        if self.first { self.ptr = byte; self.first = false; } else { self.ptr = self.ptr.wrapping_add(1); }
+        true
+    }
+    fn read(&mut self) -> u8 { let value = self.reg(self.ptr); self.ptr = self.ptr.wrapping_add(1); self.reads += 1; value }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn read_registers(device: &mut Cst820, first: u8, count: usize) -> Vec<u8> {
+    fn read_registers<D: I2cDevice + ?Sized>(device: &mut D, first: u8, count: usize) -> Vec<u8> {
         assert!(device.start(false));
         assert!(device.write(first));
         assert!(device.start(true));
@@ -198,6 +283,64 @@ mod tests {
         let touch = std::sync::Arc::new(std::sync::Mutex::new(TouchState { down: true, x: 0x167, y: 0x1bf, ..Default::default() }));
         let mut device = Cst820::new(touch);
         assert_eq!(read_registers(&mut device, 0x02, 5), [1, 0x01, 0x67, 0x01, 0xbf]);
+    }
+
+    fn cst816d_pointer(touch: &std::sync::Arc<std::sync::Mutex<TouchState>>, x: u16, y: u16, down: bool) -> Cst816d {
+        {
+            let mut state = touch.lock().unwrap();
+            *state = TouchState::default();
+            state.update(x, y, down);
+        }
+        Cst816d::new(touch.clone())
+    }
+
+    /// The vendor BSP probes 0xA7 for 0xB6, then reads the finger count and one point.
+    #[test]
+    fn cst816d_answers_the_vendor_probe_and_reports_one_point() {
+        let touch = std::sync::Arc::new(std::sync::Mutex::new(TouchState::default()));
+        let mut idle = Cst816d::new(touch.clone());
+        assert_eq!(read_registers(&mut idle, 0xa7, 3), [0xb6, 0x01, 0x01]);
+        assert_eq!(read_registers(&mut idle, 0x02, 5), [0, 0, 0, 0, 0], "no finger, no point");
+
+        let mut device = cst816d_pointer(&touch, 0x39, 0x1a2, true);
+        assert_eq!(read_registers(&mut device, 0x02, 1), [1]);
+        // x = 0x039, y = 0x1a2, high nibble first
+        assert_eq!(read_registers(&mut device, 0x03, 4), [0x00, 0x39, 0x01, 0xa2]);
+    }
+
+    /// A press the driver sampled and then saw lift without travel is a single click; travel of at
+    /// least `CST816_SLIDE_MIN` in one axis is the slide in that direction.
+    #[test]
+    fn cst816d_turns_the_pointer_stream_into_gestures() {
+        let touch = std::sync::Arc::new(std::sync::Mutex::new(TouchState::default()));
+        let mut device = cst816d_pointer(&touch, 100, 100, true);
+        assert_eq!(read_registers(&mut device, 0x02, 1), [1]);
+        assert_eq!(read_registers(&mut device, 0x01, 1), [CST816_GESTURE_NONE], "still down: no gesture yet");
+        { touch.lock().unwrap().update(104, 99, false); }
+        assert_eq!(read_registers(&mut device, 0x02, 1), [0], "the lift");
+        assert_eq!(read_registers(&mut device, 0x01, 1), [CST816_GESTURE_SINGLE_CLICK]);
+
+        for (dx, dy, gesture) in [(0, 100, CST816_GESTURE_SLIDE_DOWN), (0, -100, CST816_GESTURE_SLIDE_UP),
+                                  (100, 0, CST816_GESTURE_SLIDE_RIGHT), (-100, 0, CST816_GESTURE_SLIDE_LEFT)] {
+            // a fresh controller for each gesture, as the chip starts its report clean
+            let mut device = cst816d_pointer(&touch, 100, 150, true);
+            assert_eq!(read_registers(&mut device, 0x02, 1), [1]);
+            { touch.lock().unwrap().update((100 + dx) as u16, (150 + dy) as u16, false); }
+            assert_eq!(read_registers(&mut device, 0x02, 1), [0]);
+            assert_eq!(read_registers(&mut device, 0x01, 1), [gesture], "dx {dx}, dy {dy}");
+        }
+    }
+
+    /// A tap shorter than the driver's poll interval — pressed and released between two reads —
+    /// is reported as a press that lifts, not lost: the second read shows the lift and the click.
+    #[test]
+    fn cst816d_keeps_a_tap_the_driver_never_sampled() {
+        let touch = std::sync::Arc::new(std::sync::Mutex::new(TouchState::default()));
+        { touch.lock().unwrap().update(50, 60, true); touch.lock().unwrap().update(50, 60, false); }
+        let mut device = Cst816d::new(touch.clone());
+        assert_eq!(read_registers(&mut device, 0x02, 1), [1], "the press is reported first");
+        assert_eq!(read_registers(&mut device, 0x02, 1), [0], "then the lift the driver asked for");
+        assert_eq!(read_registers(&mut device, 0x01, 1), [CST816_GESTURE_SINGLE_CLICK]);
     }
 
     #[test]

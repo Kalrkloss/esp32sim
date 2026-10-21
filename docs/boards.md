@@ -103,6 +103,20 @@ combination is not selected by this board name. It needs `--flash-mb 16 --psram-
 Board input edges retain their intended timestamps. The current fast scheduler applies them to
 the SoC at its next existing bus tick.
 
+## `waveshare-s3-touch-lcd-2` — Waveshare ESP32-S3-Touch-LCD-2
+
+| Device | Bus | Model |
+| --- | --- | --- |
+| ST7789T3 240×320 IPS panel | GP-SPI2 (SCLK 39, MOSI 38, MISO 40, CS 45, D/C 42, no reset line) | `DcsPanel::st7789()`: the controller's commands and its whole 240×320 GRAM; every GP-SPI2 transaction reaches it in order, framed by the D/C line the driver toggles on GPIO 42. `lcd_visible` is what the glass shows: the full frame, and nothing while the controller sleeps or the display is off. INVON is not applied — the module is IPS and the driver sets it to compensate the panel's polarity, so the RGB565 sent is the colour the glass shows |
+| CST816D touch at 0x15 | I2C0 (SDA 48, SCL 47) | chip id 0xB6 at 0xA7 (the vendor BSP's probe), finger count at 0x02, one point at 0x03..0x06, gestures at 0x01; browser/script pointer events are latched until the driver reads them |
+| QMI8658 IMU at 0x6B | I2C0 | initialization-compatible register stub, not a behavioral model; `set_imu_motion` selects the scripted motion |
+| Backlight GPIO 1 | GPIO | level tracked and reported. The battery divider (GPIO 5), the TF card and the camera header are not modelled |
+
+Needs `--flash-mb 16 --psram-mb 8`. Its 2" glass is the native 240×320 of the controller's RAM, so
+a driver that fills the frame shows a complete picture; a 240×240 or 135×240 preset leaves the rest
+of the glass black (Annex's `display res` line names the geometry it selected). `examples/waveshare-s3-touch-lcd-2/run.sh`
+runs a build of your own against the board.
+
 ## `waveshare-c6-lcd147` — Waveshare ESP32-C6-LCD-1.47 (ESP32-C6)
 
 | Device | Bus | Model |
