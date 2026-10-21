@@ -53,11 +53,19 @@ Things that cost real time to find out, recorded so they do not have to be found
   regression WAV was re-baselined: same sample stream, five more samples over five seconds.
 - **WebSocket sends must not block the emulator thread** — a frozen browser tab stalled
   emulation until sends moved to per-client writer threads with bounded queues.
+- **A guest reset rebuilds the digital peripheral set, so host state kept inside it has to be
+  carried across explicitly.** The reset path already carried the debug areas and
+  `misc.log_unknown`; an observer's MMIO log was missed, so `--regstat` — and every other observer
+  that wants MMIO — recorded nothing from the first reset on, which for a soft-AP guest is the whole
+  configured second boot. A probe that goes quiet at a reset is indistinguishable from a driver that
+  never uses the peripheral, so carry such state in the reset path and test it there (EX234).
 
 ## Boards and firmware
 - **Atech's own Pocket Synth build drives the ST7735 over hardware SPI2 and reads the encoder
   with PCNT**; our PlatformIO build of the same sketch bit-bangs SPI and uses a GPIO ISR (older
-  SDK modules). Both paths are modelled; the display decoder accepts bytes from either.
+  SDK modules). Both paths are modelled; the display decoder accepts bytes from either, and the
+  peripheral feed is the verified one for a third-party driver: `spi_master` on SPI2 completes
+  16 195 transactions and a full frame in 12 emulated seconds (EX234).
 - **The real board boots app1 (0x340000)**: its partition table is the Arduino 8 MB OTA layout and
   `otadata` selects the slot with the higher sequence — a 1 MB flash dump is not enough, and
   `pio run -t upload` alone would not change what runs (erase `otadata` at 0xE000 first).

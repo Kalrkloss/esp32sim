@@ -1,0 +1,34 @@
+SPI2 (0x6002_4000) accesses of the display driver, one run of 12 emulated seconds
+counts from --regstat; 'values' are every value the run wrote (writes) or read (reads)
+
+offset  register     writes   reads  values
+0x000   CMD           16218   16533  0x00000000, 0x00800000, 0x01800000
+0x008   CTRL             14       7  0x00000000
+0x00c   CLOCK            29       2  0x00000000, 0x00003043, 0x003c4002
+0x010   USER             64   11390  0x00000000, 0x08000000, 0x18000000, 0x18000001
+0x014   USER1             7       2  0x00000000
+0x01c   MS_DLEN       12568       0  0x00000007, 0x0000000f, 0x0000001f, 0x0000003f, 0x0000005f, 0x0000019f
+0x020   MISC             29       3  0x00000000, 0x0000003f
+0x030   DMA_CONF         28      22  0x00000000, 0x00100000, 0x00180000, 0x20000000, 0x60000000, 0x60100000
+0x034   DMA_INT_ENA       1       1  0x00000000, 0x00001000
+0x044   DMA_INT_SET       1       1  0x00000000, 0x00001000
+0x098   W0            11668       0  0x00000000, 0x0000002c, 0x0000ffff, 0x00f800f8, 0x1e0c1e0c, 0x51000200
+0x09c   W1             1795       0  0x00000000, 0x00f800f8, 0x1e0c1e0c
+0x0a0   W2             1794       0  0x00000000, 0x00f800f8, 0x1e0c1e0c
+0x0a4   W3             1186       0  0x00000000, 0x00f800f8, 0x1e0c1e0c
+0x0a8   W4             1154       0  0x00000000, 0x00f800f8, 0x1e0c1e0c
+0x0ac   W5             1154       0  0x00000000, 0x00f800f8, 0x1e0c1e0c
+0x0b0   W6             1154       0  0x00000000, 0x00f800f8, 0x1e0c1e0c
+0x0b4   W7             1154       0  0x00000000, 0x00f800f8, 0x1e0c1e0c
+0x0b8   W8              898       0  0x00000000, 0x00f800f8
+0x0bc   W9              898       0  0x00000000, 0x00f800f8
+0x0c0   W10             898       0  0x00000000, 0x00f800f8
+0x0c4   W11             898       0  0x00000000, 0x00f800f8
+0x0c8   W12             898       0  0x00000000, 0x00f800f8
+0x0cc   W13             898       0  0x00000000, 0x00f800f8
+0x0d0   W14             898       0  0x00000000, 0x00f800f8
+0x0d4   W15             898       0  0x00000000, 0x00f800f8
+0x0e0   SLAVE             6       0  0x00000000
+0x0e8   CLK_GATE         17      12  0x00000000, 0x00000001, 0x00000005, 0x00000007
+
+total SPI2 accesses 85198; transactions on the wire 16195
