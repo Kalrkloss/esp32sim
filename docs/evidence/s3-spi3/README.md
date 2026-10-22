@@ -183,3 +183,15 @@ marked `on_main` in [checks.json](checks.json):
   27 × CMD0 `40 00 00 00 00 95`), 88 on SPI2 starting `ef`, CMD0 never on SPI2; `tft ready`, then
   `mount failed`. On main `af9ebc79` (3 emulated seconds): `tft ready`, no SPI3 line, core 1 at
   550 084 899 instructions, as on `f5a038bf`.
+
+## Review follow-up
+
+`spi3_dma_fault` is cleared on every USR write, as `spi2_dma_fault` is; it was cleared only
+while no SPI3 transfer was pending. The two rules agree in every state the model reaches today
+(SPI3's DMA data phase is committed at once, so no transfer is pending at a USR write); the change
+keeps a retry after a descriptor fault reading the same on both hosts. New test
+`spi3_dma_fault_is_cleared_by_the_next_transaction` (`esp32s3/src/bus/tests.rs`): a descriptor
+without its owner bit records `NotOwned` on SPI3 and reaches no board; the next CPU-FIFO
+transaction clears it and reaches the board as host 3. With the clear removed it fails. Workspace
+(`--include-ignored --skip external_`): 1019 passed, the same two `decoder_matches_corpus`
+failures; Clippy native and wasm, the wasm build and demos, the privacy check: pass.

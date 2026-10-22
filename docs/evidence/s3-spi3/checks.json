@@ -134,5 +134,20 @@
     "command": "the same image and command on main af9ebc79, --max-seconds 3",
     "exit_code": 0,
     "result": "tft ready, no SPI3 log line, core1 550084899 instructions in 3 emulated seconds (spinning in SD.begin)"
+  },
+  {
+    "check": "review-follow-up",
+    "on_main": "af9ebc79",
+    "command": "cargo +1.99.1 test --release --workspace --no-fail-fast -- --include-ignored --skip external_",
+    "exit_code": 101,
+    "tests": {
+      "binaries": 109,
+      "passed": 1019,
+      "failed": 2,
+      "ignored": 0
+    },
+    "failures": "the two decoder_matches_corpus tests (Windows drive-letter path split), unrelated",
+    "new_test": "spi3_dma_fault_is_cleared_by_the_next_transaction",
+    "mutation": "without the SPI3 fault clear on a USR write the new test fails"
   }
 ]
