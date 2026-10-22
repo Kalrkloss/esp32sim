@@ -160,8 +160,8 @@ explicit browser configuration values.
 | CST820 at `0x15` | I2C0 | Identity and latched touch coordinates, clamped to 467/465; reset clears pending touch |
 | Buttons A / B | GPIO2 / GPIO1, active low | Released-high initial inputs; script names `a` / `b` or `btn_a` / `btn_b`; browser buttons |
 
-Power/reset wiring follows
-[`main/board.cpp`](https://github.com/aliceisjustplaying/stopwatch/blob/device/main/board.cpp):
+Power/reset wiring follows M5Stack's public hardware documentation and
+power-management guide, linked in [the M5 device sources](m5-i2c.md#stopwatch-address-and-wiring-sources):
 M5IOE1 IO8 enables the OLED rail, IO5 releases OLED reset and IO4 releases touch
 reset. The board accepts SPI2 panel writes only while the rail and OLED reset
 are high and the PMIC shutdown latch is clear. Every M5 write updates the wiring,
@@ -182,6 +182,13 @@ parameters are not hardware measurements. Physical scanout, touch IRQs,
 BMI270 and RX8130 are not modeled. These tests do not establish firmware boot,
 relay connectivity or tear-free rendering. Native `--web` keeps native
 networking; browser-only WASM has no NAT for external relay connections.
+
+The original PR's native boot report used private StopWatch firmware revision
+`9e0d4dc`. Its `relay_connected` log and rendered status face were a manual
+observation, not a checked-in test or a public firmware fixture. That run cannot
+be reproduced from this repository alone; no public build or private relay
+configuration is included. CI covers the directed board and UI tests above,
+not that firmware's boot or relay connection.
 
 ## `waveshare-c6-lcd147` — Waveshare ESP32-C6-LCD-1.47 (ESP32-C6)
 
