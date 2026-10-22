@@ -89,6 +89,21 @@ fn stopwatch_shutdown_is_observable_only_after_system_command() {
 }
 
 #[test]
+fn reattaching_pmic_clears_shutdown_without_changing_host_inputs() {
+    let state = Arc::new(Mutex::new(M5pm1State {
+        battery_mv: 4150, charging: true, power_off_requested: false,
+    }));
+    let mut device = M5pm1::new(state.clone());
+    write(&mut device, 0x0c, &[0xa1]);
+    assert!(state.lock().unwrap().power_off_requested);
+    let mut device = M5pm1::new(state.clone());
+    assert!(!state.lock().unwrap().power_off_requested);
+    assert_eq!(read(&mut device, 0x22, 2), 4150u16.to_le_bytes());
+    assert_eq!(read(&mut device, 0x12, 1), [0]);
+    assert_eq!(read(&mut device, 0x06, 1), [0x17]);
+}
+
+#[test]
 fn stopwatch_expander_rmw_and_reset_pulse_leave_rail_on() {
     let state = Arc::new(Mutex::new(M5ioe1State::default()));
     let mut device: Box<dyn I2cDevice> = Box::new(M5ioe1::new(state.clone(), 0x1234));
