@@ -27,6 +27,7 @@ impl M5pm1 {
     pub const ADDRESS: u8 = 0x6e;
 
     pub fn new(state: Arc<Mutex<M5pm1State>>) -> Self {
+        state.lock().expect("M5PM1 state mutex poisoned").power_off_requested = false;
         Self {
             registers: Reg8Device::new("m5pm1", &[
                 (0x00, 0x50), (0x01, 0x20), (0x02, 0x05), (0x03, 0x06),
