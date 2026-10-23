@@ -133,5 +133,26 @@
     "exit_code": 0,
     "uart0": "not connected: status=6",
     "frames": "30 probe requests for Home, 30 probe responses from 02:4e:11:e0:7f:d8 delivered, 30 authentication frames to it, 0 authentication responses"
+  },
+  {
+    "check": "review-follow-up",
+    "on_main": "20117b08",
+    "command": "cargo +1.99.1 test --release --workspace --no-fail-fast -- --include-ignored --skip external_",
+    "exit_code": 101,
+    "tests": {
+      "binaries": 111,
+      "passed": 1044,
+      "failed": 2,
+      "ignored": 0
+    },
+    "failures": "the two decoder_matches_corpus tests (Windows drive-letter path split), unrelated",
+    "new_tests": [
+      "nearby_networks_need_a_bssid_each",
+      "a_nearby_network_answers_only_probes_addressed_to_it",
+      "wifi_rx_ctrl_carries_a_nearby_networks_channel_and_rssi (S3, C3)",
+      "classic_rx_ctrl_carries_a_nearby_networks_channel_and_rssi"
+    ],
+    "mutations": "without the BSSID-equals-access-point case, the duplicate-BSSID check or the probe address check, the matching test fails",
+    "firmware": "scan 4 networks, control 1, join status=6 with 30 probe requests, 30 probe responses, 30 authentication frames, 0 authentication responses"
   }
 ]

@@ -38,8 +38,8 @@ delivered. Without the option nothing changes; the Wi-Fi goldens pass byte-ident
   signed, dBm) and lines 59-60 (`channel`, `secondary_channel`) of `wifi_pkt_rx_ctrl_t`; v4.4.8
   `components/esp_wifi/include/esp_wifi_types.h` lines 387 and 408-409: the fields the chips' RX
   descriptors carry and the scan reads.
-- v5.5.5 `components/esp_wifi/include/esp_wifi_types_generic.h` lines 325-349 (`wifi_ap_record_t`:
-  `bssid`, `ssid`, `primary`, `rssi`, `authmode`), v4.4.8 `esp_wifi_types.h` lines 189-210: what
+- v5.5.5 `components/esp_wifi/include/esp_wifi_types_generic.h` lines 320-349 (`wifi_ap_record_t`:
+  `bssid`, `ssid`, `primary`, `rssi`, `authmode`), v4.4.8 `esp_wifi_types.h` lines 191-210: what
   `WiFi.scanNetworks()` reports per network; `WIFI_AUTH_OPEN` / `WIFI_AUTH_WPA2_PSK` (v5.5.5 lines
   87 and 90) are what the station derives from the Privacy bit and the RSN element.
 - The RX descriptor layouts themselves are unchanged from main (the S3 words are silicon-noted
@@ -60,8 +60,8 @@ value, the 32 limit) and `set_beacons` dropping the access point's own SSID.
 
 ## Firmware
 
-Arduino-ESP32 3.3.12 sketches (in this directory), from the mask ROM, `--wifi ssid=Jumperly
---net none` (commands in inputs.json):
+Arduino-ESP32 3.3.12 sketches (in this directory) on the ESP32-S3, from the mask ROM,
+`--wifi ssid=Jumperly --net none` (commands in inputs.json):
 
 | Run | Options | Console |
 | --- | --- | --- |
@@ -159,3 +159,29 @@ Windows 11, ROMs from `tools/fetch-rom-elfs.sh roms`; entries marked `on_main` i
   (`--debug wifi-frames`, 30 s) has 30 probe requests for `Home`, 30 probe responses from Home's
   derived BSSID delivered to the station, 30 authentication frames from the station to that
   BSSID and no authentication response, with the access point's beacons throughout.
+
+## Review follow-up
+
+- **One BSSID per network.** `BeaconAp::parse_all` refuses two networks around on one BSSID
+  (one SSID given twice without `bssid`, or one `bssid` given twice): both would answer from that
+  address. `StationLink::set_beacons` leaves out a network with the access point's SSID or BSSID,
+  which would otherwise be that access point (with its BSSID, `rx_meta` would give every frame of
+  the access point the network's channel and RSSI), and returns the ones left out with the reason;
+  the CLI prints `[emu] --wifi-nearby '…' left out: it has the access point's BSSID` for those and
+  `network around: …` only for the ones kept.
+- **Probe addressing.** A network around answers a probe request sent to the broadcast address or
+  its own, with a wildcard BSSID or its own (IEEE 802.11-2020 11.1.4.3.4), and no other.
+- **Chip-side tests.** `wifi_rx_ctrl_carries_a_nearby_networks_channel_and_rssi` (S3, C3) and
+  `classic_rx_ctrl_carries_a_nearby_networks_channel_and_rssi` deliver a frame from a network
+  around and one from the access point and read the RX descriptor: the RSSI byte (the classic
+  with its +96 offset) and the channel word. The C6 writes the RSSI only and is covered by
+  firmware, as before.
+- **Citations.** `wifi_ap_record_t` is v5.5.5 `esp_wifi_types_generic.h` lines 320-349 and v4.4.8
+  `esp_wifi_types.h` lines 191-210.
+
+Tests: `nearby_networks_need_a_bssid_each`, `a_nearby_network_answers_only_probes_addressed_to_it`
+and the access point's BSSID case in the set_beacons test; each fails with its rule removed.
+Workspace (`--include-ignored --skip external_`, main `20117b08` merged): 1044 passed, the same
+two `decoder_matches_corpus` failures; virtual-quantum tests 43; Clippy native and wasm, the wasm
+build and demos, the privacy check: pass. The firmware runs above give the same scan, control and
+join results (30 / 30 / 30 / 0 frames).
