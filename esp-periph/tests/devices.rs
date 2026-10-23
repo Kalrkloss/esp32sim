@@ -76,6 +76,33 @@ fn timer_group_alarm_autoreload_and_deadline() {
     assert_eq!(Device::read(&mut g, 0x0) & (1 << 10), 1 << 10, "autoreload keeps the alarm");
 }
 
+#[test]
+fn timer_group_resets_to_divider_one_which_divides_by_two() {
+    let mut g = TimerGroup::new();
+    assert_eq!(Device::read(&mut g, 0x0), 0x6000_2000, "T0CONFIG: up, autoreload, divider 1");
+    Device::write(&mut g, 0x0, (1 << 31) | (1 << 30) | (1 << 10) | (1 << 13));   // enabled, up, alarm, divider 1
+    Device::write(&mut g, 0x10, 10);                         // alarm = 10 -> 20 APB ticks
+    Device::write(&mut g, 0x70, 1);
+    Device::tick(&mut g, 19);
+    assert_eq!(Device::irq_sources(&g), 0);
+    Device::tick(&mut g, 1);
+    assert_eq!(Device::irq_sources(&g), 1, "divider 1 divides by 2, as divider 2 does");
+}
+
+#[test]
+fn timer_group_one_shot_alarm_at_the_counter_fires_at_once() {
+    // esp-rtos arms 0 ticks, on a counter it has just reset to 0, for a wakeup already due.
+    let mut g = TimerGroup::new();
+    Device::write(&mut g, 0x70, 1);
+    Device::write(&mut g, 0x18, 0); Device::write(&mut g, 0x1c, 0); Device::write(&mut g, 0x20, 1);   // load 0
+    Device::write(&mut g, 0x10, 0); Device::write(&mut g, 0x14, 0);   // alarm 0
+    Device::write(&mut g, 0x0, (1 << 31) | (1 << 30) | (1 << 10) | (2 << 13));   // enabled, up, one-shot alarm
+    assert_eq!(Device::next_deadline(&g), Some(0), "due now");
+    Device::tick(&mut g, 1);
+    assert_eq!(Device::irq_sources(&g), 1);
+    assert_eq!(Device::read(&mut g, 0x0) & (1 << 10), 0, "a one-shot alarm disarms itself");
+}
+
 // ------------------------------------------------------------------ GPIO
 #[test]
 fn gpio_edges_and_interrupt_types() {
