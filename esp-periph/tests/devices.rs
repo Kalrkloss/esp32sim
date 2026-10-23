@@ -26,9 +26,23 @@ fn systimer_one_shot_fires_on_its_tick_and_says_when() {
 }
 
 #[test]
+fn systimer_unit0_counts_from_reset() {
+    // SYSTIMER_CONF resets to 0x4600_0000, TIMER_UNIT0_WORK_EN set (esp32s3 PAC 0.36,
+    // systimer/conf.rs RESET_VALUE; the C3's and C6's are the same). esp-hal never writes it:
+    // `Instant::now` reads unit 0 from power-on.
+    let mut s = Systimer::new();
+    assert_eq!(Device::read(&mut s, 0x0), 0x4600_0000);
+    Device::tick(&mut s, 16);
+    Device::write(&mut s, 0x4, 1 << 30);                     // UNIT0_OP.UPDATE
+    assert_eq!(Device::read(&mut s, 0x44), 16, "unit 0 counts");
+    Device::write(&mut s, 0x8, 1 << 30);
+    assert_eq!(Device::read(&mut s, 0x4c), 0, "unit 1 does not");
+}
+
+#[test]
 fn systimer_periodic_repeats() {
     let mut s = Systimer::new();
-    Device::write(&mut s, 0x0, (1 << 30) | (1 << 25));      // unit 0, comparator 1
+    Device::write(&mut s, 0x0, (1 << 30) | (1 << 23));      // unit 0, comparator 1 (TARGET1_WORK_EN is bit 23)
     Device::write(&mut s, 0x38, (1 << 30) | 50);             // periodic, 50 ticks
     Device::write(&mut s, 0x54, 1);                          // COMP1_LOAD
     Device::write(&mut s, 0x64, 2);
