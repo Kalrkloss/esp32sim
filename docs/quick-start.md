@@ -132,6 +132,7 @@ the end-of-run report:
 | the audio the firmware played | `--wav out.wav` |
 | GPIO edges and interrupt lines as a waveform | `--vcd gpio.vcd` (open it in GTKWave or PulseView) |
 | a PWM pin's frequency and duty | `--pwm 4` |
+| an ADC pad's last 12-bit sample | `--adc 1` |
 | memory at the end of the run | `--peek 0x3fc90000,64` |
 | which functions ran, and for how long | `--profile-blocks` (needs `--elf`) |
 | every call to a function, with arguments | `--trace-fn my_function` |

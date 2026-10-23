@@ -32,6 +32,7 @@ fn help(chip: &str, code: i32) -> ! {
     eprintln!("  --elf F               symbols for logs, traces and profiles (repeatable)");
     eprintln!("  --trace-fn PREFIX, --break PC, --watch ADDR, --peek ADDR,N, --profile, --vcd F, --debug AREAS, --no-jit");
     eprintln!("                        debugging; --no-jit is the oracle when a result looks wrong");
+    eprintln!("  --adc PIN, --adc-raw PIN=N   last ADC sample at exit / a 12-bit count into that pad");
     eprintln!("  --no-dump             skip the register dump at exit");
     eprintln!();
     eprintln!("Every flag: docs/cli.md. First run: docs/quick-start.md. Both are in the tarball and at github.com/mikroverk/esp32sim.");
@@ -39,6 +40,12 @@ fn help(chip: &str, code: i32) -> ! {
 }
 
 fn usage_error(message: &str) -> ! { eprintln!("{message}"); std::process::exit(2) }
+
+fn apply_adc_raw<S: Soc>(m: &mut Machine<S>, specs: &[(u8, u16)]) {
+    for &(pin, raw) in specs {
+        if !m.bus.adc_set_raw(pin, raw) { usage_error(&format!("--adc-raw: GPIO{pin} is not an ADC pad on this chip")); }
+    }
+}
 
 fn timing_cycles(value: &str, name: &str) -> Result<u32, String> {
     value.parse().map_err(|_| format!("{name}: expected a nonnegative u32 cycle count, got {value:?}"))
@@ -100,7 +107,7 @@ pub struct Opts {
     pub console: Option<String>, pub console_prefix: bool, pub realtime: bool, pub web_port: Option<u16>, pub web_dir: Option<String>, pub no_reboot: bool,
     pub i2s_tone: Vec<String>,
     pub wav: Option<String>, pub tft_png: Option<String>, pub gram_png: Option<String>, pub dump: bool,
-    pub trace: bool, pub trace_from: u64, pub breaks: Vec<u32>, pub watch: Option<u32>, pub peeks: Vec<(u32, usize)>, pub pwm_pins: Vec<u8>, pub disasms: Vec<(u32, usize)>,
+    pub trace: bool, pub trace_from: u64, pub breaks: Vec<u32>, pub watch: Option<u32>, pub peeks: Vec<(u32, usize)>, pub pwm_pins: Vec<u8>, pub adc_pins: Vec<u8>, pub adc_raw: Vec<(u8, u16)>, pub disasms: Vec<(u32, usize)>,
     pub profile: bool, pub profile_blocks: bool, pub coverage: Option<Option<String>>, pub irq_latency: bool, pub vcd: Option<String>,
     pub regstat: Option<String>, pub regtrace: Option<String>, pub regtrace_max: u64, pub regtrace_from_pc: Option<u32>,
     pub stubs: Vec<String>, pub trace_fns: Vec<String>, pub stop_exc: u64, pub log_periph: bool, pub no_jit: bool, pub debug: Vec<String>,
@@ -173,6 +180,15 @@ pub fn parse(args: &[String], default_chip: &str) -> Opts {
             "--watch" => o.watch = Some(hex(&next(), "watch")),
             "--peek" => o.peeks.push(pair(&next(), 8)),
             "--pwm" => o.pwm_pins.push(next().parse().unwrap_or_else(|_| usage_error("--pwm: expected a pin number in 0..255"))),
+            "--adc" => o.adc_pins.push(next().parse().unwrap_or_else(|_| usage_error("--adc: expected a pin number in 0..255"))),
+            "--adc-raw" => {
+                let spec = next();
+                let Some((pin, raw)) = spec.split_once('=') else { usage_error("--adc-raw: expected PIN=COUNT") };
+                let pin: u8 = pin.parse().unwrap_or_else(|_| usage_error("--adc-raw: expected a pin number in 0..255"));
+                let raw: u16 = raw.parse().unwrap_or_else(|_| usage_error("--adc-raw: expected a count in 0..4095"));
+                if raw > 4095 { usage_error("--adc-raw: expected a count in 0..4095"); }
+                o.adc_raw.push((pin, raw));
+            }
             "--disasm" => o.disasms.push(pair(&next(), 16)),
             "--profile" => o.profile = true,
             "--profile-blocks" => o.profile_blocks = true,
@@ -509,6 +525,7 @@ fn prepare<S: Soc>(m: &mut Machine<S>, o: &Opts) -> String {
     if o.ble { m.bus.enable_ble(&ble_elf).unwrap_or_else(|e| usage_error(&format!("--ble: {e}"))); }
     if let Some(p) = &o.script { m.load_script(&std::fs::read_to_string(p).unwrap_or_else(|e| usage_error(&format!("script: {e}")))).unwrap_or_else(|e| usage_error(&format!("script: {e}"))); }
     if let Some(s) = &o.serial { m.bus.serial_input(s.as_bytes()); }
+    apply_adc_raw(m, &o.adc_raw);
     for pre in &o.trace_fns {
         let n = m.trace_fns(pre);
         eprintln!("[emu] --trace-fn {}: {} functions", pre, n);
@@ -590,6 +607,12 @@ fn report<S: Soc>(m: &mut Machine<S>, o: &Opts, stop: Stop, dt: f64) {
         match m.bus.pwm_output(pin) {
             Some((hz, duty)) => eprintln!("[pwm] GPIO{}: {:.3} Hz, {:.2}% duty", pin, hz, duty as f64 * 100.0 / 65535.0),
             None => eprintln!("[pwm] GPIO{}: no supported running PWM", pin),
+        }
+    }
+    for &pin in &o.adc_pins {
+        match m.bus.adc_observation(pin) {
+            Some(s) => eprintln!("[adc] GPIO{}: raw {}, generation {}", pin, s.raw, s.generation),
+            None => eprintln!("[adc] GPIO{}: no ADC pad", pin),
         }
     }
     for &(a, n) in &o.disasms { eprintln!("[disasm {:#010x}]\n{}", a, m.disasm(a, n)); }
