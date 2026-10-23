@@ -58,6 +58,7 @@ The last setter wins. Raw input bypasses the voltage curve and attenuation. Coun
 ADC pad and `None` for other pins. Generation starts at zero, advances once when a
 conversion completes, and wraps at `u64::MAX`. Reading a register or changing the input
 does not advance it. Host sources and observations survive a software reboot.
+`--adc PIN` prints that snapshot at exit; `--adc-raw PIN=COUNT` is `adc_set_raw`.
 
 | Chip | ADC1 pads | ADC2 pads | One-shot controller |
 | --- | --- | --- | --- |

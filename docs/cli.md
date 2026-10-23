@@ -70,6 +70,8 @@ separately lists the actual instruction count for each core.
 | `--wav F` | audio captured from I2S (whichever controller played) |
 | `--tft-png F`, `--gram-png F` | display frame (visible, scaled) / raw GRAM |
 | `--no-dump` | skip the register dump at exit |
+| `--adc PIN` | (repeatable) last completed ADC conversion on that GPIO: 12-bit raw count and generation |
+| `--adc-raw PIN=COUNT` | (repeatable) a post-attenuation 12-bit count (0..4095) on that pad, before the first instruction |
 
 ### PWM observation
 
@@ -80,6 +82,17 @@ A running timer with 0% or 100% duty still has a snapshot. "No supported running
 unrouted, disabled, paused or unsupported configuration; it does not imply a low GPIO level.
 A paused hardware timer can hold its last level. This reports register-derived steady state,
 not sampled edges. LEDC fades and MCPWM dead time, carrier and extra generator actions are unsupported.
+
+### ADC observation
+
+`--adc PIN` reports the last completed conversion on that pad when the run stops: the 12-bit
+raw count and the generation (zero until the firmware samples, then one step per completed
+conversion). Repeat it to observe several pads. PIN is an unsigned 8-bit decimal number.
+`--adc-raw PIN=COUNT` puts a post-attenuation count on the pad before the first instruction;
+unsupported pins and counts above 4095 are refused. Voltage scripts (`adc`, `adcwave`) still
+set the transfer-curve input; a script on the same pin replaces the raw count at its timestamp.
+Pads, units and the voltage curve are in [peripherals.md](peripherals.md#host-adc-inputs).
+"no ADC pad" means that GPIO is not an ADC input on this chip.
 
 ## Debugging
 | Flag | Meaning |
@@ -141,7 +154,8 @@ select ADC1 and GPIO5 selects ADC2; C6 GPIO0–6 select ADC1.
 
 `waituart0 <timeout_s> <text>` holds later actions until UART0 prints the text or
 the timeout expires. Raw counts and completed-conversion observations are exposed
-through the [host ADC API](peripherals.md#host-adc-inputs), with no CLI equivalent.
+through the [host ADC API](peripherals.md#host-adc-inputs). `--adc PIN` prints the last completed
+sample at exit; `--adc-raw PIN=COUNT` injects a 12-bit count before the run.
 
 ## Virtual BLE
 
