@@ -759,7 +759,7 @@ fn quiet_backstop_keeps_the_original_cadence_for_active_devices() {
         ("gdma-out", |p| p.gdma.out[0].running = true),
         ("wifi-tx", |p| p.wifi.tx_pending.push((0, 0))),
         ("wifi-ap", |p| p.wifi.link.attach(Some(crate::wifi::VirtualAp::new(crate::wifi::ApConfig {
-            ssid: "test".into(), bssid: [0; 6], channel: 1, psk: None,
+            ssid: "test".into(), bssid: [0; 6], channel: 1, psk: None, epoch_s: None,
         }, false)), None)),
         ("network", |p| p.wifi.link.attach(None, Some(crate::net::VirtualNet::new(false)))),
         ("aes", |p| p.aes.dma_pending = true),
@@ -866,7 +866,7 @@ fn periodic_tick_notifies_wifi_tx_and_air_rx() {
 
     let mut bus = SocBus::new(1024, 1024, [0; 6]);
     bus.periph.wifi.link.attach(Some(crate::wifi::VirtualAp::new(crate::wifi::ApConfig {
-        ssid: "test".into(), bssid: [2, 0, 0, 0, 0, 1], channel: 1, psk: None,
+        ssid: "test".into(), bssid: [2, 0, 0, 0, 0, 1], channel: 1, psk: None, epoch_s: None,
     }, false)), None);
     bus.periph.wifi.link.ap_mut().unwrap().queue.push(crate::wifi::AirFrame { at_us: 0, frame: vec![0; 24] });
     bus.periph.wifi.rx_next = FIRST_DESC & 0xfffff;
@@ -1716,4 +1716,35 @@ fn spi3_dma_fault_is_cleared_by_the_next_transaction() {
     assert_eq!(bus.spi3_dma_fault, None);
     assert_eq!(bus.periph.spi3.transfers, 1);
     assert_eq!(&*events.lock().unwrap(), &["spi:3:[a5]:0"]);
+}
+
+/// A frame from a network around reaches the RX descriptor with that network's channel and RSSI
+/// (`VirtualAp::rx_meta`): `wifi_pkt_rx_ctrl_t`'s `rssi` in word 0's low byte, `channel` and
+/// `secondary_channel` in word 2 bits 16-23 (IDF v5.5.5
+/// components/esp_wifi/include/local/esp_wifi_types_native.h:36, :59-60); a frame from the access
+/// point keeps its channel and -40 dBm.
+#[test]
+fn wifi_rx_ctrl_carries_a_nearby_networks_channel_and_rssi() {
+    use esp_soc::wifi::{ApConfig, BeaconAp, VirtualAp};
+    const DESC: u32 = 0x3fc9_0100;
+    const BUF: u32 = 0x3fc9_0200;
+    let mut bus = SocBus::new(1024, 1024, [0; 6]);
+    bus.periph.wifi.link.attach(Some(VirtualAp::new(ApConfig::parse("ssid=demo,chan=6").unwrap(), false)), None);
+    let home = [0x02, 1, 2, 3, 4, 5];
+    let left_out = bus.periph.wifi.link.set_beacons(vec![BeaconAp { ssid: "Home".into(), bssid: home, channel: 1, rssi: -60, secure: true }]);
+    assert_eq!(left_out, Some(vec![]));
+    let ap = bus.periph.wifi.link.ap().unwrap().cfg.bssid;
+    for (from, chan, rssi) in [(home, 1u32, -60i8), (ap, 6, -40)] {
+        bus.write32(DESC, (1 << 31) | 0xfff).unwrap();                     // owner DMA, size 4095
+        bus.write32(DESC + 4, BUF).unwrap();
+        bus.write32(DESC + 8, 0).unwrap();
+        bus.periph.wifi.rx_next = DESC & 0xf_ffff;
+        let mut frame = vec![0u8; 24];
+        frame[0] = 0x80;                                                     // beacon
+        frame[4..10].fill(0xff);
+        frame[10..16].copy_from_slice(&from);
+        bus.wifi_rx_deliver(&frame, 1234);
+        assert_eq!(bus.read32(BUF).unwrap() & 0xff, u32::from(rssi as u8), "RSSI of {from:02x?}");
+        assert_eq!(bus.read32(BUF + 8).unwrap(), (chan << 16) | (chan << 20), "channel of {from:02x?}");
+    }
 }

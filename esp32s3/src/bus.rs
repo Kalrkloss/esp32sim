@@ -592,13 +592,14 @@ impl SocBus {
     /// Write one received frame into the next RX descriptor (rx_ctrl header + frame + FCS) and raise the RX event.
     #[allow(clippy::identity_op, reason = "rx_state zero remains visible in the packed descriptor layout")]
     fn wifi_rx_deliver(&mut self, frame: &[u8], now_us: u64) {
+        if self.periph.wifi.rx_next == 0 { self.periph.wifi.link.drop_rx_unarmed(); return; }
         let desc = self.periph.wifi.rx_next | crate::periph::DMA_ADDR_BASE;
-        if desc == 0 { self.periph.wifi.link.drop_rx(); return; }
         let dw0 = self.read32_unpriced(desc).unwrap_or(0); let buf = self.read32_unpriced(desc + 4).unwrap_or(0); let next = self.read32_unpriced(desc + 8).unwrap_or(0);
         let size = (dw0 & 0xfff) as usize;
         let total = 48 + frame.len() + 4;
         if dw0 & (1 << 31) == 0 || buf == 0 || size < total { self.periph.wifi.link.drop_rx(); return; }
-        let (chan, log) = { let ap = self.periph.wifi.link.ap().unwrap(); (ap.cfg.channel as u32, ap.log) };
+        // A network around's frames carry its own channel and signal (`VirtualAp::rx_meta`)
+        let (chan, rssi, log) = { let ap = self.periph.wifi.link.ap().unwrap(); let (c, r) = ap.rx_meta(frame); (c as u32, r, ap.log) };
         let mut b = Vec::with_capacity(total);
         // rx_ctrl word 0 (silicon: a real broadcast beacon reads 0x111b20ad — bit 28 set, signed rssi in the low
         // byte). The MAC has already address-filtered, so every delivered frame is "for us"; use the same flags
@@ -610,7 +611,7 @@ impl SocBus {
         // filter-match nibble: bit 28 is the "accepted by the address filter" bit the blob's RX path
         // requires (silicon: a broadcast beacon reads 0x111b20ad); unicast frames add bit 29.
         let fm = if bcast { 1u32 << 28 } else { (1u32 << 28) | (1u32 << 29) };
-        let w0: u32 = fm | (0xd8u32 & 0xff);   // rssi -40 dBm, 1 Mbps, legacy
+        let w0: u32 = fm | (rssi as u8 as u32);   // rssi (−40 dBm for the access point), 1 Mbps, legacy
         let w2: u32 = (chan << 16) | (chan << 20);                                        // channel, secondary
         let w5: u32 = 0xa6;                                                                // noise floor -90
         let w11: u32 = ((frame.len() + 4) as u32 & 0xfff) | (0 << 24);                    // sig_len (incl. FCS), rx_state OK
