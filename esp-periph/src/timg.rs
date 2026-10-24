@@ -42,6 +42,10 @@ impl Timer {
         // value has exceeded the alarm value, the alarm event will be triggered immediately",
         // IDF v5.5.1 docs/en/api-reference/peripherals/gptimer.rst). esp-rtos arms 0 ticks, on a
         // counter it has just reset to 0, for a wakeup that is already due.
+        // One-shot only, on purpose: an auto-reload alarm armed at or behind the counter still
+        // waits for the wrap, because firing it at once would also mean modelling the reload that
+        // follows. Nothing arms one there: esp-hal 1.2.2's `PeriodicTimer::start` resets the
+        // counter to 0 and arms one period ahead, and IDF's gptimer arms ahead too.
         let reached = if inc { t.count >= alarm } else { t.count <= alarm };
         if t.config & (1 << 10) != 0 && t.config & (1 << 29) == 0 && reached {   // ALARM_EN, no autoreload
             on_alarm();
