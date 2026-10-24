@@ -15,7 +15,7 @@ pub struct Systimer {
 }
 impl Systimer {
     /// CONF resets to 0x4600_0000: TIMER_UNIT0_WORK_EN and unit 1's two stall enables set (IDF
-    /// v5.5.4 components/soc/esp32s3/register/soc/systimer_reg.h; the C3's and C6's are the same).
+    /// v5.5.4 components/soc/esp32s3/register/soc/systimer_reg.h; the C3's, C6's and P4's are the same).
     /// esp-hal never writes it: `Instant::now` reads unit 0, counting from power-on.
     pub fn new() -> Self { Systimer { conf: 0x4600_0000, unit: [0; 2], unit_latch: [0; 2], load: [0; 2], target: [0; 3], target_conf: [0; 3], period_start: [0; 3], int_ena: 0, int_raw: 0, ticks_acc: 0, armed: [false; 3] } }
     pub fn tick(&mut self, ticks: u64) {
