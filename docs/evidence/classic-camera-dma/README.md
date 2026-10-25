@@ -8,7 +8,8 @@ now consolidated here. Historical results below were not rerun by this curation.
 
 Supported guest-capture scope is raw RGB565/YUV422 in internal DRAM. JPEG and
 adjustable FPS are parked; FIFO mode 3 is unit-tested, not guest-driver-qualified.
-CPU comparison remains pending for classic ESP32; no CPU timing was run here.
+Classic ESP32 CPU: the maintainer's table in the [review receipt](review.md#cpu-comparison)
+(`6cf190c6` vs `361b3a46`) is flat, nothing flagged.
 Route-loss `IN_DSCR_ERR` is an intentional partial-frame cancellation policy,
 not a claim about what the hardware reports for a disconnected route.
 
@@ -157,7 +158,8 @@ represented as a CPU speed measurement.
 
 ## CPU comparison
 
-PENDING. No CPU timing or benchmark was run.
+Measured by the maintainer on head `361b3a46`; see the [review receipt](review.md#cpu-comparison).
+Classic hello +0.0% (slower 1/7), T-Display MicroPython +1.1% (5/7, 10 ms); nothing flagged.
 
 # Limits
 

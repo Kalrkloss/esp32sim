@@ -77,8 +77,22 @@ summaries remain distinct from these reruns.
 
 ## CPU comparison
 
-Classic ESP32 CPU comparison is PENDING. No CPU timing was run for this review.
-The maintainer supplied the following historical S3-only measurements in the
+The maintainer measured the classic ESP32 in the
+[October 21, 2026 review](https://github.com/mikroverk/esp32sim/pull/243#issuecomment-6322902023): main `6cf190c6` against camera head
+`361b3a46`, user CPU, seven alternating pairs, load gate 5, identical
+instructions and console hashes.
+
+| Workload | Main median user CPU seconds | Camera median user CPU seconds | Posted change | Camera slower |
+| --- | ---: | ---: | ---: | ---: |
+| classic hello, 30 s | 0.370 | 0.370 | +0.0% | 1/7 |
+| T-Display MicroPython, 60 s | 0.920 | 0.930 | +1.1% | 5/7 |
+
+These are the maintainer's posted rounded aggregates, not a new measurement.
+Neither reaches the slower-in-at-least-6/7 flag threshold. Both workloads use
+under a second of CPU, so the 5/7 is 10 ms, within noise (the maintainer's
+reading: flat, not a flag).
+
+The maintainer also supplied the following historical S3-only measurements in the
 [October 21, 2026 review](https://github.com/mikroverk/esp32sim/pull/243#issuecomment-6309114561):
 main `63670bb1` against camera head `7352bc81`, S3 hello for 30 emulated seconds,
 seven alternating pairs per run, identical instructions and console hashes.
@@ -91,6 +105,5 @@ seven alternating pairs per run, identical instructions and console hashes.
 These are the maintainer's posted rounded aggregates, not a new measurement.
 Round samples, load/warmup metadata and machine conditions were not supplied
 with that comment. Neither reaches the slower-in-at-least-6/7 flag threshold.
-This shows no S3 regression in those two historical runs; it neither measures
-the classic I2S camera path nor clears the current integrated head. No browser,
+This shows no S3 regression in those two historical runs. No browser,
 production-speed or hardware-timing conclusion follows from this table.
