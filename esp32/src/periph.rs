@@ -167,7 +167,10 @@ impl Device for ClassicSpi {
 
 impl ClassicSpi {
     // IDF v5.1.4 soc/esp32/include/soc/spi_reg.h:903-1016; functional QPI
-    // cache contract, not a cache-line/timing model. Legacy delay-clock excluded.
+    // cache contract, not a cache-line/timing model. Delay-clock (DCLK) runs take
+    // this gate too: their startup commands are decoded in esp-periph spi_mem.rs,
+    // and the speed-dependent SRAM_DUMMY_CYCLELEN (bits 14-21; IDF v5.5.1
+    // esp_psram/esp32/esp_psram_impl_quad.c:1107) is not checked.
     pub(crate) fn sram_cache_ready(&self, write: bool) -> bool {
         let s = self.0.regs.read(0x54);
         let command = self.0.regs.read(if write { 0x60 } else { 0x5c });

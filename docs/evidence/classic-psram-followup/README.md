@@ -182,6 +182,14 @@ cycle-accurate caches, full dual-core fidelity or silicon equivalence is claimed
 
 ## CPU comparison
 
-PENDING. No CPU timing was run. The non-layout differences above are accepted as
-explained deltas, not evidence of timing parity. Static source/codegen evidence
-is not a CPU table; the measured comparison remains required.
+Measured by the maintainer (joakimeriksson, PR #246 review of `f8cfc039`): main
+`6cf190c6` vs `f8cfc039`, user CPU, 7 alternating pairs, identical instruction
+counts and console hashes, load gate 5.
+
+| workload | main | PR | change | PR slower |
+| --- | ---: | ---: | ---: | ---: |
+| classic hello, 30 s | 0.370 s | 0.370 s | +0.0% | 0/7 |
+| T-Display MicroPython, 60 s | 0.920 s | 0.920 s | +0.0% | 3/7 |
+
+Neutral: nothing flagged (slower 6/7 or more). The non-layout differences above
+remain explained codegen deltas; this table is the timing evidence.
