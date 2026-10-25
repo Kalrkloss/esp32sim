@@ -8,7 +8,8 @@ use emu_core::{Bus, Core};
 use std::path::PathBuf;
 
 pub mod cooja;
-pub mod cosim;
+/// The P4 and its ESP32-C6 co-processor in lock-step (`esp32p4::coproc`), as the CLI's `--coproc` runs them.
+pub use esp32p4::coproc as cosim;
 mod camera;
 
 fn usage(chip: &str) -> ! { help(chip, 2) }
@@ -316,16 +317,21 @@ fn run_cooja(o: &mut Opts) {
 /// is set up and booted as for a normal run; `--wifi`, `--net` and `--debug` also go to the C6.
 /// Both consoles go to stdout line by line, the C6's prefixed `[c6] ` (or to `console=FILE`).
 fn run_cosim(o: &Opts) {
-    use std::io::Write;
     if !matches!(o.chip.as_str(), "p4" | "esp32p4") { usage_error("--coproc: the co-processor joins an ESP32-P4 (--chip p4)"); }
     let spec = cosim::CoprocSpec::parse(o.coproc.as_deref().unwrap()).unwrap_or_else(|e| usage_error(&format!("--coproc: {e}")));
-    let mut p4 = setup_p4::<esp32p4::RevLt3>(o);
+    if p4_rev3(o) { run_cosim_on::<esp32p4::RevGe3>(o, &spec) } else { run_cosim_on::<esp32p4::RevLt3>(o, &spec) }
+}
+
+/// `run_cosim` with the P4 revision the images were built for.
+fn run_cosim_on<R: esp32p4::Revision>(o: &Opts, spec: &cosim::CoprocSpec) {
+    use std::io::Write;
+    let mut p4 = setup_p4::<R>(o);
     let boot = prepare(&mut p4, o);
     // the SDIO link's commands and data take their wire time, as `--sd-timing` gives the card
     if o.sd_timing { p4.bus.periph.sdmmc.timed = true; }
     let end_ns = if p4.max_cycles == u64::MAX { u64::MAX } else { (p4.max_cycles as u128 * 1_000_000_000 / esp32p4::periph::CPU_HZ as u128) as u64 };
     p4.max_cycles = u64::MAX;
-    let c6 = setup_coproc(o, &spec);
+    let c6 = setup_coproc(o, spec);
     let cfg = cosim::Config {
         slice_ns: spec.slice_ns.unwrap_or(cosim::DEFAULT_SLICE_NS), en_pin: spec.en_pin.unwrap_or(cosim::DEFAULT_EN_PIN), en_inverted: spec.en_inverted,
         reboot_p4: !o.no_reboot && boot == "rom", reboot_c6: !o.no_reboot, p4_console: p4.console.mask, c6_console: 2,

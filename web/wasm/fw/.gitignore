@@ -18,6 +18,7 @@
 !c3-hello.json
 !c6-hello.json
 !p4-hello.json
+!p4-c6-hosted.json
 !c6-energy-scan.json
 !c6-contiki.json
 !c6-contiki-net.json
@@ -35,8 +36,8 @@
 !atech-sid.json
 !public/
 !public/*
-# The P4 example images the goldens boot but the page does not run: pinned and fetched by
-# tools/fetch-p4-firmware.sh, so a fetched copy is never committed by accident.
+# The P4 example images the goldens boot, and the P4 + C6 demo (p4-c6-hosted.json): pinned and
+# fetched by tools/fetch-p4-firmware.sh, so a fetched copy is never committed by accident.
 public/p4-hello-smp-bootloader.bin
 public/p4-hello-smp_world.bin
 public/p4-hello-rev3-bootloader.bin
@@ -58,5 +59,7 @@ public/c6-hosted-rawtp-slave.bin
 public/p4-hosted-bootloader.bin
 public/p4-hosted-ptable.bin
 public/p4-hosted-station.bin
+public/p4-hosted-rev3-bootloader.bin
+public/p4-hosted-rev3-station.bin
 public/p4-hosted-rawtp-rx.bin
 public/p4-hosted-rawtp-tx.bin

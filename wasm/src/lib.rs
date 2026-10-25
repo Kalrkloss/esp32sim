@@ -119,7 +119,11 @@ pub unsafe extern "C" fn esp32sim_new(board: *const u8, board_len: usize, flash_
     };
     // The classic ESP32: `esp32` is the bare module (esp32dev); its boards are named like the CLI's
     // `--board` (ttgo-tdisplay). `none`/`bare` stay the S3's, so the classic factory is not asked.
-    let p4 = matches!(board.as_str(), "esp32p4" | "p4");
+    // `esp32p4` is rev < 3, `esp32p4-rev3` rev >= 3; `+c6` adds the ESP32-C6 co-processor on SDIO
+    // (`esp32p4::coproc`), whose images load with `COPROC_KIND` / `COPROC_FLASH`.
+    let (p4_name, coproc) = board.strip_suffix("+c6").map_or((board.as_str(), false), |b| (b, true));
+    let p4_rev3 = matches!(p4_name, "esp32p4-rev3" | "p4-rev3");
+    let p4 = p4_rev3 || matches!(p4_name, "esp32p4" | "p4");
     let classic_board = if board == "esp32" {
         esp32::board::make_board("esp32dev")
     } else if p4 || c6_board.is_some() || matches!(board.as_str(), "none" | "bare") {
@@ -142,12 +146,20 @@ pub unsafe extern "C" fn esp32sim_new(board: *const u8, board_len: usize, flash_
         prepare(&mut m);
         MachineKind::C3(Box::new(m))
     } else if p4 {
-        let mut m = esp32p4::machine([0x30, 0xed, 0xa0, 0x00, 0x11, 0x22], flash_bytes);
-        m.bus.set_flash_size(flash_bytes);
-        let _ = m.bus.set_psram_size(psram_bytes);
-        m.console.mask = 2;
-        prepare(&mut m);
-        MachineKind::P4(Box::new(m))
+        fn p4_machine<R: esp32p4::Revision>(flash_bytes: usize, psram_bytes: usize) -> Machine<esp32p4::Esp32p4<R>> {
+            let mut m = esp32p4::machine_rev::<R>([0x30, 0xed, 0xa0, 0x00, 0x11, 0x22], flash_bytes);
+            m.bus.set_flash_size(flash_bytes);
+            let _ = m.bus.set_psram_size(psram_bytes);
+            m.console.mask = 2;
+            prepare(&mut m);
+            m
+        }
+        match (p4_rev3, coproc) {
+            (false, false) => MachineKind::P4(Box::new(p4_machine::<esp32p4::RevLt3>(flash_bytes, psram_bytes))),
+            (true, false) => MachineKind::P4Rev3(Box::new(p4_machine::<esp32p4::RevGe3>(flash_bytes, psram_bytes))),
+            (false, true) => MachineKind::P4C6(Box::new(esp32p4::coproc::CoSim::new(p4_machine(flash_bytes, psram_bytes), coproc_c6(), coproc_config()))),
+            (true, true) => MachineKind::P4Rev3C6(Box::new(esp32p4::coproc::CoSim::new(p4_machine(flash_bytes, psram_bytes), coproc_c6(), coproc_config()))),
+        }
     } else if let Some(b) = c6_board {
         let mut m = esp32c6::machine([0xdc, 0x1e, 0xd5, 0x6e, 0x8c, 0xdc], flash_bytes);
         m.bus.board = b;
@@ -185,6 +197,18 @@ pub unsafe extern "C" fn esp32sim_new(board: *const u8, board_len: usize, flash_
         jit: BrowserJit::default(),
     }))
 }
+
+/// The co-processor as the CLI's `--coproc` makes it: a bare 4 MB ESP32-C6 with an Espressif-OUI MAC
+/// of its own; the page loads its images and boots it with the P4.
+fn coproc_c6() -> esp32c6::Machine {
+    let mut m = esp32c6::machine([0x40, 0x4c, 0xca, 0x00, 0x11, 0x22], 4 << 20);
+    m.bus.set_flash_size(4 << 20);
+    m.rt.enabled = false;                                    // std::time does not exist here
+    m
+}
+
+/// The CLI's defaults: 10 µs slices, EN on GPIO 54, both chips rebooting, both on UART0.
+fn coproc_config() -> esp32p4::coproc::Config { esp32p4::coproc::Config::default() }
 
 /// The page is the one client: messages queue in a `WebServer` sink; the worker paces the run.
 fn prepare<S: Soc>(m: &mut Machine<S>) {

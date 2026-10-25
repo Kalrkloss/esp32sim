@@ -11,6 +11,7 @@
 //! I2C master. Each core's CLIC candidate is presented to the core, whose CLIC mode takes it
 //! (`periph::Clic`, `riscv_rv32::exec::CLIC_IRQ_*`).
 pub mod bus;
+pub mod coproc;
 pub mod periph;
 pub mod soc;
 

@@ -135,9 +135,10 @@ Hello world!
 This is esp32p4 chip with 2 CPU core(s), , silicon revision v3.1, 2MB external flash
 ```
 
-An image for the other revision stops the run before the first instruction: a rev ≥ 3 app
-behind a rev < 3 bootloader, a rev < 3 app behind a rev ≥ 3 bootloader, and any rev ≥ 3 image in
-the browser build and with `--coproc`, which have the rev < 3 model only:
+`--coproc` picks the revision the same way ("The co-processor"). The browser build takes it from
+the board name: `esp32p4` is rev < 3, `esp32p4-rev3` rev ≥ 3. An image for the other revision
+stops the run before the first instruction: a rev ≥ 3 app behind a rev < 3 bootloader, a rev < 3
+app behind a rev ≥ 3 bootloader, or, in the browser, an image for the other board name:
 
 ```
 [emu] build/hello_world.bin was built for ESP32-P4 rev ≥ v3.0 (min_chip_rev_full=301); this model is rev < 3 (v1.0). Rebuild with CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y, or run a bootloader and app both built for rev ≥ 3.
@@ -164,7 +165,8 @@ So far it is the rev < 3 model with those changes: 51 of the register headers th
 differ between IDF v5.5.4's `soc/esp32p4/register/hw_ver1` and `hw_ver3` in addresses or fields,
 among them GPIO, SYSTIMER, CACHE, HP_SYS_CLKRST, both interrupt matrices, SDMMC, the SPI memory
 controllers, eFuse, PMU, USB-Serial/JTAG and LP_SYSTEM, and `hw_ver3` adds 23. hello_world does
-not reach the differences; the SD card, USB and the co-processor have not been run on rev ≥ 3. The
+not reach the differences, and neither does ESP-Hosted with the C6 (golden `hosted-p4-rev3`); the
+SD card and USB have not been run on rev ≥ 3. The
 model runs at 360 MHz on both revisions, where IDF sets rev ≥ 3 to 400 MHz: the systimer and the
 timer groups count from the XTAL and keep time, but code that counts CPU cycles against the
 400 MHz IDF assumes, a busy-wait on the cycle counter such as `esp_rom_delay_us`, should take
@@ -727,7 +729,19 @@ interrupt, and the slave answers with its INIT event: the chip, the capabilities
 version. The host compares that with its own and prints `Version mismatch` only when the
 major.minor differ (transport_drv.c, `compare_fw_version`); it prints nothing here, 2.12 against
 2.12. The station's RPCs follow, the C6 joins the access point, and the P4's lwIP takes a lease
-through the link 3.77 s after power-up. The golden pins both consoles in the order the slices
+through the link 3.77 s after power-up. The same station built for rev ≥ 3 (`station/sdkconfig.defaults.rev3`,
+IDF v5.5.4, images `p4-hosted-rev3-*`, golden `hosted-p4-rev3`) runs on the rev ≥ 3 model with the
+same C6 and takes its lease at 3.77 s too. On a Waveshare ESP32-P4-WIFI6 with a v3.2 chip and the
+board's own C6 the image goes through the same steps (SDIO up, slave identified, transport
+active, WiFi started); that C6's factory firmware reports version 0.0.0, so the host also prints
+`Version mismatch`.
+
+**In the browser.** The demo `p4-c6-hosted` (`web/wasm/fw/p4-c6-hosted.json`, board
+`esp32p4-rev3+c6`) runs the rev ≥ 3 pair in the page: both chips from their ROMs, the P4's console
+and the C6's side by side (the "both chips" tab). A board name ending in `+c6` makes the module
+create the pair (`esp32p4::coproc::CoSim`); a manifest's `coproc` section lists the C6's images,
+which load through `esp32sim_load` with bit 8 of the kind set and `esp32sim_load_at` with bit 31 of
+the offset set; a stub `c6:NAME` and the WiFi configuration go to the C6. The golden pins both consoles in the order the slices
 produced them, the P4's instruction count, the C6's run and its SDIO, WiFi and network counts.
 19 frames go by before the C6's driver has given its MAC a receive ring (beacons before the
 radio is on; the report counts them apart from frames that find no free descriptor, of which
@@ -866,7 +880,7 @@ ENABLE1, which the W1TS and W1TC registers reach for every pin to 56; the IO MUX
 
 ### Lock-step
 
-`cli/src/cosim.rs` runs a P4 machine and a C6 machine on one clock, nanoseconds from power-up
+`esp32p4::coproc` (`esp32p4/src/coproc.rs`) runs a P4 machine and a C6 machine on one clock, nanoseconds from power-up
 (the P4 at 9 cycles per 25 ns, the C6 at 4). Slices of 10 µs (`slice-us`) end on a fixed grid:
 
 1. the P4 runs to the slice's end (`max_cycles`, both cores);
@@ -899,8 +913,8 @@ pieces). The virtual network's SNTP server answers its own clock plus emulated t
 none,epoch=S` fixes that clock, and without it the host's clock at the first answer sets it
 ([networking-howto.md](networking-howto.md)), so a firmware that asks for the time is
 reproducible only with an epoch. The goldens and tests pass one. Both consoles are
-collected a line at a time and printed in the order the slices produced them. The co-processor
-is native only: the browser build has none.
+collected a line at a time and printed in the order the slices produced them. The browser build
+runs the same pair ("In the browser" above).
 
 **Cost.** Without `--coproc` nothing of this runs: the C6's slave is an optional device-table
 entry and one address compare after a peripheral write, the P4's SDIO path one flag tested where
@@ -1045,15 +1059,15 @@ firmware dialog offers the board `esp32p4`.
 
 ## Not there yet
 
-- **Rev ≥ 3 beyond hello_world**: its register-layout differences, 400 MHz, the browser build and
-  `--coproc` ("Revisions").
+- **Rev ≥ 3 beyond hello_world and ESP-Hosted**: its register-layout differences and 400 MHz
+  ("Revisions").
 - **ASSIST_DEBUG's saved PC** is the instruction after the store that requested the reset, not
   the store, and core 1's is not recorded ("Compared with silicon").
 - **AXI-GDMA, the LP core, MIPI-DSI/CSI, DMA2D/PPA**, and Xesppie's save and restore,
   which FreeRTOS runs only for a task that uses PIE. mbedTLS's SHA and AES in DMA mode run through
   the AXI GDMA on the P4 (IDF v5.5.3 `mbedtls/port/crypto_shared_gdma`, `SOC_AXI_GDMA_SUPPORTED`),
   so SHA_BUSY (0x50091018) never clears and the caller spins on it.
-- **The co-processor**: native only; the SDIO link without timing by default and the slave
+- **The co-processor**: the SDIO link without timing by default and the slave
   without busy or read wait, CRC or suspend ("The co-processor"); faults are injected on the link
   rather than arising from a model of the bus. `--usb-host` does not run with `--coproc` yet.
 - **The temperature sensor** (LP_TSENS) is register RAM: IDF's driver reads OUT as 0, which it

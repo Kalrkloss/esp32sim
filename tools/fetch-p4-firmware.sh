@@ -1,5 +1,5 @@
 #!/bin/sh
-# The ESP32-P4 example images the goldens boot but the web page does not run (built from
+# The ESP32-P4 example images the goldens boot, and the page's P4 + C6 demo (built from
 # examples/*-p4 with ESP-IDF v5.5.3, the rev >= 3 hello with v5.5.4; each example's README says
 # how), pinned by SHA-256 so CI and a fresh checkout get the same bytes. The page's P4 hello
 # (p4-hello-*) stays committed.
@@ -12,7 +12,7 @@
 set -e
 cd "$(dirname "$0")/.."
 DIR=${1:-web/wasm/fw/public}
-BASE=${P4_FIRMWARE_BASE_URL:-https://raw.githubusercontent.com/mikroverk/esp32sim-firmware/293c5bf7961559e213466ff4c9d1ce294f90f661/p4}
+BASE=${P4_FIRMWARE_BASE_URL:-https://raw.githubusercontent.com/mikroverk/esp32sim-firmware/fa546a4408a7f7b460f351d147f9c0f08bbfa870/p4}
 # file, SHA-256, URL
 IMAGES="p4-hello-smp-bootloader.bin fc8698c1520e0d6469861e917d84568c94d17721faa93937896ae427e8f91717 $BASE/p4-hello-smp-bootloader.bin
 p4-hello-smp_world.bin 9476bccf819114fe30ad55dde4d0917e7f5213df34ec6f159b81c4a84e053f8b $BASE/p4-hello-smp_world.bin
@@ -35,6 +35,8 @@ c6-hosted-rawtp-slave.bin 3b0dd12a47b69cec91e20a2264393824de0bf9238c01d690f1233e
 p4-hosted-bootloader.bin 0afa47b7d81bac1e57ba261abfb8a9f622c555da56319434ad8b0f346f7cb062 $BASE/p4-hosted-bootloader.bin
 p4-hosted-ptable.bin 7f00b6c042a89b15b0cac534f82ed988caf29278ff5700b0c511eb1b5bb7c820 $BASE/p4-hosted-ptable.bin
 p4-hosted-station.bin b0e99c2150ba445d07b5a5f7cbe4ccd3e1e30b39075e3c93bcf736d74271f1e1 $BASE/p4-hosted-station.bin
+p4-hosted-rev3-bootloader.bin 42d99a6f7470a7324077cf29de6dd5012aa2d4fbfd0f2ee0a55ba376981b86ed $BASE/p4-hosted-rev3-bootloader.bin
+p4-hosted-rev3-station.bin 0a99eb9dbcf11a9b22740b4d524e44b022e327adbe737fd82390353200a11367 $BASE/p4-hosted-rev3-station.bin
 p4-hosted-rawtp-rx.bin ca8efaf3d8ea2d5f67b2dd48171a75ad883ef4ecb46c9c92f1a6c5f51a180ac6 $BASE/p4-hosted-rawtp-rx.bin
 p4-hosted-rawtp-tx.bin 8c5a3bcf2fc99d982119697e35ff7e3903805589489e69221ab828cdfd1d820e $BASE/p4-hosted-rawtp-tx.bin"
 
