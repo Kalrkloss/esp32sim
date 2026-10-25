@@ -3,7 +3,6 @@
     ./run-lvgl.sh --tft-png page1.png --max-seconds 10
     ./run-lvgl.sh --script swipe.txt --tft-png page3.png --max-seconds 12
     ./run-lvgl.sh --script tap.txt   --tft-png taps.png  --max-seconds 12
-    ./run-lvgl.sh --web 8768          # browser UI, click/drag on the panel
 
 The board model (`--board jc3248w535`) is a 320×480 AXS15231B on QSPI with the same IC's
 capacitive touch on I2C0 at 0x3B. The application is MicroPython + LVGL: three tileview pages in
@@ -66,3 +65,7 @@ because that is what MicroPython's `Partition` block device reports (`MICROPY_FA
 
 Not modelled: the QSPI bus timing, the panel's own oscillator/refresh, tearing, brightness
 (`0x51` is accepted and ignored), and the touch gesture codes (only single-point coordinates).
+
+Not wired up yet: the browser UI's layout switch (`web/run.html`) knows the Waveshare boards but
+not this one, so `--web` shows the console without the panel; `--tft-png` and the MCP
+`sim_screenshot` path do produce the frame.
