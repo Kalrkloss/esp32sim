@@ -29,6 +29,7 @@ pub const PIN_TOUCH_INT: u8 = 50;
 /// (esp_lcd_touch_ft5x06.c); its INT pulses low once per report, and once more on release.
 const TOUCH_PERIOD: VirtualCycle = 12 * crate::periph::CPU_HZ / 1000;
 const TOUCH_PULSE: VirtualCycle = crate::periph::CPU_HZ / 10_000;
+const MIN_TOUCH: VirtualCycle = 2 * TOUCH_PERIOD + TOUCH_PULSE;
 pub const LCD_COLS: usize = 320;
 pub const LCD_ROWS: usize = 480;
 
@@ -65,13 +66,16 @@ pub struct WaveshareP4Lcd35 {
     /// the next INT pulse, and the end of the one under way
     next_pulse: Option<VirtualCycle>,
     pulse_end: Option<VirtualCycle>,
+    /// when the finger went down, and a lift held back until the controller has reported the touch
+    down_at: VirtualCycle,
+    release_at: Option<VirtualCycle>,
     edges: Vec<BoardEdge>,
 }
 impl Default for WaveshareP4Lcd35 { fn default() -> Self { Self::new() } }
 impl WaveshareP4Lcd35 {
     pub fn new() -> Self {
         WaveshareP4Lcd35 { panel: DcsPanel::new(LCD_COLS, LCD_ROWS), amp: false, touch: Default::default(), gpio_events: 0,
-                           cycle: 0, next_pulse: None, pulse_end: None, edges: Vec::new() }
+                           cycle: 0, next_pulse: None, pulse_end: None, down_at: 0, release_at: None, edges: Vec::new() }
     }
     fn touched(&self) -> bool { self.touch.lock().unwrap().iter().any(|p| p.is_some()) }
 }
@@ -94,17 +98,32 @@ impl BoardModel for WaveshareP4Lcd35 {
         vec![(0, FT5X06_ADDRESS, Box::new(Ft5x06::new(self.touch.clone()))), (0, 0x18, Box::new(Reg8Device::new("es8311", &[(0xfd, 0x83), (0xfe, 0x11)])))]
     }
     fn touch(&mut self, x: u16, y: u16, down: bool) { self.touch_at(self.cycle, x, y, down); }
+    /// A lift comes at least two report periods after its touch, so a click shorter than that (a
+    /// mouse click in a browser running slower than real time) is still a touch the driver reads.
     fn touch_at(&mut self, cycle: VirtualCycle, x: u16, y: u16, down: bool) {
+        let cycle = cycle.max(self.cycle);
+        if !down && cycle < self.down_at + MIN_TOUCH {
+            self.release_at = Some(self.down_at + MIN_TOUCH);
+            return;
+        }
+        if down { self.down_at = cycle; self.release_at = None; }
         self.touch.lock().unwrap()[0] = down.then_some((x.min(LCD_COLS as u16 - 1), y.min(LCD_ROWS as u16 - 1)));
         // a report now: the first of a touch, or the one that says the finger has gone
-        self.next_pulse = Some(self.next_pulse.map_or(cycle, |p| p.min(cycle)).max(self.cycle));
+        self.next_pulse = Some(self.next_pulse.map_or(cycle, |p| p.min(cycle)));
     }
     fn input_levels(&self) -> Vec<(u8, bool)> { vec![(PIN_TOUCH_INT, true)] }
     fn next_deadline(&self) -> Option<VirtualCycle> {
-        match (self.next_pulse, self.pulse_end) { (Some(a), Some(b)) => Some(a.min(b)), (a, b) => a.or(b) }
+        [self.next_pulse, self.pulse_end, self.release_at].into_iter().flatten().min()
     }
     fn advance_to(&mut self, cycle: VirtualCycle) {
         while let Some(due) = self.next_deadline().filter(|&d| d <= cycle) {
+            if self.release_at == Some(due) {
+                self.release_at = None;
+                self.touch.lock().unwrap()[0] = None;
+                let after = self.pulse_end.map_or(due, |end| due.max(end + 1));   // not inside a pulse under way
+                self.next_pulse = Some(self.next_pulse.map_or(after, |p| p.min(after)));
+                continue;
+            }
             if self.pulse_end == Some(due) {
                 self.pulse_end = None;
                 self.edges.push(BoardEdge { cycle: due, pin: PIN_TOUCH_INT, level: true });
@@ -152,5 +171,19 @@ mod tests {
         // the release at 2P + 10 falls inside the pulse begun at 2P, so its report follows that one
         assert_eq!(falls, [1000, 1000 + p, 1000 + 2 * p, 1000 + 2 * p + TOUCH_PULSE + 1]);
         assert!(b.next_deadline().is_none());
+    }
+
+    /// A click shorter than two reports is held down until the controller has reported it.
+    #[test]
+    fn a_short_click_is_still_reported() {
+        let mut b = WaveshareP4Lcd35::new();
+        b.touch_at(0, 100, 200, true);
+        b.touch_at(1000, 100, 200, false);
+        b.advance_to(TOUCH_PERIOD + 10);
+        assert!(b.touched());
+        b.advance_to(MIN_TOUCH + 4 * TOUCH_PERIOD);
+        assert!(!b.touched());
+        let falls = b.take_edges().iter().filter(|e| !e.level).count();
+        assert_eq!(falls, 4);                    // at 0, P, 2P, and the report of the lift
     }
 }

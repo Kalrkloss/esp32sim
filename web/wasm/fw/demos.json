@@ -70,6 +70,11 @@
   "note": "two chips in this tab, as on the Waveshare ESP32-P4-WIFI6: the P4 (rev ≥ 3, two RISC-V cores) runs IDF's wifi_station with ESP-Hosted, the C6 the ESP-Hosted slave, both from their mask ROMs and in lock-step over SDIO. The C6 joins the virtual access point and the P4 gets its address through it. A real board with a v3.2 P4 and its own C6 goes through the same steps to its address"
  },
  {
+  "fw": "p4-lcd35-synth",
+  "title": "ESP32-P4 · Scintilla synth (Touch-LCD-3.5)",
+  "note": "the Elka Synthex in integer C on the Waveshare ESP32-P4-WIFI6-Touch-LCD-3.5: LVGL on the ST7796 over SPI and DMA, FT5x06 touch, the ES8311's audio — enable audio and play the keys; tap the red display for the 80 presets, INSTRUMENT edits the sound live. Slower than real time in the browser"
+ },
+ {
   "fw": "tdisplay-prices",
   "title": "LilyGO TTGO T-Display · spot prices (MicroPython)",
   "note": "the classic ESP32: stock MicroPython v1.29.0 (ESP32_GENERIC) from micropython.org, booted by the mask ROM, running a pure-Python spot-price app on its ST7789 135×240 over VSPI from a LittleFS filesystem — day prices as a bar chart with the current hour. Demo data from its own filesystem: the browser has no sockets, so there is no Wi-Fi and no fetch; the two buttons are below the panel"

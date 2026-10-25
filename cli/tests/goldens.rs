@@ -572,6 +572,39 @@ fn hosted_p4_rev3() {
     expect_u64("hosted-p4-rev3.insns", r.insns);
 }
 
+/// Scintilla (the Elka Synthex in integer C, GPL-3.0, joakimeriksson/esp32 `scintilla-p4-lcd35`) on
+/// the model of Waveshare's ESP32-P4-WIFI6-Touch-LCD-3.5, with no C6 on the SDIO bus: Waveshare's
+/// BSP 2.0.2 and LVGL 9 bring up the ST7796 over GPSPI2 and the AXI-GDMA, the FT5x06 on I2C1 and
+/// the ES8311 on I2S1 and the AHB-GDMA. A4 (the thirteenth white key, at the panel's (290, 160)
+/// under the firmware's landscape touch mapping) held for 0.6 s sounds at 440 Hz; a tap on the
+/// program display opens the patch picker. Pinned: the audio, the last frame, the instruction count.
+#[test] #[ignore = "needs the ESP32-P4 rev 3 mask ROM ELF"]
+fn scintilla_p4_lcd35() {
+    let rom = rom("esp32p4_rev300");
+    let (script, wav, png) = (tmp("scintilla.txt"), tmp("scintilla.wav"), tmp("scintilla.png"));
+    std::fs::write(&script, "4.5 touch 290 160 1\n5.1 touch 290 160 0\n6.0 touch 23 179 1\n6.0 touch 23 179 0\n").unwrap();
+    let r = run(BIN_P4, &["--rom", rom.to_str().unwrap(), "--board", "waveshare-p4-lcd35", "--flash-mb", "16", "--psram-mb", "32", "--no-dump",
+        "--bootloader", &fetched("p4-scintilla-lcd35-bootloader.bin"), "--ptable", &fetched("p4-scintilla-lcd35-ptable.bin"), "--app", &fetched("p4-scintilla-lcd35.bin"),
+        "--script", script.to_str().unwrap(), "--wav", wav.to_str().unwrap(), "--tft-png", png.to_str().unwrap(), "--max-seconds", "7"]);
+    for line in ["boot: chip revision: v3.1", "audio: preset 0 Chunky Synth", "ble-midi: no co-processor answers, BLE MIDI off", "scintilla: ready"] {
+        assert!(r.stdout.contains(line), "missing {line:?}:\n{}", r.stdout);
+    }
+    assert!(!r.stdout.contains("Guru Meditation") && !r.stdout.contains("abort()"), "{}", r.stdout);
+    assert!(r.stderr.contains("[emu] p4-lcd35:") && r.stderr.contains("madctl=0xe8") && r.stderr.contains("amplifier on"), "{}", r.stderr);
+    let data = std::fs::read(&wav).unwrap();
+    let pcm: Vec<i16> = data[44..].as_chunks::<2>().0.iter().map(|&b| i16::from_le_bytes(b)).collect();
+    let onset = pcm.iter().position(|&v| v != 0).expect("the key sounds");
+    assert!(onset > 3 * 44100, "sound before the key was touched, at sample {onset}");
+    // the fundamental, by autocorrelation over 40 ms from 50 ms after the onset
+    let w = &pcm[onset + 2205..onset + 2205 + 1764];
+    let lag = (44100 / 1000..44100 / 100).max_by_key(|&l| w[..w.len() - l].iter().zip(&w[l..]).map(|(&a, &b)| a as i64 * b as i64).sum::<i64>()).unwrap();
+    let hz = 44100.0 / lag as f64;
+    assert!((hz - 440.0).abs() < 440.0 * 0.03, "A4 sounds at {hz:.1} Hz");
+    expect_sha("scintilla-p4-lcd35.wav.sha256", &data);
+    expect_sha("scintilla-p4-lcd35.png.sha256", &std::fs::read(&png).unwrap());
+    expect_u64("scintilla-p4-lcd35.insns", r.insns);
+}
+
 /// ESP-Hosted's raw throughput test on the same pair (`examples/esp-hosted-p4`, "Raw
 /// throughput"), the SD bus timed at the slot's 4 lines and 40 MHz: `rx` the C6 sends, `tx` the P4
 /// does. Traffic starts near 7.7 s (both sides wait 5 s); the per-second reports pin the steady

@@ -33,6 +33,7 @@
     esp32p4: { soc: 'ESP32-P4 rev < 3 (v1.0)', cpu: '2× RISC-V RV32IMAFC @ 360 MHz', board: 'Bare ESP32-P4', peripherals: 'UART · USB-Serial/JTAG · timers · SDMMC · flash' },
     'esp32p4-rev3': { soc: 'ESP32-P4 rev ≥ 3 (v3.1)', cpu: '2× RISC-V RV32IMAFC @ 360 MHz', board: 'Bare ESP32-P4', peripherals: 'UART · USB-Serial/JTAG · timers · flash' },
     'esp32p4-c6': { soc: 'ESP32-P4 rev < 3 + ESP32-C6', cpu: '2× RV32IMAFC @ 360 MHz + 1× RV32IMAC @ 160 MHz', board: 'P4 with a C6 on SDIO, as the Waveshare ESP32-P4-WIFI6', peripherals: 'SDIO 4-bit · ESP-Hosted 2.12.13 · the C6\'s WiFi on a virtual AP' },
+    'waveshare-p4-lcd35': { soc: 'ESP32-P4 rev ≥ 3 (v3.1)', cpu: '2× RISC-V RV32IMAFC @ 360 MHz', board: 'Waveshare ESP32-P4-WIFI6-Touch-LCD-3.5', peripherals: 'ST7796 320×480 SPI · FT5x06 touch · ES8311 I²S audio' },
     'esp32p4-rev3-c6': { soc: 'ESP32-P4 rev ≥ 3 (v3.1) + ESP32-C6', cpu: '2× RV32IMAFC @ 360 MHz + 1× RV32IMAC @ 160 MHz', board: 'P4 with a C6 on SDIO, as the Waveshare ESP32-P4-WIFI6', peripherals: 'SDIO 4-bit · ESP-Hosted 2.12.13 · the C6\'s WiFi on a virtual AP' },
     none: { soc: 'ESP32-S3 rev 0', cpu: '2× Xtensa LX7 @ 240 MHz', board: 'Bare ESP32-S3', peripherals: 'UART · USB-Serial/JTAG · timers · flash' },
   };
@@ -51,10 +52,11 @@
     'pocket-tank': ['Tap or drag to touch the tank', 'Type feed 6 or shadow in the line box', 'help lists the director commands'],
     hello: ['Watch the ROM, the bootloader, then the app', 'The watchdog reboots it: same output again', 'Compare UART0 and USB-CDC'],
     'c3-hello': ['The RISC-V mask ROM boots the app', 'Open UART0 for the console', 'Verified line for line against a real C3'],
+    'p4-lcd35-synth': ['Enable audio, then play the keys', 'Tap the red display to pick a preset', 'INSTRUMENT edits the sound while it plays'],
     'p4-c6-hosted': ['Both chips boot from their ROMs: [p4] and [c6]', 'The C6 joins the virtual AP for the P4', 'The P4 gets its address over SDIO'],
     'c6-hello': ['The C6 mask ROM boots the app', 'Open UART0 for the console', 'Verified against a Waveshare C6-LCD-1.47'],
   };
-  const CHIP = { esp32c3: 'c3', esp32c6: 'c6', 'waveshare-c6-lcd147': 'c6', 'ttgo-tdisplay': 'esp32', esp32p4: 'p4', 'esp32p4-rev3': 'p4', 'esp32p4-c6': 'p4', 'esp32p4-rev3-c6': 'p4', 'esp32p4+c6': 'p4', 'esp32p4-rev3+c6': 'p4' };
+  const CHIP = { esp32c3: 'c3', esp32c6: 'c6', 'waveshare-c6-lcd147': 'c6', 'ttgo-tdisplay': 'esp32', esp32p4: 'p4', 'esp32p4-rev3': 'p4', 'esp32p4-c6': 'p4', 'esp32p4-rev3-c6': 'p4', 'esp32p4+c6': 'p4', 'esp32p4-rev3+c6': 'p4', 'waveshare-p4-lcd35': 'p4' };
   // The board the running machine announced (run.html's `board` message): a native --web run has no
   // manifest or Configure form, and a board picked in Configure can change after the rail is built.
   let liveBoard = null, renderMachine = null;
