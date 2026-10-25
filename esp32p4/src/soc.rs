@@ -278,7 +278,7 @@ impl esp_soc::SocBus for SocBus {
     fn gpio_input(&self) -> u64 { self.periph.gpio.g.input }
     fn board(&mut self) -> &mut dyn BoardModel { &mut *self.board }
     fn board_ref(&self) -> &dyn BoardModel { &*self.board }
-    fn audio(&self) -> (&[i16], u32) { (&[], 44100) }
+    fn audio(&self) -> (&[i16], u32) { (&self.periph.i2s1.pcm, self.periph.i2s1.sample_rate) }
     /// `line` is the CPU interrupt line, CLIC ID - 16.
     fn irq_sources_of(&self, core: usize, line: u32) -> Vec<usize> { self.periph.sources_of(core, line + CLIC_EXT_OFFSET) }
     /// The card goes in the reference board's socket, on slot 0's IO MUX pins; firmware reaches
@@ -303,6 +303,8 @@ impl esp_soc::SocBus for SocBus {
             out.push(format!("[usb] {} SETUPs, {} IN packets ({} bytes), {} OUT packets ({} bytes), {} NAKs, {} STALLs; host: {} transfers, {} bus resets, {} data PID errors; core: {} DMA faults, {} FIFO size errors",
                              d.setups, d.packets_in, d.bytes_in, d.packets_out, d.bytes_out, d.naks, d.stalls, k.transfers, k.resets, k.toggle_errors, d.dma_faults, d.fifo_errors));
         }
+        if self.periph.spi2.transfers > 0 { out.push(format!("[emu] spi2: {} transfers", self.periph.spi2.transfers)); }
+        let b = self.board.report(); if !b.is_empty() { out.push(b); }
         out.join("\n")
     }
     /// The host on the other end of the high-speed USB-OTG port (rhport 1, `DR_REG_USB2_BASE`).

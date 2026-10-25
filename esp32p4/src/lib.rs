@@ -10,6 +10,7 @@
 //! blocks, the cache controller, HP_SYSTEM, HP_SYS_CLKRST, the LP system blocks and the analog
 //! I2C master. Each core's CLIC candidate is presented to the core, whose CLIC mode takes it
 //! (`periph::Clic`, `riscv_rv32::exec::CLIC_IRQ_*`).
+pub mod board;
 pub mod bus;
 pub mod coproc;
 pub mod periph;
