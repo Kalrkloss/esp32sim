@@ -73,7 +73,7 @@ Restarting now.
 ESP-ROM:esp32p4-eco5-20250430
 Build:Apr 30 2025
 rst:0xc (SW_CPU_RESET),boot:0x30f (SPI_FAST_FLASH_BOOT)
-Core0 Saved PC:0x4ff2237c
+Core0 Saved PC:0x4ff2237a
 SPI mode:DIO, clock div:1
 load:0x4ffb60d0,len:0x15e0
 load:0x4ffac2c0,len:0xe88

@@ -119,6 +119,10 @@ pub struct SocBus {
     pub cur_core: usize,
     /// each hart's LR reservation (the word); a store by the other hart to it breaks it
     pub reservation: [Option<u32>; 2],
+    /// the core whose store requested the pending software reset, and that store's PC
+    pub reset_request: Option<(usize, u32)>,
+    /// where each core was when the reset took effect (`SocBus::note_core_pcs`)
+    pub core_pcs: [u32; 2],
 }
 
 impl SocBus {
@@ -129,7 +133,7 @@ impl SocBus {
             flash: vec![0xff; flash_size], psram: Vec::new(),
             mmu_flash: Box::new([0; MMU_ENTRIES]), mmu_psram: Box::new([0; MMU_ENTRIES]), mmu_flash_index: 0, mmu_psram_index: 0,
             periph: Peripherals::new(mac, wafer), wafer, board: Box::new(esp_soc::NoBoard),
-            cycles: 0, last_fault: None, irq_dirty: true, gpio_events: None, debug: Default::default(), cur_core: 0, reservation: [None; 2],
+            cycles: 0, last_fault: None, irq_dirty: true, gpio_events: None, debug: Default::default(), cur_core: 0, reservation: [None; 2], reset_request: None, core_pcs: [0; 2],
         }
     }
 
@@ -223,7 +227,10 @@ impl SocBus {
             return;
         }
         let v = if size == 4 { v } else { merge(self.periph.read32(a)) };
+        let resetting = self.periph.lp.sw_reset;
         self.periph.write32(a, v);
+        // the store that asks for a software reset is where ASSIST_DEBUG finds this core
+        if !resetting && self.periph.lp.sw_reset { self.reset_request = Some((self.cur_core, self.periph.misc.cur_pc)); }
         if self.periph.spi_exec { self.run_spi(); }
         if self.periph.psram_exec { self.run_psram(); }
         if self.periph.sdmmc.pending() { self.run_sdmmc(); }

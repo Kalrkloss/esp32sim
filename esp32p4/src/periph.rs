@@ -377,12 +377,14 @@ impl Device for AnaMst {
     }
 }
 
-/// ASSIST_DEBUG (0x3FF06000): the ROM prints core 0's recorded PC as `Saved PC` after a reset.
-/// IDF v5.5.3 register/hw_ver1/soc/assist_debug_reg.h: CORE_0_RCD_PDEBUGPC at 0x48.
+/// ASSIST_DEBUG (0x3FF06000): the ROM prints each core's recorded PC as `CoreN Saved PC` after a
+/// reset, and nothing for a core whose register reads 0. IDF v5.5.4 register/hw_ver1/soc/
+/// assist_debug_reg.h: CORE_0_RCD_PDEBUGPC at 0x48, CORE_1_RCD_PDEBUGPC at 0xC8; the ECO0 ROM's
+/// `main` reads both (0x4fc028e4-0x4fc02918).
 #[derive(Default)]
-pub struct AssistDebug { pub saved_pc: u32, ram: RegRam }
+pub struct AssistDebug { pub saved_pc: [u32; 2], ram: RegRam }
 impl Device for AssistDebug {
-    fn read(&mut self, off: u32) -> u32 { match off { 0x48 => self.saved_pc, _ => self.ram.read(off) } }
+    fn read(&mut self, off: u32) -> u32 { match off { 0x48 => self.saved_pc[0], 0xc8 => self.saved_pc[1], _ => self.ram.read(off) } }
     fn write(&mut self, off: u32, v: u32) -> WriteEffect { self.ram.write(off, v); WriteEffect::NONE }
 }
 

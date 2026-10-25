@@ -35,7 +35,7 @@ Hello world!
 This is esp32p4 chip with 2 CPU core(s), , silicon revision v1.0, 2MB external flash
 Restarting now.
 rst:0xc (SW_CPU_RESET),boot:0x30f (SPI_FAST_FLASH_BOOT)
-Core0 Saved PC:0x4ff0232a
+Core0 Saved PC:0x4ff02328
 ```
 
 The images are IDF v5.5.3's hello_world for rev < 3 (`examples/hello_world-p4`): `p4-hello-*`
@@ -990,10 +990,10 @@ Two Waveshare ESP32-P4-WIFI6 boards, console on UART0 through the board's USB-UA
 - **v1.3 chip** (ROM `esp32p4-eco2-20240710`, 32 MB flash): `p4-hello` and `p4-hello-smp`, both
   boots, print what the goldens hold except the ROM's two banner lines, the heap region below the
   ROM's data (`len 00004BF0`, 12 bytes more than ECO0 leaves), the chip revision, the flash
-  size warning for the larger part and the `Saved PC` lines: silicon reports core 0 at the store
-  that requested the reset, the model at the instruction after it (2 bytes later), and after the
-  two-core image's restart silicon also prints `Core1 Saved PC` (ASSIST_DEBUG 0xC8), which the
-  model leaves at 0. The two-core image's `Minimum free heap size` is 16 bytes higher on silicon
+  size warning for the larger part and, after the two-core image's restart, the value of
+  `Core1 Saved PC` (0x12 bytes later here: "Not there yet", core stall). `Core0 Saved PC` is the
+  store that requested the reset, on silicon and here (ASSIST_DEBUG 0x48 and 0xC8,
+  `AssistDebug`). The two-core image's `Minimum free heap size` is 16 bytes higher on silicon
   beyond those 12. `p4-sdcard` with the socket empty prints the same lines, the timeout 20 ms
   after `Mounting filesystem` on both; with a 64 GB SDHC card the same lines apart from the
   card's name and size; the model's card answers at once, so mounting takes 30 ms of emulated
@@ -1005,7 +1005,7 @@ Two Waveshare ESP32-P4-WIFI6 boards, console on UART0 through the board's USB-UA
   hello_world on one core and on both prints what `hello-p4-rev3` and `hello-p4-rev3-smp` hold
   except the ROM's banner lines, `boot:0x31f` for `boot:0x30f`, the chip revision (v3.2) and
   efuse block revision (v1.2), the flash chip (`generic`) and its size warning, and the same
-  `Saved PC` differences as on v1.3; the two-core `Minimum free heap size` is again 16 bytes
+  `Core1 Saved PC` difference as on v1.3; the two-core `Minimum free heap size` is again 16 bytes
   higher on silicon. The heap region below the ROM's data has the same length on ECO5 and ECO7.
 
 Beyond that, the ROMs and IDF's own sources are what this page is checked against.
@@ -1062,8 +1062,11 @@ firmware dialog offers the board `esp32p4`.
 
 - **Rev ≥ 3 beyond hello_world and ESP-Hosted**: its register-layout differences and 400 MHz
   ("Revisions").
-- **ASSIST_DEBUG's saved PC** is the instruction after the store that requested the reset, not
-  the store, and core 1's is not recorded ("Compared with silicon").
+- **Core stall**: PMU's CPU_SW_STALL (stall code 0x86, IDF v5.5.4
+  `hal/esp32p4/include/hal/cpu_utility_ll.h`) does not stop the other core, and HP_SYSTEM's
+  CORESTALLED_ST reads 0. `esp_restart` stalls core 1 before the reset, so core 1 runs on here and
+  its `Core1 Saved PC` is 0x12 bytes later than on silicon, on both revisions ("Compared with
+  silicon"). Anything else that relies on stalling the other core does not get it either.
 - **AXI-GDMA, the LP core, MIPI-DSI/CSI, DMA2D/PPA**, and Xesppie's save and restore,
   which FreeRTOS runs only for a task that uses PIE. mbedTLS's SHA and AES in DMA mode run through
   the AXI GDMA on the P4 (IDF v5.5.3 `mbedtls/port/crypto_shared_gdma`, `SOC_AXI_GDMA_SUPPORTED`),

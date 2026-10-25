@@ -207,7 +207,16 @@ impl esp_soc::SocBus for SocBus {
         p.lp = old.lp;
         p.lp.sw_reset = false;
         p.lp.reset_cause = cause;
-        p.assist_debug.saved_pc = old.misc.cur_pc;
+        // ASSIST_DEBUG's PDEBUGPC: the requesting core at its reset store, the other where it was;
+        // core 1 still held in reset records nothing (silicon prints no `Core1 Saved PC` then)
+        let request = self.reset_request.take();
+        for core in 0..2 {
+            p.assist_debug.saved_pc[core] = match request {
+                Some((c, pc)) if c == core => pc,
+                _ if core == 1 && !old.hp_clkrst.core1_released() => 0,
+                _ => self.core_pcs[core],
+            };
+        }
         p.spi0.0.jedec = old.spi0.0.jedec;
         p.spi1.jedec = old.spi1.jedec;
         p.psram1.psram_mr = old.psram1.psram_mr;      // the PSRAM keeps its mode registers
@@ -231,6 +240,7 @@ impl esp_soc::SocBus for SocBus {
         self.periph.misc.log_all = self.debug.has("mmio");
         cause
     }
+    fn note_core_pcs(&mut self, pcs: &[u32]) { for (s, &pc) in self.core_pcs.iter_mut().zip(pcs) { *s = pc; } }
     fn sw_reset(&self) -> bool { self.periph.lp.sw_reset }
     fn request_reset(&mut self, cause: u32) { self.periph.lp.sw_reset = true; self.periph.lp.reset_cause = cause; }
     fn reset_cause(&self) -> u32 { self.periph.lp.reset_cause }
