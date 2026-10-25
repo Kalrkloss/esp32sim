@@ -48,6 +48,8 @@ pub struct Emu {
     ethernet_out: Vec<Vec<u8>>,
     ble_out: String,
     booted: bool,
+    /// a mask ROM ELF was loaded: a ROM boot without one would run from empty memory and print nothing
+    rom_loaded: bool,
     #[cfg(target_arch = "wasm32")]
     jit: BrowserJit,
 }
@@ -92,7 +94,8 @@ unsafe fn text<'a>(ptr: *const u8, len: usize) -> &'a str {
 /// `board` is a CLI board name (atech14, waveshare-cam, waveshare-lcd4b,
 /// waveshare-amoled18-v2, none) for the ESP32-S3, `esp32` (the bare esp32dev module) or a classic
 /// board such as `ttgo-tdisplay` for the classic ESP32, `esp32c6` or `waveshare-c6-lcd147` for the
-/// C6, or `esp32c3` for the C3, which is console-only and takes no board. Null on failure.
+/// C6, `esp32c3` for the C3 or `esp32p4` for the P4 (rev < 3), which are console-only and take no
+/// board. Null on failure.
 /// Flash and PSRAM are each limited to 32 MiB, matching the browser configuration form.
 ///
 /// # Safety
@@ -116,9 +119,10 @@ pub unsafe extern "C" fn esp32sim_new(board: *const u8, board_len: usize, flash_
     };
     // The classic ESP32: `esp32` is the bare module (esp32dev); its boards are named like the CLI's
     // `--board` (ttgo-tdisplay). `none`/`bare` stay the S3's, so the classic factory is not asked.
+    let p4 = matches!(board.as_str(), "esp32p4" | "p4");
     let classic_board = if board == "esp32" {
         esp32::board::make_board("esp32dev")
-    } else if c6_board.is_some() || matches!(board.as_str(), "none" | "bare") {
+    } else if p4 || c6_board.is_some() || matches!(board.as_str(), "none" | "bare") {
         None
     } else {
         esp32::board::make_board(&board)
@@ -137,6 +141,13 @@ pub unsafe extern "C" fn esp32sim_new(board: *const u8, board_len: usize, flash_
         m.console.mask = 2;                                  // the ROM mirrors its console to UART0 and USB-Serial/JTAG
         prepare(&mut m);
         MachineKind::C3(Box::new(m))
+    } else if p4 {
+        let mut m = esp32p4::machine([0x30, 0xed, 0xa0, 0x00, 0x11, 0x22], flash_bytes);
+        m.bus.set_flash_size(flash_bytes);
+        let _ = m.bus.set_psram_size(psram_bytes);
+        m.console.mask = 2;
+        prepare(&mut m);
+        MachineKind::P4(Box::new(m))
     } else if let Some(b) = c6_board {
         let mut m = esp32c6::machine([0xdc, 0x1e, 0xd5, 0x6e, 0x8c, 0xdc], flash_bytes);
         m.bus.board = b;
@@ -169,7 +180,7 @@ pub unsafe extern "C" fn esp32sim_new(board: *const u8, board_len: usize, flash_
     Box::into_raw(Box::new(Emu {
         m,
         out: Vec::new(), ethernet_out: Vec::new(), ble_out: String::new(),
-        booted: false,
+        booted: false, rom_loaded: false,
         #[cfg(target_arch = "wasm32")]
         jit: BrowserJit::default(),
     }))
@@ -196,7 +207,8 @@ pub unsafe extern "C" fn esp32sim_delete(e: *mut Emu) {
 }
 
 /// kind: 0 mask-ROM ELF, 1 bootloader (chip-specific offset), 2 partition table (0x8000), 3 app (0x10000),
-/// 4 ELF for symbols, 5 whole flash image (0x0), 6 script text, 7 camera picture (BMP/PPM).
+/// 4 ELF for symbols, 5 whole flash image (0x0), 6 script text, 7 camera picture (BMP/PPM),
+/// 8 SD card image for the board's socket (P4; held in memory, at least 512 KiB).
 /// Returns 0, or 1 with the reason logged.
 ///
 /// # Safety
@@ -208,7 +220,7 @@ pub unsafe extern "C" fn esp32sim_load(e: *mut Emu, kind: u32, ptr: *const u8, l
     let e = unsafe { &mut *e };
     // SAFETY: The caller provides a readable input buffer for this call.
     let data = unsafe { bytes(ptr, len) };
-    match e.m.load(kind, data) { Ok(()) => 0, Err(msg) => { log(&format!("[emu] load kind {}: {}", kind, msg)); 1 } }
+    match e.m.load(kind, data) { Ok(()) => { if kind == 0 { e.rom_loaded = true; } 0 } Err(msg) => { log(&format!("[emu] load kind {}: {}", kind, msg)); 1 } }
 }
 
 /// Write bytes into flash at an arbitrary offset (a data partition's contents).
@@ -287,10 +299,14 @@ pub unsafe extern "C" fn esp32sim_reports(e: *mut Emu) {
 pub unsafe extern "C" fn esp32sim_boot(e: *mut Emu, app_direct: u32) -> u32 {
     // SAFETY: The caller provides exclusive access to a live emulator.
     let e = unsafe { &mut *e };
+    // a ROM boot without a ROM runs from empty memory and prints nothing: say so (the page refuses it
+    // earlier; the ABI stays permissive for callers that drive the machine another way)
+    if app_direct == 0 && !e.rom_loaded { log("[emu] boot: no mask ROM loaded: the run will print nothing (pick the chip's ROM ELF, or boot the app directly)"); }
     if let Err(msg) = e.m.boot(app_direct != 0) { log(&format!("[emu] boot: {}", msg)); return 1; }
     // the WebSocket server announces the board in its per-client hello; here there is one client
     let name = e.m.board_name();
-    if let Some(w) = e.m.web() { w.send_text(&format!("{{\"t\":\"board\",\"name\":\"{}\"}}", name)); }
+    let chip = e.m.chip();
+    if let Some(w) = e.m.web() { w.send_text(&format!("{{\"t\":\"board\",\"name\":\"{}\",\"chip\":\"{}\"}}", name, chip)); }
     e.booted = true; 0
 }
 

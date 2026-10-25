@@ -130,6 +130,9 @@ impl SocBus {
         let drive = (self.periph.gpio.enable, self.periph.gpio.out);
         // Reuse the peripheral's pin-block classification; only those blocks start or stop I2C/RMT.
         if self.periph.write32(a, v) { self.pins_active = self.pins_active(); }
+        if matches!(a & !0xfff, 0x6000_4000 | 0x6000_9000) && self.board.uses_gpio_waveform() {
+            self.board.gpio_waveform_at(self.cycles, esp_soc::pins::ChipPins::C3.routes(&self.periph.gpio, &self.periph.io_mux));
+        }
         if self.periph.sha.dma_pending { self.sha_dma_write(a); }
         if drive != (self.periph.gpio.enable, self.periph.gpio.out) {
             self.deliver_gpio_output();
@@ -154,6 +157,9 @@ impl SocBus {
 
     /// Attach controller 0 devices and reconnect board inputs after a reset.
     pub fn attach_board_devices(&mut self) {
+        if self.board.uses_gpio_waveform() {
+            self.board.gpio_waveform_at(self.cycles, esp_soc::pins::ChipPins::C3.routes(&self.periph.gpio, &self.periph.io_mux));
+        }
         self.uart_pins = self.board.uses_uart_pins();
         self.board_edges = self.board.uses_gpio_edges();
         self.pins_active = self.pins_active();
@@ -301,19 +307,20 @@ impl SocBus {
 
     /// Write one received frame into the next RX descriptor (rx_ctrl header + frame + FCS) and raise the RX event.
     fn wifi_rx_deliver(&mut self, frame: &[u8], now_us: u64) {
-        if self.periph.wifi.rx_next == 0 { self.periph.wifi.link.drop_rx(); return; }
+        if self.periph.wifi.rx_next == 0 { self.periph.wifi.link.drop_rx_unarmed(); return; }
         let desc = self.periph.wifi.rx_next | esp_periph::DMA_ADDR_BASE;
         let dw0 = self.sram32(desc); let buf = self.sram32(desc.wrapping_add(4)); let next = self.sram32(desc.wrapping_add(8));
         let size = (dw0 & 0xfff) as usize;
         let total = 48 + frame.len() + 4;
         if dw0 & (3 << 30) != 1 << 31 || buf == 0 || size < total { self.periph.wifi.link.drop_rx(); return; }
-        let (chan, log) = { let ap = self.periph.wifi.link.ap().unwrap(); (ap.cfg.channel as u32, ap.log) };
+        // A network around's frames carry its own channel and signal (`VirtualAp::rx_meta`)
+        let (chan, rssi, log) = { let ap = self.periph.wifi.link.ap().unwrap(); let (c, r) = ap.rx_meta(frame); (c as u32, r, ap.log) };
         let mut b = Vec::with_capacity(total);
         let bcast = frame.len() >= 5 && frame[4] & 1 == 1;
         // filter-match nibble: bit 28 is the "accepted by the address filter" bit the blob's RX path
         // requires in the C3 blob; inherited from the S3 model, not measured on C3 silicon.
         let fm = if bcast { 1u32 << 28 } else { (1u32 << 28) | (1u32 << 29) };
-        let w0: u32 = fm | 0xd8u32;   // rssi -40 dBm, 1 Mbps, legacy
+        let w0: u32 = fm | (rssi as u8 as u32);   // rssi (−40 dBm for the access point), 1 Mbps, legacy
         let w2: u32 = (chan << 16) | (chan << 20);                                        // channel, secondary
         let w5: u32 = 0xa6;                                                                // noise floor -90
         let w11: u32 = (frame.len() + 4) as u32 & 0xfff;                    // sig_len (incl. FCS), rx_state OK
@@ -511,5 +518,34 @@ mod tests {
         assert_eq!(bus.tick(64), 1);
         assert!(!bus.periph.i2c.is_active());
         assert!(!bus.pins_active, "completion leaves pin service");
+    }
+    /// As on the S3: a frame from a network around reaches the RX descriptor with that network's
+    /// channel and RSSI (`VirtualAp::rx_meta`; `wifi_pkt_rx_ctrl_t`, IDF v5.5.5
+    /// components/esp_wifi/include/local/esp_wifi_types_native.h:36, :59-60); a frame from the
+    /// access point keeps its channel and -40 dBm.
+    #[test]
+    fn wifi_rx_ctrl_carries_a_nearby_networks_channel_and_rssi() {
+        use esp_soc::wifi::{ApConfig, BeaconAp, VirtualAp};
+        const DESC: u32 = 0x3fc9_0100;
+        const BUF: u32 = 0x3fc9_0200;
+        let mut bus = SocBus::new(4 << 20, [0; 6]);
+        bus.periph.wifi.link.attach(Some(VirtualAp::new(ApConfig::parse("ssid=demo,chan=6").unwrap(), false)), None);
+        let home = [0x02, 1, 2, 3, 4, 5];
+        let left_out = bus.periph.wifi.link.set_beacons(vec![BeaconAp { ssid: "Home".into(), bssid: home, channel: 1, rssi: -60, secure: true }]);
+        assert_eq!(left_out, Some(vec![]));
+        let ap = bus.periph.wifi.link.ap().unwrap().cfg.bssid;
+        for (from, chan, rssi) in [(home, 1u32, -60i8), (ap, 6, -40)] {
+            bus.write32(DESC, (1 << 31) | 0xfff).unwrap();                     // owner DMA, size 4095
+            bus.write32(DESC + 4, BUF).unwrap();
+            bus.write32(DESC + 8, 0).unwrap();
+            bus.periph.wifi.rx_next = DESC & 0xf_ffff;
+            let mut frame = vec![0u8; 24];
+            frame[0] = 0x80;                                                     // beacon
+            frame[4..10].fill(0xff);
+            frame[10..16].copy_from_slice(&from);
+            bus.wifi_rx_deliver(&frame, 1234);
+            assert_eq!(bus.read32(BUF).unwrap() & 0xff, u32::from(rssi as u8), "RSSI of {from:02x?}");
+            assert_eq!(bus.read32(BUF + 8).unwrap(), (chan << 16) | (chan << 20), "channel of {from:02x?}");
+        }
     }
 }

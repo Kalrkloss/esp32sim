@@ -27,7 +27,7 @@ Ordered by value; each item links to its plan where one exists.
    a Waveshare ESP32-C6-LCD-1.47, 203/204 console lines identical over three boots. The board is
    in (`waveshare-c6-lcd147`: ST7789 on SPI2+GDMA, WS2812 on the C6 RMT, BOOT button) and its
    802.15.4 energy-scan firmware runs with a synthetic spectrum from the MAC model. Left: TF card,
-   I2C on the C6 layout, watchdogs, the PHY's baseband calibration (stubbed), real radios.
+   I2C on the C6 layout, watchdogs, real radios.
 6. **More boards** — Touch-LCD-4B done (`waveshare-lcd4b`: LVGL panel, touch/swipe, SID player audio).
    Next candidates as firmware needs them; `--board waveshare-*` variants share the codec/PSRAM/I2C work.
 7. **Peripherals on demand** — LEDC, PCNT, ADC, SPI2/3 masters, RX sides of I2S/RMT/UART DMA,
@@ -41,8 +41,9 @@ Ordered by value; each item links to its plan where one exists.
 11. **ESP8266 (Xtensa LX106)** — todo ([#214](https://github.com/mikroverk/esp32sim/issues/214)):
    the call0 subset of the LX7 decoder, the ESP8266 ROM and memory map, UART/GPIO/FRC timers/HSPI,
    then its own Wi-Fi MAC model, since the SDK drives different hardware than the ESP32.
-12. **ESP32-P4 (RISC-V, dual HP core)** — todo ([#215](https://github.com/mikroverk/esp32sim/issues/215)):
-   F and Xesppie on top of the RV32 core, CLIC, L2MEM/PSRAM, then MIPI-DSI + DMA2D/PPA for the
-   display boards it ships on. Wi-Fi comes from a C6 over ESP-Hosted, so the C6 can be the co-processor.
+12. **ESP32-P4 (RISC-V, dual HP core)** — in progress ([#215](https://github.com/mikroverk/esp32sim/issues/215)):
+   F, CLIC, L2MEM/PSRAM, SDMMC, USB-OTG and Wi-Fi from an
+   emulated C6 over ESP-Hosted (`--coproc`) are there; Xesppie, MIPI-DSI and DMA2D/PPA for the
+   display boards it ships on are not.
 
 Not planned: blob-level WiFi/BLE emulation, cache-timing accuracy, Wokwi/cloud integration.

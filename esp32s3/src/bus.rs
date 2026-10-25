@@ -61,6 +61,9 @@ pub struct SocBus {
     pub spi2_timing: bool,
     spi2_scheduled: Option<(u64, Spi2DmaCompletion)>,
     spi2_pins: Option<esp_soc::board::SpiPins>,
+    /// SPI3's DMA descriptor fault and routes, as SPI2's above (no wire timing).
+    pub spi3_dma_fault: Option<DmaDescriptorFault>,
+    spi3_pins: Option<esp_soc::board::SpiPins>,
     /// set by any peripheral write: interrupt lines must be re-evaluated before the next instruction
     pub irq_dirty: bool,
     /// GPIO edges for observers, while one wants them: (cycle, pin, level)
@@ -140,7 +143,7 @@ fn tlb_idx(addr: u32) -> usize { xtensa_lx7::bus::tlb_index(addr) }
 static BUS_EPOCHS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 impl SocBus {
-    pub(crate) fn cancel_spi2_timing(&mut self) { self.spi2_scheduled = None; self.spi2_pins = None; }
+    pub(crate) fn cancel_spi2_timing(&mut self) { self.spi2_scheduled = None; self.spi2_pins = None; self.spi3_pins = None; }
 
     pub fn new(flash_size: usize, psram_size: usize, mac: [u8; 6]) -> Self { Self::with_sizes(flash_size, psram_size, mac) }
     pub fn with_sizes(flash_size: usize, psram_size: usize, mac: [u8; 6]) -> Self {
@@ -149,7 +152,7 @@ impl SocBus {
             sram: vec![0; SRAM_SIZE], irom: vec![0; (IROM_MASK_HIGH - IROM_MASK_LOW) as usize], drom: vec![0; (DROM_MASK_HIGH - DROM_MASK_LOW) as usize],
             rtc_fast: vec![0; 8192], rtc_slow: vec![0; 8192], flash: vec![0xff; flash_size], psram: vec![0; psram_size],
             mmu: [MMU_INVALID; MMU_ENTRIES], periph: Peripherals::new(mac), board: Box::new(crate::board::Atech14::new()), uart_pins: false, cycles: 0, last_fault: None, spi2_dma_fault: None, irq_dirty: false, gpio_events: None, debug: Default::default(), board_edges: true,
-            spi2_timing: false, spi2_scheduled: None, spi2_pins: None,
+            spi2_timing: false, spi2_scheduled: None, spi2_pins: None, spi3_dma_fault: None, spi3_pins: None,
             tlb: vec![TlbEntry::EMPTY; TLB_SIZE], page_ver: Vec::new(), ver_base: [0; 7], flash_epoch: BUS_EPOCHS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) << 32, code_blk: Vec::new(), tick_pending: 0, tick_budget: 0, defer_mmio: false, mmio_deferred: false, vq_violations: 0,
             approximate_cache: None, approximate_cache_pending: 0, approximate_cache_fast_internal: false, approximate_cache_inline: false,
             approximate_cache_yield_miss: false,
@@ -293,6 +296,9 @@ impl SocBus {
 
     /// Attach fresh peripheral-side devices and restore the levels driven by the persistent board.
     pub fn attach_board_devices(&mut self) {
+        if self.board.uses_gpio_waveform() {
+            self.board.gpio_waveform_at(self.cycles, esp_soc::pins::ChipPins::S3.routes(&self.periph.gpio, &self.periph.io_mux));
+        }
         self.uart_pins = self.board.uses_uart_pins();
         self.board_edges = self.board.uses_gpio_edges();
         for (bus, address, device) in self.board.i2c_devices() {
@@ -484,13 +490,17 @@ impl SocBus {
         self.flush_ticks();
         let a = addr & !3;
         // mmio-s1: SPI2 and GDMA writes reach only those two devices' sources (and RAM, the board),
-        // so they re-derive interrupt lines only when one of those sources moved.
-        let spi = matches!(a >> 12, 0x60024 | 0x6003f);
-        let sources = |p: &Peripherals| (p.spi2.irq(), esp_periph::Device::irq_sources(&p.gdma));
-        let before = if spi { sources(&self.periph) } else { (false, 0) };
+        // so they re-derive interrupt lines only when one of those sources moved; SPI3 (0x60025)
+        // likewise.
+        let spi = matches!(a >> 12, 0x60024 | 0x60025 | 0x6003f);
+        let sources = |p: &Peripherals| (p.spi2.irq(), p.spi3.irq(), esp_periph::Device::irq_sources(&p.gdma));
+        let before = if spi { sources(&self.periph) } else { (false, false, 0) };
         if a == PERIPH_BASE + 0x24_000 && v & (1 << 24) != 0 {
             self.spi2_dma_fault = None;
             self.spi2_scheduled = None;
+        }
+        if a == PERIPH_BASE + 0x25_000 && v & (1 << 24) != 0 {
+            self.spi3_dma_fault = None;
         }
         // GDMA block: OUT_RST (0x60) or an OUT_LINK START/RESTART (0x80) on the
         // scheduled SPI2 source channel discards the transaction: the payload was
@@ -516,7 +526,13 @@ impl SocBus {
         if a == PERIPH_BASE + 0x24_000 && v & (1 << 24) != 0 && !self.periph.spi2.has_pending_transfer() {
             self.spi2_pins = self.board.uses_spi_pins().then(|| self.periph.spi2_pins());
         }
+        if a == PERIPH_BASE + 0x25_000 && v & (1 << 24) != 0 && !self.periph.spi3.has_pending_transfer() {
+            self.spi3_pins = self.board.uses_spi_pins().then(|| self.periph.spi3_pins());
+        }
         self.periph.write32(a, v);
+        if matches!(a & !0xfff, 0x6000_4000 | 0x6000_9000) && self.board.uses_gpio_waveform() {
+            self.board.gpio_waveform_at(self.cycles, esp_soc::pins::ChipPins::S3.routes(&self.periph.gpio, &self.periph.io_mux));
+        }
         if old_gpio_out != self.periph.gpio.out || old_gpio_enable != self.periph.gpio.enable {
             let changes = &self.periph.gpio.changes;
             if let Some(events) = &mut self.gpio_events {
@@ -530,6 +546,8 @@ impl SocBus {
         }
         self.complete_spi2_dma();
         self.deliver_spi2_transfer();
+        self.complete_spi3_dma();
+        self.deliver_spi3_transfer();
         // Resolved output changes can raise edge or level input interrupts.
         if spi {
             self.irq_dirty |= before != sources(&self.periph);
@@ -574,13 +592,14 @@ impl SocBus {
     /// Write one received frame into the next RX descriptor (rx_ctrl header + frame + FCS) and raise the RX event.
     #[allow(clippy::identity_op, reason = "rx_state zero remains visible in the packed descriptor layout")]
     fn wifi_rx_deliver(&mut self, frame: &[u8], now_us: u64) {
+        if self.periph.wifi.rx_next == 0 { self.periph.wifi.link.drop_rx_unarmed(); return; }
         let desc = self.periph.wifi.rx_next | crate::periph::DMA_ADDR_BASE;
-        if desc == 0 { self.periph.wifi.link.drop_rx(); return; }
         let dw0 = self.read32_unpriced(desc).unwrap_or(0); let buf = self.read32_unpriced(desc + 4).unwrap_or(0); let next = self.read32_unpriced(desc + 8).unwrap_or(0);
         let size = (dw0 & 0xfff) as usize;
         let total = 48 + frame.len() + 4;
         if dw0 & (1 << 31) == 0 || buf == 0 || size < total { self.periph.wifi.link.drop_rx(); return; }
-        let (chan, log) = { let ap = self.periph.wifi.link.ap().unwrap(); (ap.cfg.channel as u32, ap.log) };
+        // A network around's frames carry its own channel and signal (`VirtualAp::rx_meta`)
+        let (chan, rssi, log) = { let ap = self.periph.wifi.link.ap().unwrap(); let (c, r) = ap.rx_meta(frame); (c as u32, r, ap.log) };
         let mut b = Vec::with_capacity(total);
         // rx_ctrl word 0 (silicon: a real broadcast beacon reads 0x111b20ad — bit 28 set, signed rssi in the low
         // byte). The MAC has already address-filtered, so every delivered frame is "for us"; use the same flags
@@ -592,7 +611,7 @@ impl SocBus {
         // filter-match nibble: bit 28 is the "accepted by the address filter" bit the blob's RX path
         // requires (silicon: a broadcast beacon reads 0x111b20ad); unicast frames add bit 29.
         let fm = if bcast { 1u32 << 28 } else { (1u32 << 28) | (1u32 << 29) };
-        let w0: u32 = fm | (0xd8u32 & 0xff);   // rssi -40 dBm, 1 Mbps, legacy
+        let w0: u32 = fm | (rssi as u8 as u32);   // rssi (−40 dBm for the access point), 1 Mbps, legacy
         let w2: u32 = (chan << 16) | (chan << 20);                                        // channel, secondary
         let w5: u32 = 0xa6;                                                                // noise floor -90
         let w11: u32 = ((frame.len() + 4) as u32 & 0xfff) | (0 << 24);                    // sig_len (incl. FCS), rx_state OK
@@ -638,14 +657,25 @@ impl CacheResource {
 }
 
 impl SocBus {
+    /// The radio's analog blocks, whose registers Espressif's SVD declares 8 bits wide: FE2, FE,
+    /// NRX and BB (IDF v5.5.4 components/soc/esp32s3/register/soc/reg_base.h, DR_REG_FE2_BASE
+    /// 0x6000_5000, DR_REG_FE_BASE 0x6000_6000, DR_REG_NRX_BASE 0x6001_CC00, DR_REG_BB_BASE
+    /// 0x6001_D000). esp-hal 1.2.2's sleep setup, run from `esp_hal::init`, clears bits of
+    /// NRXPD_CTRL (NRX + 0xd4, IDF v5.5.4 components/soc/esp32s3/include/soc/nrx_reg.h) with
+    /// l8ui/s8i. Sub-word accesses there are served from the containing word.
+    fn radio_narrow(addr: u32) -> bool {
+        matches!(addr & !0xfff, 0x6000_5000 | 0x6000_6000 | 0x6001_d000) || (0x6001_cc00..0x6001_d000).contains(&addr)
+    }
     // Const specialization keeps origin checks and CPU pricing out of DMA/host accessors.
     fn read8_access<const CPU: bool>(&mut self, addr: u32) -> Result<u8, Fault> {
+        if Self::radio_narrow(addr) { return Ok((self.periph_read(addr & !3) >> (8 * (addr & 3))) as u8); }
         if Self::is_periph(addr) { self.last_fault = Some((addr, false)); return Err(Fault::Prohibited); }
         let Some(e) = self.lookup(addr) else { self.last_fault = Some((addr, false)); return Err(Fault::Unmapped) };
         if CPU { self.price_cached_data(e, addr, 1, false); }
         Ok(self.buf(e.src as u8)[e.off as usize + (addr - e.lo) as usize])
     }
     fn read16_access<const CPU: bool>(&mut self, addr: u32) -> Result<u16, Fault> {
+        if Self::radio_narrow(addr) && addr & 1 == 0 { return Ok((self.periph_read(addr & !3) >> (8 * (addr & 2))) as u16); }
         if Self::is_periph(addr) { self.last_fault = Some((addr, false)); return Err(Fault::Prohibited); }
         match self.lookup(addr) {
             Some(e) if e.hi - addr >= 2 => { if CPU { self.price_cached_data(e, addr, 2, false); } let o = e.off as usize + (addr - e.lo) as usize; Ok(u16::from_le_bytes(self.buf(e.src as u8)[o..o + 2].try_into().unwrap())) }
@@ -667,7 +697,14 @@ impl SocBus {
     fn write8_access<const CPU: bool>(&mut self, addr: u32, v: u8) -> Result<(), Fault> {
         // S3 register writes are modelled only as aligned words (TRM §15.6.6).
         // Reject unsupported widths before reading a device or advancing its time.
-        // This is an explicit emulator policy, not a model of optional PMS IRQs.
+        // This is an explicit emulator policy, not a model of optional PMS IRQs. The radio's
+        // analog registers are 8 bits wide (`radio_narrow`).
+        if Self::radio_narrow(addr) {
+            let (word, shift) = (addr & !3, 8 * (addr & 3));
+            let old = self.periph_read(word);
+            self.periph_write(word, (old & !(0xff << shift)) | (u32::from(v) << shift));
+            return Ok(());
+        }
         if Self::is_periph(addr) { self.last_fault = Some((addr, true)); return Err(Fault::Prohibited); }
         match self.lookup(addr) {
             Some(e) if e.writable != 0 => { if CPU { self.price_cached_data(e, addr, 1, true); } let rel = (addr - e.lo) as usize; self.buf_mut(e.src as u8)[e.off as usize + rel] = v; if e.code != 0 { self.bump(e.vbase, rel, 1); } Ok(()) }
@@ -675,6 +712,12 @@ impl SocBus {
         }
     }
     fn write16_access<const CPU: bool>(&mut self, addr: u32, v: u16) -> Result<(), Fault> {
+        if Self::radio_narrow(addr) && addr & 1 == 0 {
+            let (word, shift) = (addr & !3, 8 * (addr & 2));
+            let old = self.periph_read(word);
+            self.periph_write(word, (old & !(0xffff << shift)) | (u32::from(v) << shift));
+            return Ok(());
+        }
         if Self::is_periph(addr) { self.last_fault = Some((addr, true)); return Err(Fault::Prohibited); }
         match self.lookup(addr) {
             Some(e) if e.writable != 0 && e.hi - addr >= 2 => { if CPU { self.price_cached_data(e, addr, 2, true); } let rel = (addr - e.lo) as usize; let o = e.off as usize + rel; self.buf_mut(e.src as u8)[o..o + 2].copy_from_slice(&v.to_le_bytes()); if e.code != 0 { self.bump(e.vbase, rel, 2); } Ok(()) }
@@ -801,6 +844,7 @@ impl SocBus {
             || p.wifi.link.ap().is_some() || p.wifi.link.net().is_some() || !p.wifi.tx_pending.is_empty()
             || p.aes.dma_pending || p.sha.dma_pending
             || p.spi2.has_pending_transfer() || p.spi2.dma_tx_pending.is_some()
+            || p.spi3.has_pending_transfer() || p.spi3.dma_tx_pending.is_some()
             || p.rmt.ch.iter().any(|c| c.running) || !p.rmt.done.is_empty()
             || !p.gpio.changes.is_empty() || !p.gpio.input_changes.is_empty()
             || p.rtc.ram.read(0x98) & (1 << 31) != 0
@@ -853,6 +897,8 @@ impl SocBus {
         if self.board_edges { self.irq_dirty |= esp_soc::gpio::drain_board_inputs(&mut *self.board, &mut self.periph.gpio, &mut self.gpio_events, self.cycles); }
         self.complete_spi2_dma();
         self.deliver_spi2_transfer();
+        self.complete_spi3_dma();
+        self.deliver_spi3_transfer();
         self.dma_i2s_step(cycles as u64);
         self.dma_cam_step(cycles as u64);
         self.dma_lcd_step(cycles as u64);
@@ -871,6 +917,7 @@ impl SocBus {
             self.periph.gpio.changes.clear();
         }
         self.deliver_spi2_transfer();
+        self.deliver_spi3_transfer();
         if !self.periph.rmt.done.is_empty() { self.deliver_rmt_frames(); }
         0
     }

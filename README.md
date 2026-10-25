@@ -25,6 +25,7 @@ CameraWebServer path is unsupported. See the [camera scope and example](docs/esp
 | ESP32-C3 | RISC-V RV32IMC | draft | console only |
 | ESP32-C6 | RISC-V RV32IMAC | draft | Waveshare ESP32-C6-LCD-1.47, with the 802.15.4 radio |
 | ESP32 (classic) | 2 x Xtensa LX6 | early | LilyGO TTGO T-Display, AI-Thinker ESP32-CAM (raw capture) |
+| ESP32-P4 (rev < 3) | 2 x RISC-V RV32IMAFC | draft | console only |
 
 ## Features
 
@@ -53,6 +54,10 @@ You can also load your own firmware for any of the chips.
 
 ## Quick start
 
+No Rust needed: the [releases](https://github.com/mikroverk/esp32sim/releases) carry prebuilt binaries
+for macOS and Linux, and [docs/quick-start.md](docs/quick-start.md) takes your own build from the tarball
+to a run in three steps. From a checkout:
+
 ```sh
 cargo build --release
 tools/fetch-demo-assets.sh --no-linux       # downloads the mask ROMs, which are not in the repo
@@ -64,13 +69,14 @@ FW=web/wasm/fw/public                       # demo firmware included in the repo
 ```
 
 This boots the Atech synth firmware, plays a short script, and saves the audio to `out.wav` and
-the display to `tft.png`. Use `esp32sim-c3`, `esp32sim-c6` or `--chip esp32` for the other chips.
+the display to `tft.png`. Use `esp32sim-c3`, `esp32sim-c6`, `esp32sim-p4` or `--chip esp32` for the other chips.
 
 [Getting started](docs/getting-started.md) covers the rest: your own ESP-IDF builds, each chip,
 WiFi, scripts, the browser build and debugging.
 
 ## Documentation
 
+- [Quick start](docs/quick-start.md): install the release, fetch the mask ROM, run your own build, read the result
 - [Getting started](docs/getting-started.md): running firmware on each chip, WiFi, scripts, the browser build
 - [CLI reference](docs/cli.md): every flag, environment variable and output file
 - [Boards](docs/boards.md): what each board models, and how to add one
@@ -82,7 +88,8 @@ WiFi, scripts, the browser build and debugging.
 ## Contributing
 
 Bug fixes, peripherals, boards and new chips are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) lists
-what a pull request needs; these are the same checks CI runs.
+what a pull request needs; these are the same checks CI runs. Security problems go through
+[SECURITY.md](SECURITY.md), not the public issue tracker.
 
 ## Credits and license
 

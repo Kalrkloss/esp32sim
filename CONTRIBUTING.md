@@ -30,6 +30,29 @@ form for coding agents, plus the conventions for experiments and evidence.
 - Say what was compared with silicon and what was derived from another chip's model. Code copied
   from another chip keeps none of that chip's "verified on silicon" notes.
 
+## Code style
+
+The code is dense by design: a register map should fit on a screen. Match the file you are in.
+
+- **No rustfmt.** The tree isn't formatted with it, and running it on a whole file rewrites
+  hundreds of lines and buries the actual change. Format only the lines you write, the way their
+  neighbours look. Clippy with warnings denied is the only enforced lint.
+- **Short things stay on one line**: a constructor, a one-expression method, a few related fields,
+  several short `match` arms. Long logic gets its own lines.
+- **A register block is a `match off` on hex offsets** in `read` and `write`, with unmodelled
+  offsets falling through to `RegRam` (see [docs/adding.md](docs/adding.md)). Name the struct after the
+  block and its fields after the IDF register fields (`int_ena`, `int_raw`), so one search finds
+  both.
+- **Each file opens with a one-line `//!`** saying what it models. Comments say why: what the
+  firmware relies on, what silicon does, and the header and IDF version behind it. Don't restate
+  the code.
+- **The guest must not be able to crash the emulator.** Values from registers, descriptors or DMA
+  lengths are clamped or turned into the error the hardware would report (a short SHA DMA chain
+  raises `OUT_DSCR_ERR` in `esp-periph/src/sha.rs`), never an `unwrap` or an index panic.
+- **Tests go in a `#[cfg(test)] mod tests` at the end of the file**, or in a sibling `tests.rs`
+  once they outgrow it (`esp32s3/src/bus/tests.rs`). Tests that boot firmware go in a `tests/`
+  directory; the golden-output tests are in `cli/tests/goldens.rs`.
+
 ## Checks to run before pushing
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) installs the newest stable Rust on every
@@ -131,14 +154,19 @@ Releases are tagged `vMAJOR.MINOR.PATCH` and carry one asset per platform, built
    let `cargo check` update `Cargo.lock`. That is the whole commit.
 2. Open the pull request and let CI run. Merge it with a merge commit, so the tag names a commit
    that is on `main`.
-3. Tag the merge commit and push the tag: `git tag -a vX.Y.Z -m "esp32sim X.Y.Z" && git push origin vX.Y.Z`.
-   The release workflow refuses a tag that disagrees with the workspace version.
-4. The workflow builds macOS arm64, Linux x86_64 and Linux arm64 tarballs — each holding
-   `esp32sim`, `esp32sim-c3`, `esp32sim-c6`, `LICENSE` and `README.md` — writes a `SHA256SUMS.txt`,
-   and attaches everything to that tag's release. If no release exists it creates a **draft**, so
-   the notes and the Latest flag stay a human decision.
-5. Write the release notes and publish. `workflow_dispatch` with a tag rebuilds the assets if a
-   build needs repeating.
+3. Create the release as a **draft** under your own account, before any tag exists, with the notes
+   ready: `gh release create vX.Y.Z --draft --target <merge commit> --title "esp32sim X.Y.Z"
+   --notes-file notes.md`. A draft does not create the tag, and a release created by the workflow
+   would be attributed to github-actions.
+4. Tag the merge commit and push the tag: `git tag -a vX.Y.Z -m "esp32sim X.Y.Z" <merge commit> &&
+   git push origin vX.Y.Z`. The workflow refuses a tag that disagrees with the workspace version,
+   builds macOS arm64, Linux x86_64 and Linux arm64 tarballs — each holding `esp32sim`,
+   `esp32sim-c3`, `esp32sim-c6`, `LICENSE` and `README.md` — writes a `SHA256SUMS.txt`, and attaches
+   everything to your draft. It fails if the draft does not exist yet; create it and rerun with
+   `workflow_dispatch` and the tag.
+5. Check the assets and checksums, then publish the draft and mark it Latest
+   (`gh release edit vX.Y.Z --draft=false --latest`). `workflow_dispatch` with the tag rebuilds the
+   assets if a build needs repeating.
 
 ## License
 

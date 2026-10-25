@@ -148,8 +148,7 @@ The C6 is in the WebAssembly build too — pick board `esp32c6` on the page, or 
 
 The first is console-only; the second is the energy scanner on the Waveshare board at real time,
 with the panel, the WS2812 and a BOOT button on the page (its firmware is published under
-`web/wasm/fw/public/`, and the `bb_init` stub is resolved through the manifest's `symbols` map,
-so no ELF ships). See [wasm.md](wasm.md).
+`web/wasm/fw/public/`; no ELF ships). See [wasm.md](wasm.md).
 
 ## What is modelled
 
@@ -159,6 +158,7 @@ so no ELF ships). See [wasm.md](wasm.md).
 | Interrupts | the interrupt matrix (77 sources → 31 lines) with its two front-ends: the PLIC at `0x20001000` that ESP-IDF drives and INTPRI at `0x600C5000` that the ROM uses, one state; the four `FROM_CPU` software interrupts |
 | Memory | 512 KB HP SRAM (one address space for code and data), 320 KB mask ROM, 16 KB LP SRAM, a 16 MB flash window through the 256-entry MMU programmed via SPI0's item index/content registers, page size from `MMU_POWER_CTRL` |
 | WiFi | an unmodified ESP-IDF station scans, joins the virtual access point (open or WPA2-PSK), takes a lease and talks to the virtual network or, with `--net nat`, the host's (`--wifi ssid=esp32sim,psk=esp32sim-pass`, as on the S3). The MAC model is `esp32c6/src/wifi.rs` (register map and differences from the S3 in [wifi-c6-plan.md](wifi-c6-plan.md)); the descriptors move in `bus.rs`; the access point, network, pacing and relay are the chips' shared `StationLink` (`esp-soc/src/wifi.rs`). The `wifi_station_c6` golden runs the committed `examples/c6-wifi-station` build in CI; the browser build runs it too (a manifest's `wifi`, without NAT) |
+| SDIO slave | HINF, SLC and SLCHOST (`esp32c6/src/sdio.rs`) as IDF's sdio_slave driver programs them, and the I/O card a host sees: CMD5/3/7/52/53, the CCCR, FBR and CIS, function 1's registers and FIFO onto the SLC DMA links, the interrupts both ways (source 64). A host reaches it through `SocBus::sdio_command`, `sdio_read_data` and `sdio_write_data`; the P4's co-processor is one ([esp32p4.md](esp32p4.md), "The co-processor"), running ESP-Hosted's slave |
 | Peripherals | UART0/1, USB-Serial/JTAG, systimer, TIMG0/1, GPIO, efuse, SPI0/1 flash controller, SHA/AES/RSA, L1 cache controller, PCR, the LP blocks (LP_CLKRST reset cause, LP_AON store registers and software reset, LP_TIMER, LP_WDT registers), the analog I2C master (regi2c, with the RF block's status the PHY polls), ASSIST_DEBUG's saved PC, hardware RNG; for the board: RMT (the S3 transmitter on the C6's register map), GDMA (three channels, the S3 model behind the C6's layout), GP-SPI2 with its DMA data phase; the 802.15.4 MAC: energy detect, TX and RX of whole frames with the timing of the air, its two timers (below) |
 
 Peripheral models are **shared with the C3 and S3 through `esp-periph`** where the IP is the same:
@@ -252,7 +252,7 @@ integer arithmetic both ways, monotonic across a chip reset.
 ```sh
 # what csim runs (the config's "firmware" string); csim writes hello/step/stop on its stdin
 B=~/work/esp32/esp32-contiki/build-nullnet
-esp32sim-c6 --cooja --boot rom --flash-mb 2 --stub bb_init=0 \
+esp32sim-c6 --cooja --boot rom --flash-mb 2 \
     --bootloader $B/bootloader/bootloader.bin --ptable $B/partition_table/partition-table.bin \
     --app $B/esp32-blink.bin --elf $B/esp32-blink.elf
 ```
@@ -329,12 +329,16 @@ ENERGY_SCAN_DIR=~/work/esp32/energy_scan examples/waveshare-c6-lcd147/run.sh --m
   a burst lands on a channel and fades, and levels drift 1 dB per 100 ms toward their targets,
   all from one xorshift so a run is reproducible (`Ieee802154::set_channel_dbm` sets a level
   outright). ~260 scans in 8 s, 16 bars on the screen.
-- The PHY blob's init runs, with one stub: `--stub bb_init=0` skips the baseband calibration
-  (TX DC, IQ, power-detector tones), a set of hardware handshakes on undocumented registers at
-  `0x600A0000` that spin forever without them. Everything before it (`rf_init`, the parameter
-  tables the PLL-tracking timer later dereferences) runs; stubbing `register_chipv7_phy` as a
-  whole crashed that timer. The 802.15.4 MAC model does not depend on the PHY. The blob's own
-  `wait_i2c_sdm_stable` polls the RF block over regi2c for 0x5b, which the analog master answers.
+- The PHY blob's init runs in full, no stub. `bb_init`, the baseband calibration (TX DC,
+  power-detector tones, RX DCO, the RX gain tables), once spun forever on handshakes in the
+  undocumented block at `0x600A0000` and was stubbed with `--stub bb_init=0`. #203 ([EX220](experiments.md#ex220),
+  `42c5a547`) modelled the two fields it waits on, inferred from the blob — TX-DC done at `+0x418`
+  and the tone readback at `+0x814` (`esp32c6/src/wifi.rs`, `ModemBb`) — and since then it completes:
+  3.81 M cycles, 23.8 ms of device time, 3.1 M of them `ets_delay_us`, returning 0 (#248).
+  Everything before it (`rf_init`, the parameter tables the PLL-tracking timer later dereferences)
+  runs; stubbing `register_chipv7_phy` as a whole crashed that timer. The 802.15.4 MAC model does
+  not depend on the PHY. The blob's own `wait_i2c_sdm_stable` polls the RF block over regi2c for
+  0x5b, which the analog master answers.
 - The app writes its PHY calibration into NVS on first boot ("Saving new calibration data"),
   through the shared flash model.
 
@@ -349,8 +353,7 @@ machine wants to see, as the Xtensa block interpreter always did.
 - **`--boot app`** maps the image through the unified MMU and jumps to it, but the system
   registers the bootloader would have set up are not preset; ROM boot is the tested path.
 - **Watchdogs.** The LP_WDT and the TIMG watchdogs are register RAM: they never fire.
-- **WiFi** beyond one station: legacy rates only, no power save, no TSF; the PHY calibration is
-  the `bb_init` stub as for 802.15.4.
+- **WiFi** beyond one station: legacy rates only, no power save, no TSF.
 - **BLE, the LP core** — nothing of that radio or the second core is modelled. The
   802.15.4 MAC sends, receives, acknowledges and filters (above); enhanced ACKs and security are not there.
 - **Peripherals on demand**: GDMA, I2C, SPI2, RMT, ADC, TWAI, PARL_IO. Each shows up as an

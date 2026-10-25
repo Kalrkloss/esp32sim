@@ -123,6 +123,11 @@ pub trait BoardModel {
     fn encoder(&self) -> Option<(u8, u8)> { None }
     /// Lines for the end-of-run report.
     fn report(&self) -> String { String::new() }
+    /// Opt-in software drive after GPIO/IO_MUX writes and board attachment (including reset).
+    /// Unlike raw latch changes, this observes route, mux and enable-only transitions.
+    /// `uses_gpio_waveform` enables this callback as well as instruction-sized scheduling.
+    /// Peripheral-generated waveforms remain on their existing callbacks.
+    fn gpio_waveform_at(&mut self, _cycle: VirtualCycle, _routes: crate::pins::PinRoutes<'_>) {}
     /// Lazy physical clock query; called by the capture adapter, never polled per tick.
     /// The callback returns routed PWM frequency and duty (0..=65535) at a GPIO.
     /// Appended to preserve the existing board vtable's hot-call offsets.

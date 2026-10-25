@@ -33,9 +33,8 @@ gateway with an immediate RST, so applications fail fast instead of hanging — 
 run to be reproducible and offline.
 
 The same `--wifi` and `--net` work on the **ESP32-C6** (`esp32sim-c6`): the access point and the
-network are the same code, the MAC model is the C6's own ([wifi-c6-plan.md](wifi-c6-plan.md)). A C6
-radio run also needs `--stub bb_init=0`, and what has been tried is one station on one open or
-WPA2 network; `examples/c6-wifi-station` has the full command. The C3 also supports `--wifi` with open/WPA2 station mode and the same network backend.
+network are the same code, the MAC model is the C6's own ([wifi-c6-plan.md](wifi-c6-plan.md)). What
+has been tried is one station on one open or WPA2 network; `examples/c6-wifi-station` has the full command. The C3 also supports `--wifi` with open/WPA2 station mode and the same network backend.
 
 ## What the network gives the firmware
 
@@ -44,8 +43,10 @@ WPA2 network; `examples/c6-wifi-station` has the full command. The C3 also suppo
   answer comes back looking as if 10.0.2.3 produced it. With `--net none`, the built-in responder
   answers every A query with 10.0.2.3 itself, so lookups succeed and the connection is then refused.
 - **Time** — with NAT, SNTP requests reach the real server the firmware asked for. With `--net none`,
-  the built-in SNTP server answers from the host clock (stratum 1), so firmware that waits for time
-  still gets it in the first seconds.
+  the built-in SNTP server answers (stratum 1) so firmware that waits for time still gets it in the
+  first seconds: the network's clock plus emulated time since power-on. `--net none,epoch=S` fixes
+  that clock (seconds since 1970) and makes such a run the same every time; without it the host's
+  clock at the first answer sets it.
 - **ICMP echo** — answered inside the emulator for any address, including internet ones; pings never
   leave the host, so they are not a reachability test.
 - **TCP/UDP out** — real connections to real hosts: an HTTP API, a Home Assistant instance on the
