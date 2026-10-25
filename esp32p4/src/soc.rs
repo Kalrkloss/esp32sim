@@ -10,12 +10,17 @@ use std::marker::PhantomData;
 
 /// What differs between ESP32-P4 silicon revisions. rev >= 3 (ECO5) moves the interrupt threshold
 /// into the `mintthresh` CSR, the L2 cache to the bottom of L2MEM and has its own ROM
-/// (`esp32p4_rev300_rom.elf`); it becomes a second implementation of this trait.
+/// (`esp32p4_rev300_rom.elf`): `RevGe3`.
 pub trait Revision: 'static {
     /// The mask ROM ELF's name in espressif/esp-rom-elfs.
     const ROM_ELF: &'static str;
     /// (major, minor) wafer version the efuses report.
     const WAFER: (u32, u32);
+    /// The CLIC is the specification's (`mintthresh`, `mintstatus` at 0xFB1; `Cpu::clic_std`).
+    const CLIC_STD: bool;
+    /// The stack the ROM leaves the bootloader (IDF v5.5.4 include/soc/soc.h SOC_ROM_STACK_START,
+    /// SOC_ROM_STACK_START_REV2).
+    const ROM_STACK: u32;
     /// Why an image whose header accepts chip revisions `min..=max` (major * 100 + minor) cannot
     /// run on this revision, if it cannot; it completes "the image ...".
     fn refuse(min: u16, max: u16) -> Option<String>;
@@ -28,15 +33,36 @@ pub struct RevLt3;
 impl Revision for RevLt3 {
     const ROM_ELF: &'static str = "esp32p4_rev0_rom.elf";
     const WAFER: (u32, u32) = (1, 0);
+    const CLIC_STD: bool = false;
+    const ROM_STACK: u32 = 0x4FF3_CFC0;
     /// A rev >= 3 build (min 300 or more) links against the rev 3 ROM and has the rev 3 interrupt
     /// threshold built in, so it would run on here into the wrong code. It is what `idf.py
     /// set-target esp32p4` builds by default: ESP32P4_SELECTS_REV_LESS_V3 defaults to n (IDF v5.5.3
-    /// components/esp_hw_support/port/esp32p4/Kconfig.hw_support). A rev 3 model accepts these and
-    /// refuses max < 300 instead.
+    /// components/esp_hw_support/port/esp32p4/Kconfig.hw_support). `RevGe3` runs these.
     fn refuse(min: u16, _max: u16) -> Option<String> {
         let (major, minor) = Self::WAFER;
         (min >= 300).then(|| format!("was built for ESP32-P4 rev ≥ v3.0 (min_chip_rev_full={min}); this model is rev < 3 (v{major}.{minor}). \
-            Rebuild with CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y, or wait for rev 3 support."))
+            Rebuild with CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y, or run a bootloader and app both built for rev ≥ 3."))
+    }
+}
+
+/// rev >= 3 (v3.x), as on the Waveshare ESP32-P4-WIFI6 boards sold with a v3.2 chip. The rev 3
+/// ROM in esp-rom-elfs (20260528) is ECO5's (`esp32p4-eco5-20250430`), the one IDF v5.5.4 links
+/// rev >= 3 builds against (esp_rom/CMakeLists.txt, esp32p4.rom.eco5.ld); a v3.2 chip prints
+/// ECO7's banner. The efuses report v3.1, the lowest revision IDF v5.5.4 builds for by default
+/// (ESP32P4_REV_MIN_301).
+pub struct RevGe3;
+impl Revision for RevGe3 {
+    const ROM_ELF: &'static str = "esp32p4_rev300_rom.elf";
+    const WAFER: (u32, u32) = (3, 1);
+    const CLIC_STD: bool = true;
+    const ROM_STACK: u32 = 0x4FFB_CFC0;
+    /// A rev < 3 build (max 199 or less) has the memory-mapped interrupt threshold and the ECO0
+    /// ROM's entry points built in.
+    fn refuse(_min: u16, max: u16) -> Option<String> {
+        let (major, minor) = Self::WAFER;
+        (max < 300).then(|| format!("was built for ESP32-P4 rev < v3.0 (max_chip_rev_full={max}); this model is rev ≥ 3 (v{major}.{minor}). \
+            Rebuild without CONFIG_ESP32P4_SELECTS_REV_LESS_V3, or run a bootloader and app both built for rev < 3."))
     }
 }
 
@@ -51,8 +77,15 @@ pub fn check_image<R: Revision>(image: &[u8]) -> Result<(), String> {
     R::refuse(field(15), field(17)).map_or(Ok(()), Err)
 }
 
+/// An image header (`check_image`'s) for the P4 that asks for rev >= 3: what `idf.py set-target
+/// esp32p4` builds unless ESP32P4_SELECTS_REV_LESS_V3 is set.
+pub fn built_for_rev3(image: &[u8]) -> bool {
+    image.get(..24).is_some_and(|h| h[0] == 0xE9 && h[12..14] == [0x12, 0x00] && u16::from_le_bytes([h[15], h[16]]) >= 300)
+}
+
 pub struct Esp32p4<R: Revision>(PhantomData<R>);
 pub type P4 = Esp32p4<RevLt3>;
+pub type P4Rev3 = Esp32p4<RevGe3>;
 pub type Machine = esp_soc::Machine<P4>;
 
 /// The mask ROM's reset vector (IDF v5.5.3 include/soc/soc.h SOC_IROM_MASK_LOW).
@@ -83,7 +116,10 @@ impl<R: Revision> Soc for Esp32p4<R> {
     const ROM_DATA_TABLE_STRIDE: u32 = 12;
     /// RV32IMAFC with the P4's EXT_ILL CSR and CLIC mode; Xesppie and the hardware loops decode
     /// as illegal. `mhartid` is the core's index.
-    fn new_core(i: usize) -> Cpu { let mut c = Cpu::new_esp32p4(); c.hartid = i as u32; c.pc = RESET_VECTOR; c }
+    fn new_core(i: usize) -> Cpu {
+        let mut c = if R::CLIC_STD { Cpu::new_esp32p4_rev3() } else { Cpu::new_esp32p4() };
+        c.hartid = i as u32; c.pc = RESET_VECTOR; c
+    }
     /// Both cores reset into the mask ROM, which sends core 1 to the boot address in LP_SYSTEM.
     fn reset_core(c: &mut Cpu, _i: usize) { Cpu::reset(c); c.pc = RESET_VECTOR; }
     /// A reset core has no interrupt input until the lines are presented again.
@@ -91,7 +127,7 @@ impl<R: Revision> Soc for Esp32p4<R> {
     fn boot_core(c: &mut Cpu, entry: u32) {
         Self::reset_core(c, 0);
         c.pc = entry;
-        c.x[2] = 0x4FF3_CFC0;                 // SOC_ROM_STACK_START, the stack the ROM leaves the bootloader
+        c.x[2] = R::ROM_STACK;
     }
     /// Each core's CLIC candidate, as the core's CLIC mode takes it (`riscv_rv32::exec::CLIC_IRQ_*`).
     /// IDs 0-15 are the core's own and IDF routes nothing to them.
@@ -289,7 +325,7 @@ mod tests {
     #[test]
     fn a_rev3_image_is_refused_and_a_rev_lt3_one_is_not() {
         assert_eq!(check_image::<RevLt3>(&header(0x12, 300, 399)).unwrap_err(), "was built for ESP32-P4 rev ≥ v3.0 (min_chip_rev_full=300); \
-            this model is rev < 3 (v1.0). Rebuild with CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y, or wait for rev 3 support.");
+            this model is rev < 3 (v1.0). Rebuild with CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y, or run a bootloader and app both built for rev ≥ 3.");
         assert!(check_image::<RevLt3>(&header(0x12, 301, 399)).is_err());
         // what IDF v5.5.3 writes with ESP32P4_SELECTS_REV_LESS_V3: ESP32P4_REV_MIN_FULL, max 199
         for min in [0, 1, 100] { assert_eq!(check_image::<RevLt3>(&header(0x12, min, 199)), Ok(())); }
@@ -297,5 +333,17 @@ mod tests {
         assert_eq!(check_image::<RevLt3>(&header(0x0d, 300, 399)), Ok(()));
         assert_eq!(check_image::<RevLt3>(&header(0x12, 300, 399)[..23]), Ok(()));
         assert_eq!(check_image::<RevLt3>(&[0xff; 64]), Ok(()));
+    }
+
+    /// The rev >= 3 model takes what IDF v5.5.4 builds by default (min 301, max 399) and refuses
+    /// a rev < 3 build; `built_for_rev3` tells the two apart from the header alone.
+    #[test]
+    fn rev3_takes_a_rev3_image_and_refuses_a_rev_lt3_one() {
+        for min in [300, 301] { assert_eq!(check_image::<RevGe3>(&header(0x12, min, 399)), Ok(())); }
+        assert_eq!(check_image::<RevGe3>(&header(0x12, 100, 199)).unwrap_err(), "was built for ESP32-P4 rev < v3.0 (max_chip_rev_full=199); \
+            this model is rev ≥ 3 (v3.1). Rebuild without CONFIG_ESP32P4_SELECTS_REV_LESS_V3, or run a bootloader and app both built for rev < 3.");
+        assert_eq!(check_image::<RevGe3>(&header(0x0d, 0, 199)), Ok(()));
+        assert!(built_for_rev3(&header(0x12, 301, 399)) && built_for_rev3(&header(0x12, 300, 399)));
+        assert!(!built_for_rev3(&header(0x12, 100, 199)) && !built_for_rev3(&header(0x0d, 301, 399)) && !built_for_rev3(&header(0x12, 301, 399)[..23]));
     }
 }

@@ -28,8 +28,9 @@ macro_rules! st {
 pub fn step<B: Bus>(cpu: &mut Cpu, bus: &mut B) -> Result<(), Trap> { step_outcome(cpu, bus).result() }
 
 /// A CLIC candidate as the SoC presents it (`Cpu::clic`): the CPU line (CLIC ID - 16) in bits
-/// 4:0, the 8-bit level in bits 15:8, the SHV (hardware-vectored) attribute in bit 16. The SoC
-/// has applied the threshold; the core applies its own level.
+/// 4:0, the 8-bit level in bits 15:8, the SHV (hardware-vectored) attribute in bit 16. On the
+/// P4 rev < 3 the SoC has applied the threshold; the core applies its own level and, with the
+/// specification's CLIC (`Cpu::clic_std`), `mintthresh`.
 pub const CLIC_IRQ_LEVEL_SHIFT: u32 = 8;
 pub const CLIC_IRQ_SHV: u32 = 1 << 16;
 /// IDF's CPU lines 0-31 are CLIC IDs 16-47 (ESP-IDF v5.5.3 riscv/include/esp_private/interrupt_clic.h:40-41).
@@ -86,7 +87,7 @@ pub fn step_outcome<B: Bus>(cpu: &mut Cpu, bus: &mut B) -> StepOutcome {
                     // any presented interrupt ends a WFI: the privileged ISA lets WFI resume for
                     // any reason, and a core left asleep could not be woken by a lower one
                     cpu.waiting = false;
-                    if cpu.mie_enabled() && (line >> CLIC_IRQ_LEVEL_SHIFT) & 0xff > cpu.mil { return clic_take(cpu, bus, line, pc); }
+                    if cpu.mie_enabled() && (line >> CLIC_IRQ_LEVEL_SHIFT) & 0xff > cpu.mil.max(cpu.mintthresh) { return clic_take(cpu, bus, line, pc); }
                 }
             } else {
                 cpu.waiting = false;

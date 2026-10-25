@@ -383,6 +383,36 @@ fn mhartid_survives_reset() {
     assert_eq!(Cpu::new_rv32imac().read_csr(csr::MHARTID), 0);
 }
 
+/// The P4 rev >= 3 core's CLIC is the specification's (ESP-IDF v5.5.4
+/// riscv/include/esp_private/interrupt_clic.h:60-66): an interrupt is taken only above both
+/// mintthresh (0x347) and the current level, mintstatus reads at 0xFB1, and 0x346 is a plain CSR
+/// there. On the rev < 3 core the threshold is the SoC's: a write to 0x347 masks nothing.
+#[test]
+fn rev3_clic_takes_only_above_mintthresh() {
+    let nops = asm("0001 0001 0001 0001");
+    let (mut cpu, mut ram) = machine_on(Cpu::new_esp32p4_rev3(), &nops, "nop");
+    cpu.write_csr(csr::MTVEC, BASE + 0x203);
+    cpu.write_csr(csr::MSTATUS, cpu.mstatus | mstatus::MIE);
+    cpu.write_csr(csr::MINTTHRESH, 0x13f);
+    assert_eq!(cpu.read_csr(csr::MINTTHRESH), 0x3f, "the threshold is 8 bits");
+    cpu.set_irq(clic_irq(2, 0x3f, false));                          // level 1 at threshold 1 waits
+    assert_eq!(step(&mut cpu, &mut ram), Ok(()));
+    cpu.set_irq(clic_irq(2, 0x7f, false));                          // level 3 is taken
+    assert_eq!(step(&mut cpu, &mut ram), Err(Trap::Interrupt(2)));
+    assert_eq!(cpu.read_csr(csr::MINTSTATUS), 0x7f << 24);
+    cpu.write_csr(csr::MINTSTATUS_P4, 0x55);
+    assert_eq!(cpu.read_csr(csr::MINTSTATUS_P4), 0x55, "0x346 is not mintstatus on rev >= 3");
+    cpu.reset();
+    assert!(cpu.clic_std);
+    assert_eq!(cpu.read_csr(csr::MINTTHRESH), 0, "a reset clears the threshold");
+    let (mut old, mut ram) = machine_on(Cpu::new_esp32p4(), &nops, "nop");
+    old.write_csr(csr::MTVEC, BASE + 0x203);
+    old.write_csr(csr::MSTATUS, old.mstatus | mstatus::MIE);
+    old.write_csr(csr::MINTTHRESH, 0xff);
+    old.set_irq(clic_irq(2, 0x3f, false));
+    assert_eq!(step(&mut old, &mut ram), Err(Trap::Interrupt(2)));
+}
+
 fn clic_irq(line: u32, level: u32, shv: bool) -> Option<u32> {
     use riscv_rv32::exec::{CLIC_IRQ_LEVEL_SHIFT, CLIC_IRQ_SHV};
     Some(line | level << CLIC_IRQ_LEVEL_SHIFT | if shv { CLIC_IRQ_SHV } else { 0 })

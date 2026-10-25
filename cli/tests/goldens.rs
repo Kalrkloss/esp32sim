@@ -211,8 +211,10 @@ fn fetched(name: &str) -> String {
     format!("{FW}/{name}")
 }
 
-fn p4_run(images: &str, seconds: &str) -> (Vec<String>, Run) {
-    let rom = rom("esp32p4_rev0");
+fn p4_run(images: &str, seconds: &str) -> (Vec<String>, Run) { p4_run_on("esp32p4_rev0", images, seconds) }
+
+fn p4_run_on(rom_name: &str, images: &str, seconds: &str) -> (Vec<String>, Run) {
+    let rom = rom(rom_name);
     let (bl, app) = if images == "p4-hello" { (format!("{FW}/p4-hello-bootloader.bin"), format!("{FW}/p4-hello_world.bin")) }
         else { (fetched(&format!("{images}-bootloader.bin")), fetched(&format!("{images}_world.bin"))) };
     let args: Vec<String> = ["--rom", rom.to_str().unwrap(), "--flash-mb", "2",
@@ -259,6 +261,34 @@ fn hello_world_p4_smp() {
     assert!(core1 > 1_000_000_000, "core 1 did not run:\n{}", r.stderr);
     expect_text("hello-p4-smp.console.txt", &r.stdout);
     expect_u64("hello-p4-smp.insns", r.insns);
+}
+
+/// hello_world as `idf.py set-target esp32p4` builds it, for rev >= 3 (`examples/hello_world-p4`,
+/// `sdkconfig.defaults.rev3`), on the rev >= 3 model, which esp32sim-p4 chooses from the
+/// bootloader's header: the ECO5 ROM, the standard CLIC's `mintthresh`, the bootloader at the top
+/// of L2MEM and the app above the L2 cache, the countdown and esp_restart() back through the ROM.
+#[test] #[ignore = "needs the ESP32-P4 rev 3 mask ROM ELF"]
+fn hello_world_p4_rev3() {
+    let (args, r) = p4_run_on("esp32p4_rev300", "p4-hello-rev3", "12");
+    assert!(r.stdout.starts_with("ESP-ROM:esp32p4-eco5-20250430") && r.stdout.contains("boot: chip revision: v3.1"), "not the rev 3 ROM and model:\n{}", r.stdout);
+    assert!(r.stdout.matches("Hello world!").count() >= 2 && r.stdout.contains("rst:0xc (SW_CPU_RESET)"), "the app did not come back after the reset:\n{}", r.stdout);
+    expect_text("hello-p4-rev3.console.txt", &r.stdout);
+    expect_u64("hello-p4-rev3.insns", r.insns);
+    let mut chip = vec!["--chip", "p4"];
+    chip.extend(args.iter().map(|s| s.as_str()));
+    let r2 = run(BIN, &chip);
+    assert_eq!(r.stdout, r2.stdout); assert_eq!(r.insns, r2.insns);
+}
+
+/// The same for both cores (`sdkconfig.defaults.rev3-smp`).
+#[test] #[ignore = "needs the ESP32-P4 rev 3 mask ROM ELF"]
+fn hello_world_p4_rev3_smp() {
+    let (_, r) = p4_run_on("esp32p4_rev300", "p4-hello-rev3-smp", "12");
+    assert!(r.stdout.contains("cpu_start: Multicore app") && r.stdout.matches("Hello world!").count() >= 2, "both boots should reach app_main:\n{}", r.stdout);
+    let core1: u64 = r.stderr.lines().find(|l| l.starts_with("[emu] stop:")).and_then(|l| l.split("core1 ").nth(1)).and_then(|t| t.split_whitespace().next()).and_then(|n| n.parse().ok()).unwrap_or(0);
+    assert!(core1 > 1_000_000_000, "core 1 did not run:\n{}", r.stderr);
+    expect_text("hello-p4-rev3-smp.console.txt", &r.stdout);
+    expect_u64("hello-p4-rev3-smp.insns", r.insns);
 }
 
 /// ESP-IDF's sdmmc example on the P4 (`examples/sd_card-p4`) with a card in the SD socket: the

@@ -1,7 +1,8 @@
 #!/bin/sh
 # The ESP32-P4 example images the goldens boot but the web page does not run (built from
-# examples/*-p4 with ESP-IDF v5.5.3; each example's README says how), pinned by SHA-256 so CI and a
-# fresh checkout get the same bytes. The page's P4 hello (p4-hello-*) stays committed.
+# examples/*-p4 with ESP-IDF v5.5.3, the rev >= 3 hello with v5.5.4; each example's README says
+# how), pinned by SHA-256 so CI and a fresh checkout get the same bytes. The page's P4 hello
+# (p4-hello-*) stays committed.
 #   tools/fetch-p4-firmware.sh [DIR]      default web/wasm/fw/public
 # A file already in DIR with the right hash is kept, so a cached copy costs no download; any other
 # is fetched from its URL and must match its hash, or the script fails.
@@ -11,10 +12,14 @@
 set -e
 cd "$(dirname "$0")/.."
 DIR=${1:-web/wasm/fw/public}
-BASE=${P4_FIRMWARE_BASE_URL:-https://raw.githubusercontent.com/mikroverk/esp32sim-firmware/e8facb5ccae4ba4fbf303cb2e0e7d94a59f7f46f/p4}
+BASE=${P4_FIRMWARE_BASE_URL:-https://raw.githubusercontent.com/mikroverk/esp32sim-firmware/293c5bf7961559e213466ff4c9d1ce294f90f661/p4}
 # file, SHA-256, URL
 IMAGES="p4-hello-smp-bootloader.bin fc8698c1520e0d6469861e917d84568c94d17721faa93937896ae427e8f91717 $BASE/p4-hello-smp-bootloader.bin
 p4-hello-smp_world.bin 9476bccf819114fe30ad55dde4d0917e7f5213df34ec6f159b81c4a84e053f8b $BASE/p4-hello-smp_world.bin
+p4-hello-rev3-bootloader.bin 8421ccef77abbbef954571409f07aa58860dc4b1f4dd517875715307df0987d6 $BASE/p4-hello-rev3-bootloader.bin
+p4-hello-rev3_world.bin 103c6c59c2814601ef4db17d7cdb0f298f50203c43d2c2f76a9ee50892db39cd $BASE/p4-hello-rev3_world.bin
+p4-hello-rev3-smp-bootloader.bin bc55f5ab96558d37ac399306e84675a61c27733a15a2eeb7c2c3d2376f5fd823 $BASE/p4-hello-rev3-smp-bootloader.bin
+p4-hello-rev3-smp_world.bin ec158a81669da5bf149e75ea008f96cdd7eca73c7e86b7ea13fc5dcf7be78879 $BASE/p4-hello-rev3-smp_world.bin
 p4-sdcard-bootloader.bin 985366855e83f25f6b9399c79aa3eac01742e0950d3e6406e24db0a32bd76816 $BASE/p4-sdcard-bootloader.bin
 p4-sdcard.bin 411c93b78fc0efb199e3576c510bf0de23f74086a87cc3a9204c67a207428749 $BASE/p4-sdcard.bin
 p4-sdsectors-bootloader.bin 7a2e21c03a9ae5e6ac3d4b90e981843ca2348264e70cb302085e06b189a0dd71 $BASE/p4-sdsectors-bootloader.bin
