@@ -1,7 +1,5 @@
 # Verification receipt
 
-Stack: main `63670bb1`, RTC CRC `d32829a3` and CPU receipt `97fff138`
-(#238), then deep sleep/EXT0 `8c55885a` (#240). #237 is already merged.
 The existing MicroPython T-Display landing card is unchanged and precedes
 Schematik T-Display. This demo changes sketch firmware, static web content,
 packaging and verification only; no Rust/emulator code changes.
@@ -102,40 +100,39 @@ and pinned build recipe alongside unchanged dependency sources.
   entries pass. All 427 source archive members have canonical metadata;
   archived sketch, README and verifier match their working source bytes.
   The regenerated notice includes the current repository MIT copyright line.
+  A rebuild reproduces the bootloader, partition table, source archive and
+  notice byte for byte; the app image differs only in the compile date/time
+  string and the ELF/image hashes that depend on it, so the shipped app is kept.
 - Native frame assertions pass for all nine screens plus wrap. Sleeping CPUs
   remain at PCs `0x40084795` / `0x40086b91`, with instruction totals
   6,969,641 / 93,508,722 unchanged at 2 and 2.5 seconds. EXT0 wake gives
   `DEEPSLEEP_RESET` and the first frame's exact RGB bytes; another GPIO0
   press after wake/release sleeps again.
-- Both native and WASM Clippy commands from CONTRIBUTING pass with warnings
-  denied, including WASM `--release --features jit-tests`.
-- Empty HOME with retained Rust installation paths and only the ROM fixture
-  directory configured: release workspace CI mode (`--include-ignored
-  --skip external_`) passes 1,005 tests, zero failures. Empty HOME without
-  ROM environment: plain release workspace passes 977, with 50 ignored.
+- No Rust or Cargo file differs from main, and no Rust test reads the added
+  files, so Clippy and the workspace tests are main's.
 - `RUSTUP_TOOLCHAIN=1.99.0 tools/wasm-build.sh` passes. The section check
   reports DWARF absent and function names retained.
-- `node tools/wasm-test.mjs tdisplay-schematik tdisplay-prices hello c3-hello
-  c6-hello c6-energy-scan c6-contiki c6-contiki-net c6-rpl-net panel`:
-  all ten pass, plus the JIT handoff check. The new demo emits one frame.
-- Headless Chromium 148.0.7778.96 at desktop 1440×1000 and mobile 390×844:
-  landing page width equals viewport, thumbnail loaded/contained and 16:9,
-  both T-Display cards retained in order, new catalogue entry under ESP32.
-  At both sizes, each of the nine live screen masks and wrap matches native;
-  power-off blanks, wake restores the wordmark; no page exceptions.
-  UI pulses allow release time for the emulated debounce; the native replay
-  is the deterministic timed behavior check, not wall-clock UI timing.
+- `node tools/wasm-test.mjs` with CI's list (`hello c3-hello c6-hello
+  p4-hello c6-energy-scan c6-contiki c6-contiki-net c6-rpl-net panel
+  tdisplay-prices tdisplay-schematik`): all eleven pass, plus the JIT handoff
+  check. The new demo emits one frame.
+- Headless Chromium, landing page in light and dark at 1280×900 and 390×844:
+  page width equals viewport, all thumbnails loaded, both T-Display thumbnails
+  contained in their frames, no overlapping cards, the MicroPython T-Display
+  card directly followed by this one, each linking its own demo.
+- Headless Chromium live demo at 1440×1000 (light) and 390×844 (dark): each of
+  the nine live screen masks and wrap matches native; power-off blanks, wake
+  restores the wordmark; no page exceptions.
+  UI pulses (3 s press, 3 s gap) allow time for the emulated debounce on a
+  loaded host; the native replay is the deterministic timed behavior check,
+  not wall-clock UI timing.
 - Compile-valid sketch mutations (all killed by the frame verifier): uppercase
   first letter, advancing by two screens, and arming sleep before releasing
   GPIO0. Manifest mutation `min_frames: 1000000` is rejected by the existing
   WASM smoke test (`1 binary frames, wanted 1000000`); original restored.
 - Evidence privacy and `git diff --check` pass.
 
-Inherited mutation reruns also pass: all 10 RTC CRC and all 32 deep-sleep/EXT0
-mutations compile and are killed. Both suites restore their source files;
-restored library/RTC CRC/deep-sleep tests and native frame assertions pass.
-
 ## CPU comparison
 
-Not applicable: no Rust/emulator implementation changes, no hot path changed.
+CPU: not applicable (web-only, no emulator code changed).
 No CPU benchmarks were run. No physical-board verification is claimed.
