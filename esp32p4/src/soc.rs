@@ -221,6 +221,8 @@ impl esp_soc::SocBus for SocBus {
         p.spi1.jedec = old.spi1.jedec;
         p.psram1.psram_mr = old.psram1.psram_mr;      // the PSRAM keeps its mode registers
         p.gpio.g.strap = old.gpio.g.strap;
+        p.gpio.g.restore_external(&old.gpio.g);         // the board still drives its inputs
+        p.i2s1.pcm = std::mem::take(&mut old.i2s1.pcm); p.i2s1.frames_out = old.i2s1.frames_out;   // keep the captured audio continuous
         // The card in the socket keeps its power and its state; IDF's init resets it with CMD0.
         p.sdmmc.devices = old.sdmmc.devices;
         p.sdmmc.stats = old.sdmmc.stats;
@@ -236,6 +238,7 @@ impl esp_soc::SocBus for SocBus {
         self.mmu_flash_index = 0;
         self.mmu_psram_index = 0;
         self.reservation = [None; 2];
+        self.attach_board_devices();                     // the board's I2C devices, on the new controller
         for area in self.debug.iter() { esp_periph::Dispatch::debug(&mut self.periph, area, true); }
         self.periph.misc.log_all = self.debug.has("mmio");
         cause
@@ -332,6 +335,21 @@ mod tests {
         h[15..17].copy_from_slice(&min.to_le_bytes());
         h[17..19].copy_from_slice(&max.to_le_bytes());
         h
+    }
+
+    /// A chip reset rebuilds the peripherals; the board's touch controller and codec stay on I2C1,
+    /// its touch INT stays high, and the audio captured before the reset stays in the sink.
+    #[test]
+    fn a_reset_keeps_the_boards_devices_and_the_audio() {
+        let mut bus = crate::bus::SocBus::new(16 << 20, [0; 6], (0, 3));
+        bus.board = crate::board::make_board("waveshare-p4-lcd35").unwrap();
+        bus.attach_board_devices();
+        bus.periph.i2s1.pcm.extend_from_slice(&[1, 2, 3]);
+        assert!(bus.periph.i2c1.has_device(0x38) && bus.periph.i2c1.has_device(0x18) && bus.periph.gpio.g.level(50));
+        esp_soc::SocBus::reboot(&mut bus, [0; 6]);
+        assert!(bus.periph.i2c1.has_device(0x38) && bus.periph.i2c1.has_device(0x18), "the board's I2C devices are gone");
+        assert!(bus.periph.gpio.g.level(50));
+        assert_eq!(bus.periph.i2s1.pcm, [1, 2, 3]);
     }
 
     #[test]
