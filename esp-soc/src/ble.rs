@@ -38,6 +38,8 @@ pub enum LinkEvent {
     Advertising(Vec<u8>, Vec<u8>),
     AdvertisingStopped,
     Scan(bool),
+    /// LE Set Scan Enable turned scanning off.
+    ScanStopped,
     Connected(bool),
     Disconnected,
     Reset,
@@ -55,6 +57,8 @@ pub enum LinkAction {
     Connect,
     Advertisement(Vec<u8>, bool),
     Data(u16, Vec<u8>),
+    /// A device around the station (`peer::Nearby`) in the guest's scan: an LE Advertising Report.
+    Report { addr: [u8; 6], addr_type: u8, data: Vec<u8>, scan_response: Vec<u8>, rssi: i8, active: bool },
 }
 
 const HANDLE: u16 = 1;
@@ -308,7 +312,7 @@ impl Controller {
                     return;
                 }
                 self.complete(op, &[0]);
-                if p[0] == 1 { self.emit(LinkEvent::Scan(self.active_scan)); }
+                if p[0] == 1 { self.emit(LinkEvent::Scan(self.active_scan)); } else { self.emit(LinkEvent::ScanStopped); }
             }
             LE_CREATE_CONNECTION => {
                 if p[4] != 0 || p[5] != 0 || p[6..12] != PEER {
@@ -456,6 +460,20 @@ impl HciController for Controller {
                     }
                 }
                 LinkAction::Data(cid, pdu) if self.connected => self.l2cap(cid, &pdu),
+                LinkAction::Report { addr, addr_type, data, scan_response, rssi, active } => {
+                    // LE Advertising Report (Bluetooth Core 5.4, Vol 4 Part E 7.7.65.2): ADV_IND, and
+                    // for an active scan SCAN_RSP, an empty one too, as a scannable advertiser
+                    // answers every scan request.
+                    for (kind, payload) in [(0u8, &data), (4u8, &scan_response)] {
+                        if kind == 4 && !active { continue; }
+                        let mut e = vec![2, 1, kind, addr_type];
+                        e.extend_from_slice(&addr);
+                        e.push(payload.len() as u8);
+                        e.extend_from_slice(payload);
+                        e.push(rssi as u8);
+                        self.event(0x3e, &e);
+                    }
+                }
                 _ => {}
             }
         }
