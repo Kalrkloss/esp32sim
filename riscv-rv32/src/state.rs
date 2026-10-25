@@ -117,6 +117,10 @@ pub struct Cpu {
     pub fcsr: u32,
     /// EXT_ILL's value, when `has_ext_ill`
     pub ext_ill: u32,
+    /// EXT_ILL flags every FP instruction taken with FS = Off, FLW/FSW, their compressed forms and
+    /// the FP CSRs included, as on the ESP32-P4 rev >= 3. Without it those are left unflagged
+    /// (SOC_CPU_HAS_FPU_EXT_ILL_BUG, rev < 3) and IDF's `vectors.S` decodes `mtval` for them.
+    pub ext_ill_all_fp: bool,
     /// `cycle`/`instret` (Zicntr) read the machine counters; without it they are unmodelled CSRs,
     /// as they always were on the C3 and C6, which read the cycle count from MPCCR
     pub user_counters: bool,
@@ -155,7 +159,7 @@ impl Cpu {
             mstatus: 0x1800,          // MPP = machine
             mtvec: 0, mepc: 0, mcause: 0, mtval: 0, mie: 0, mscratch: 0,
             insn_count: 0, retired_count: 0, cycle_count: 0, cycle_base: 0, instret_base: 0, waiting: false, irq: None, misa: MISA_RV32IMC,
-            has_ext_ill: false, f: [0; 32], fcsr: 0, ext_ill: 0, user_counters: false, clic: false, clic_std: false, mintthresh: 0, mtvt: 0, hartid: 0, mil: 0, reservation: None, boundary_bloom: 0, csr_other: HashMap::new(),
+            has_ext_ill: false, f: [0; 32], fcsr: 0, ext_ill: 0, ext_ill_all_fp: false, user_counters: false, clic: false, clic_std: false, mintthresh: 0, mtvt: 0, hartid: 0, mil: 0, reservation: None, boundary_bloom: 0, csr_other: HashMap::new(),
         }
     }
     pub fn new_rv32imac() -> Self { let mut c = Cpu::new(); c.misa = MISA_RV32IMAC; c }
@@ -164,8 +168,10 @@ impl Cpu {
     /// custom extensions (Xesppie, hardware loops) are not modelled and decode as illegal. FS is
     /// Off at reset, as on any core with F.
     pub fn new_esp32p4() -> Self { let mut c = Cpu::new(); c.misa = MISA_RV32IMAFC; c.has_ext_ill = true; c.user_counters = true; c.clic = true; c }
-    /// An ESP32-P4 rev >= 3 HP core: the same, with the specification's CLIC CSRs.
-    pub fn new_esp32p4_rev3() -> Self { let mut c = Cpu::new_esp32p4(); c.clic_std = true; c }
+    /// An ESP32-P4 rev >= 3 HP core: the same, with the specification's CLIC CSRs and EXT_ILL
+    /// flagging every FP instruction ("The FPU_EXT_ILL bug was fixed on revision 3.0 and higher",
+    /// ESP-IDF v5.5.4 riscv/vectors.S:279).
+    pub fn new_esp32p4_rev3() -> Self { let mut c = Cpu::new_esp32p4(); c.clic_std = true; c.ext_ill_all_fp = true; c }
 
     pub fn reset(&mut self) {
         // `insn_count` is the emulator's own monotonic counter — it drives the run statistics and
@@ -173,10 +179,11 @@ impl Cpu {
         // report a negative instruction rate). The architectural cycle counter is separately
         // monotonic and firmware reads its reset-relative value.
         let (insns, retired, cycles, misa, ext_ill, counters, clic, clic_std, hart, bloom) = (self.insn_count, self.retired_count, self.cycle_count, self.misa, self.has_ext_ill, self.user_counters, self.clic, self.clic_std, self.hartid, self.boundary_bloom);
+        let all_fp = self.ext_ill_all_fp;
         *self = Cpu::new();
         self.insn_count = insns; self.retired_count = retired; self.cycle_count = cycles;
         self.cycle_base = cycles; self.instret_base = retired;
-        self.misa = misa; self.has_ext_ill = ext_ill; self.user_counters = counters; self.clic = clic; self.clic_std = clic_std; self.hartid = hart; self.boundary_bloom = bloom;
+        self.misa = misa; self.has_ext_ill = ext_ill; self.user_counters = counters; self.clic = clic; self.clic_std = clic_std; self.hartid = hart; self.boundary_bloom = bloom; self.ext_ill_all_fp = all_fp;
     }
 
     #[inline(always)]

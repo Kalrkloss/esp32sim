@@ -305,7 +305,11 @@ fn hello_world_p4_rev3_smp() {
 fn p4_sdcard(card: Option<&std::path::Path>, rw: bool, seconds: &str) -> Run { p4_sd_firmware("p4-sdcard", card, rw, seconds, &[]) }
 
 fn p4_sd_firmware(images: &str, card: Option<&std::path::Path>, rw: bool, seconds: &str, extra: &[&str]) -> Run {
-    let rom = rom("esp32p4_rev0");
+    p4_sd_firmware_on("esp32p4_rev0", images, card, rw, seconds, extra)
+}
+
+fn p4_sd_firmware_on(rom_name: &str, images: &str, card: Option<&std::path::Path>, rw: bool, seconds: &str, extra: &[&str]) -> Run {
+    let rom = rom(rom_name);
     let (bl, app) = (fetched(&format!("{images}-bootloader.bin")), fetched(&format!("{images}.bin")));
     let mut args = vec!["--rom", rom.to_str().unwrap(), "--flash-mb", "2", "--bootloader", &bl,
         "--ptable", "web/wasm/fw/public/p4-hello-ptable.bin", "--app", &app, "--max-seconds", seconds];
@@ -345,6 +349,22 @@ fn sd_card_p4() {
     assert!(r.stdout.contains("Read from file: 'Nihao SIMSD!'") && r.stdout.contains("Card unmounted"), "the example did not finish:\n{}", r.stdout);
     expect_text("sdcard-p4.console.txt", &r.stdout);
     expect_u64("sdcard-p4.insns", r.insns);
+    let files = sd_image::Volume::open(&card).unwrap().root_files();
+    let want: Vec<(String, Vec<u8>)> = vec![("NIHAO.TXT".into(), b"Nihao SIMSD!\n".to_vec()), ("FOO.TXT".into(), b"Hello SIMSD!\n".to_vec())];
+    assert_eq!(files, want, "the files the example left on the card");
+}
+
+/// The same sdmmc example built for rev >= 3 (`examples/sd_card-p4/sdkconfig.defaults.rev3`), on
+/// the rev >= 3 model: the same card, files and SD bus; as on a Waveshare ESP32-P4-WIFI6 with a v3.2
+/// chip.
+#[test] #[ignore = "needs the ESP32-P4 rev 3 mask ROM ELF"]
+fn sd_card_p4_rev3() {
+    let card = tmp("sdcard-p4-rev3.img");
+    sd_image::fat32(&card, 64 << 20, 512, "").unwrap();
+    let r = p4_sd_firmware_on("esp32p4_rev300", "p4-sdcard-rev3", Some(&card), true, "1", &[]);
+    assert!(r.stdout.contains("boot: chip revision: v3.1") && r.stdout.contains("Read from file: 'Nihao SIMSD!'") && r.stdout.contains("Card unmounted"), "the example did not finish:\n{}", r.stdout);
+    expect_text("sdcard-p4-rev3.console.txt", &r.stdout);
+    expect_u64("sdcard-p4-rev3.insns", r.insns);
     let files = sd_image::Volume::open(&card).unwrap().root_files();
     let want: Vec<(String, Vec<u8>)> = vec![("NIHAO.TXT".into(), b"Nihao SIMSD!\n".to_vec()), ("FOO.TXT".into(), b"Hello SIMSD!\n".to_vec())];
     assert_eq!(files, want, "the files the example left on the card");

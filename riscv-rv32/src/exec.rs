@@ -2,7 +2,7 @@
 
 use crate::bus::{Bus, Fault};
 use crate::decode::{decode_for, Insn, Op};
-use crate::state::{csr, exc, Cpu};
+use crate::state::{csr, exc, ext_ill, Cpu};
 use emu_core::{CacheOperation, ControlEvent, ControlEventKind, StepKind, StepOutcome};
 
 pub use emu_core::Trap;
@@ -221,8 +221,10 @@ pub fn exec_insn<B: Bus>(cpu: &mut Cpu, bus: &mut B, i: &Insn, pc: u32) -> Resul
         Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci => {
             let n = immu;
             // fflags/frm/fcsr are FP state: illegal with FS = Off. EXT_ILL does not flag these on the
-            // P4 (ESP-IDF v5.5.3 `components/riscv/vectors.S` decodes mtval for them instead).
+            // P4 rev < 3 (ESP-IDF v5.5.3 `components/riscv/vectors.S` decodes mtval for them
+            // instead); on rev >= 3 it does (`Cpu::ext_ill_all_fp`).
             if n.wrapping_sub(csr::FFLAGS) < 3 && cpu.has_f() && cpu.fs_off() {
+                if cpu.has_ext_ill && cpu.ext_ill_all_fp { cpu.ext_ill |= ext_ill::FPU; }
                 cpu.trap(exc::ILLEGAL_INSN, i.raw, pc);
                 return Err(Trap::Exception(exc::ILLEGAL_INSN));
             }

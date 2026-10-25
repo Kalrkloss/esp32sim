@@ -12,7 +12,7 @@
 set -e
 cd "$(dirname "$0")/.."
 DIR=${1:-web/wasm/fw/public}
-BASE=${P4_FIRMWARE_BASE_URL:-https://raw.githubusercontent.com/mikroverk/esp32sim-firmware/fa546a4408a7f7b460f351d147f9c0f08bbfa870/p4}
+BASE=${P4_FIRMWARE_BASE_URL:-https://raw.githubusercontent.com/mikroverk/esp32sim-firmware/8ab3122be92e013c926e371a4d6e1605975a50f2/p4}
 # file, SHA-256, URL
 IMAGES="p4-hello-smp-bootloader.bin fc8698c1520e0d6469861e917d84568c94d17721faa93937896ae427e8f91717 $BASE/p4-hello-smp-bootloader.bin
 p4-hello-smp_world.bin 9476bccf819114fe30ad55dde4d0917e7f5213df34ec6f159b81c4a84e053f8b $BASE/p4-hello-smp_world.bin
@@ -22,6 +22,8 @@ p4-hello-rev3-smp-bootloader.bin bc55f5ab96558d37ac399306e84675a61c27733a15a2eeb
 p4-hello-rev3-smp_world.bin ec158a81669da5bf149e75ea008f96cdd7eca73c7e86b7ea13fc5dcf7be78879 $BASE/p4-hello-rev3-smp_world.bin
 p4-sdcard-bootloader.bin 985366855e83f25f6b9399c79aa3eac01742e0950d3e6406e24db0a32bd76816 $BASE/p4-sdcard-bootloader.bin
 p4-sdcard.bin 411c93b78fc0efb199e3576c510bf0de23f74086a87cc3a9204c67a207428749 $BASE/p4-sdcard.bin
+p4-sdcard-rev3-bootloader.bin c2c05529d819afe7e6e8bea8694622a10c426c4fc2d5f9e2a68974806a9fa315 $BASE/p4-sdcard-rev3-bootloader.bin
+p4-sdcard-rev3.bin 497b53119c4f84724058a87a46051e4654e7828f4124024915fc40080c7037b6 $BASE/p4-sdcard-rev3.bin
 p4-sdsectors-bootloader.bin 7a2e21c03a9ae5e6ac3d4b90e981843ca2348264e70cb302085e06b189a0dd71 $BASE/p4-sdsectors-bootloader.bin
 p4-sdsectors.bin e658889c0ed35e7ca4ca0ca2acecbf4a48e1e4d87057341e6f31143c8d057062 $BASE/p4-sdsectors.bin
 p4-usbmsc-bootloader.bin 365a7cafa9e101bb564422724a5d46d22b8dd18ea1594457b559dbeae2f8f485 $BASE/p4-usbmsc-bootloader.bin

@@ -155,7 +155,12 @@ being taken only above both it and the current level, and `mintstatus` reads at 
 as well; IDF's rev ≥ 3 builds set `mintthresh` instead (`INTTHRESH_STANDARD`). Without the
 change, the threshold left to the SoC as on rev < 3, the one-core hello_world still runs, but the
 two-core boot gets no further than `cpu_start: Multicore app` (1008 exceptions in 12 emulated
-seconds, both cores ending in `ets_delay_us`). The ROM leaves the bootloader its stack at
+seconds, both cores ending in `ets_delay_us`). The core's EXT_ILL flags every FP instruction taken
+with the FPU off (`Cpu::ext_ill_all_fp`): rev ≥ 3 fixed the EXT_ILL bug of rev < 3, which left
+FLW, FSW, their compressed forms and the FP CSRs unflagged, and IDF's rev ≥ 3 builds no longer
+decode `mtval` for them (v5.5.4 `components/riscv/vectors.S:279-280`). Without that, the sdmmc
+example panics with an illegal instruction at the first `c.flw` in `sdmmc_card_init`. The ROM
+leaves the bootloader its stack at
 0x4FFBCFC0 (`SOC_ROM_STACK_START_REV2`, IDF v5.5.4 `include/soc/soc.h`). The rest is the ROM's,
 the bootloader's and the app's own doing: on rev ≥ 3 the bootloader loads at the top of L2MEM and
 the app above the L2 cache at its bottom (its first RAM segment at 0x4FF20000), and L2MEM is RAM
@@ -166,8 +171,9 @@ register moves between IDF v5.5.4's `soc/esp32p4/register/hw_ver1` and `hw_ver3`
 added bits and registers, a few removed bits and the eFuse system words, none in a field the model
 gives a meaning to ([the comparison](evidence/p4-rev3-registers/README.md)). Of the blocks it does
 not implement, many differ (DMA2D, PPA, MIPI-CSI's bridge, ISP and PMU among them), and `hw_ver3`
-adds 23 headers. hello_world does not reach the differences, and neither does ESP-Hosted with the C6 (golden `hosted-p4-rev3`); the
-SD card and USB have not been run on rev ≥ 3. The
+adds 23 headers. hello_world does not reach the differences, and neither do ESP-Hosted with the C6
+(golden `hosted-p4-rev3`) and the sdmmc example (golden `sdcard-p4-rev3`); USB has not been run on
+rev ≥ 3. The
 model runs at 360 MHz on both revisions, where IDF sets rev ≥ 3 to 400 MHz: the systimer and the
 timer groups count from the XTAL and keep time, but code that counts CPU cycles against the
 400 MHz IDF assumes, a busy-wait on the cycle counter such as `esp_rom_delay_us`, should take
@@ -178,6 +184,7 @@ about 11% longer in emulated time than on silicon (not measured).
 | `-march` | `rv32imafc_zicsr_zifencei_xesppie` | `rv32imafc_zicsr_zifencei_xesploop_xespv` |
 | CLIC threshold | memory-mapped, `0x20800008` bits 31:24 | `mintthresh` CSR (0x347) |
 | `mintstatus` | CSR 0x346 | CSR 0xFB1 |
+| EXT_ILL for FLW/FSW and the FP CSRs | not flagged (`SOC_CPU_HAS_FPU_EXT_ILL_BUG`) | flagged |
 | L2 cache | top of L2MEM | bottom of L2MEM |
 | ROM published in esp-rom-elfs | `esp32p4_rev0_rom.elf` (ECO0, `esp32p4-20230811`) | `esp32p4_rev300_rom.elf` (ECO5, `esp32p4-eco5-20250430`) |
 | ROM stack for the bootloader | 0x4FF3CFC0 | 0x4FFBCFC0 |
@@ -1008,6 +1015,8 @@ Two Waveshare ESP32-P4-WIFI6 boards, console on UART0 through the board's USB-UA
   efuse block revision (v1.2), the flash chip (`generic`) and its size warning, and the same
   `Core1 Saved PC` difference as on v1.3; the two-core `Minimum free heap size` is again 16 bytes
   higher on silicon. The heap region below the ROM's data has the same length on ECO5 and ECO7.
+  The sdmmc example built for rev ≥ 3 prints what `sdcard-p4-rev3` holds apart from the card's
+  name and size, on the same 64 GB card.
 
 Beyond that, the ROMs and IDF's own sources are what this page is checked against.
 
