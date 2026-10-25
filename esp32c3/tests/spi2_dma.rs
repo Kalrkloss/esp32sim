@@ -51,9 +51,11 @@ fn check(bus: &mut SocBus, seen: &Arc<Mutex<Vec<u8>>>) {
 #[test]
 fn link_started_before_usr() {
     let (mut bus, seen) = fixture();
+    // OUTFIFO_STATUS_CH0 (0xd8): idle reads empty (bit 1); a running channel holding a descriptor
+    // is neither empty nor full (bit 0). Reading both pins the C3 offset mapping.
+    assert_ne!(bus.read32(OUTFIFO).unwrap() & 0b10, 0, "FIFO empty while idle");
     bus.write32(LINK, (1 << 21) | (RAM & 0xfffff)).unwrap();
     assert!(seen.lock().unwrap().is_empty());
-    // OUTFIFO_STATUS_CH0 (0xd8): a running channel holding a descriptor is neither empty (bit 1) nor full (bit 0).
     assert_eq!(bus.read32(OUTFIFO).unwrap() & 0b11, 0, "FIFO not empty while the channel runs");
     bus.write32(SPI2, 1 << 24).unwrap();                 // CMD.USR
     check(&mut bus, &seen);
