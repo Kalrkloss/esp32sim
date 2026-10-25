@@ -734,7 +734,8 @@ IDF v5.5.4, images `p4-hosted-rev3-*`, golden `hosted-p4-rev3`) runs on the rev 
 same C6 and takes its lease at 3.77 s too. On a Waveshare ESP32-P4-WIFI6 with a v3.2 chip and the
 board's own C6 the image goes through the same steps (SDIO up, slave identified, transport
 active, WiFi started); that C6's factory firmware reports version 0.0.0, so the host also prints
-`Version mismatch`.
+`Version mismatch`. Built for a real 2.4 GHz network instead of `esp32sim`, it connects at 5.5 s
+and takes its lease at 6.8 s.
 
 **In the browser.** The demo `p4-c6-hosted` (`web/wasm/fw/p4-c6-hosted.json`, board
 `esp32p4-rev3+c6`) runs the rev ≥ 3 pair in the page: both chips from their ROMs, the P4's console

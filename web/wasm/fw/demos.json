@@ -67,7 +67,7 @@
  {
   "fw": "p4-c6-hosted",
   "title": "ESP32-P4 + ESP32-C6 · WiFi through a co-processor",
-  "note": "two chips in this tab, as on the Waveshare ESP32-P4-WIFI6: the P4 (rev ≥ 3, two RISC-V cores) runs IDF's wifi_station with ESP-Hosted, the C6 the ESP-Hosted slave, both from their mask ROMs and in lock-step over SDIO. The C6 joins the virtual access point and the P4 gets its address through it. A real board with a v3.2 P4 goes through the same steps"
+  "note": "two chips in this tab, as on the Waveshare ESP32-P4-WIFI6: the P4 (rev ≥ 3, two RISC-V cores) runs IDF's wifi_station with ESP-Hosted, the C6 the ESP-Hosted slave, both from their mask ROMs and in lock-step over SDIO. The C6 joins the virtual access point and the P4 gets its address through it. A real board with a v3.2 P4 and its own C6 goes through the same steps to its address"
  },
  {
   "fw": "tdisplay-prices",
