@@ -161,6 +161,8 @@ impl SocBus {
     /// OUT_TOTAL_EOF (bit 3 of the shared layout) is raised when the chain ends at a null link. A chain
     /// that faults or ends short raises OUT_DSCR_ERR and the command still completes, without data, as on the S3.
     /// The data phase completes at once, without wire time.
+    /// Model choice, as on the S3: a chain that ends before the SPI data length raises OUT_DSCR_ERR and
+    /// sends nothing, where silicon would not flag a descriptor error and the SPI side would underflow.
     #[cold]
     #[inline(never)]
     fn spi2_dma_step(&mut self) {

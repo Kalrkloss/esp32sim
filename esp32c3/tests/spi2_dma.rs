@@ -8,6 +8,7 @@ const SPI2: u32 = 0x6002_4000;
 const CONF0: u32 = 0x6003_f0d0;
 const LINK: u32 = 0x6003_f0e0;
 const CONF1: u32 = 0x6003_f0d4;
+const OUTFIFO: u32 = 0x6003_f0d8;
 const SELECT: u32 = 0x6003_f100;
 
 struct Capture(Arc<Mutex<Vec<u8>>>);
@@ -52,6 +53,8 @@ fn link_started_before_usr() {
     let (mut bus, seen) = fixture();
     bus.write32(LINK, (1 << 21) | (RAM & 0xfffff)).unwrap();
     assert!(seen.lock().unwrap().is_empty());
+    // OUTFIFO_STATUS_CH0 (0xd8): a running channel holding a descriptor is neither empty (bit 1) nor full (bit 0).
+    assert_eq!(bus.read32(OUTFIFO).unwrap() & 0b11, 0, "FIFO not empty while the channel runs");
     bus.write32(SPI2, 1 << 24).unwrap();                 // CMD.USR
     check(&mut bus, &seen);
 }
