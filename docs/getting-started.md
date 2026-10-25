@@ -108,6 +108,7 @@ model interprets them. Pick one with `--board`:
 | `none` | A bare module: any ESP32-S3 firmware, console only |
 | `waveshare-lcd4b` | Waveshare ESP32-S3-Touch-LCD-4B: ST7701S 480x480 over the LCD_CAM RGB bus, GT911 touch, TCA9554, codecs. Runs the esp32-screen LVGL panel with touch |
 | `waveshare-amoled18-v2` | Waveshare ESP32-S3-Touch-AMOLED-1.8 V2: CO5300 368x448 over QSPI, CST820 touch |
+| `jc3248w535` | Guition JC3248W535: AXS15231B 320x480 over QSPI with its capacitive touch on I2C0; runs a MicroPython + LVGL image with two full PSRAM framebuffers |
 | `waveshare-cam` | Waveshare ESP32-S3-CAM-OV5640: CH32V003 IO expander, OV5640 over SCCB and on the LCD_CAM DVP port, ES8311/ES7210 codecs on I2C0, speaker on I2S1 |
 
 The `waveshare-cam` board runs the `waveshare-autopling` firmware end to end (IDF 5.5, 16 MB flash,

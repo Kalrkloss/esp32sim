@@ -10,6 +10,8 @@ pub trait BoardModel {
     fn gpio_output_at(&mut self, cycle: VirtualCycle, changes: &[(u8, bool)], enabled: u64, output: u64) {}
     fn uses_spi_pins(&self) -> bool                          // opt in to route decoding
     fn spi_transfer_pins(&mut self, host: u8, pins: SpiPins, tx: &[u8], rx_len: usize) -> Vec<u8>
+    fn uses_spi_phases(&self) -> bool                        // opt in to command/address phase split
+    fn spi_transfer_phases(&mut self, host: u8, phases: SpiPhases, tx: &[u8], rx_len: usize) -> Vec<u8>
     fn rmt_frame(&mut self, pin: u8, bits: &[bool]) {}       // a decoded RMT transmission
     fn spi_transfer(&mut self, host: u8, tx: &[u8], rx_len: usize) -> Vec<u8>
     fn uses_uart_pins(&self) -> bool                         // opt in to UART routes and polling
@@ -225,6 +227,21 @@ supplies a still image; absent input is black. Raw RGB565/YUV422 captures use
 I2S0 RX DMA into internal DRAM with a fixed approximate 10 FPS cadence.
 JPEG+PSRAM CameraWebServer, adjustable FPS and silicon/PCLK timing are unsupported.
 See [the fixture and scope](esp32.md#the-camera---board-ai-thinker-cam).
+
+## `jc3248w535` — Guition JC3248W535
+
+| Device | Bus | Model |
+| --- | --- | --- |
+| AXS15231B 320×480 panel | SPI2 QSPI, no D/C line: SCLK 47, D0–D3 21/48/40/39, CS 45 | `esp_soc::devices::qspi_panel::QspiPanel`: decodes the QSPI framing (`0x02` write-command opcode, `0x32` write-memory opcode, DCS command in the 24-bit address word) onto `DcsPanel`'s command set and GRAM, including headerless DMA continuations of a long write; RGB565 frame memory |
+| AXS15231B touch at 0x3B | I2C0: SDA 4, SCL 8, no reset or interrupt line | `i2c::Axs15231Touch`: the 11-byte poll command plus the eight-byte report (gesture, point count, x/y with the pressed/released event in the top bits, idle pattern when untouched); UI pointer events become touch points |
+| Backlight | GPIO 1 through LEDC | level tracked, in the report |
+
+Needs `--flash-mb 16 --psram-mb 8`. `examples/jc3248w535/run-lvgl.sh` runs a MicroPython + LVGL
+image on it: three tileview pages, so a swipe shows in a screenshot, and a tap counter.
+
+The panel is driven with full frames only (partial window updates leave its address counter out of
+step) and has no hardware rotation; `QspiPanel::ignoring_window()` models the batches that ignore
+window-address commands entirely and always start a memory write at (0, 0).
 
 ## `none` — bare module
 

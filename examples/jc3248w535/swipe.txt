@@ -1,0 +1,17 @@
+# Swipe left on the tileview twice: page 1 -> page 2 -> page 3.
+# 320x480 panel, so the gesture runs horizontally at mid-height.
+2.00 touch 280 240 1
+2.04 touch 240 240 1
+2.08 touch 200 240 1
+2.12 touch 160 240 1
+2.16 touch 120 240 1
+2.20 touch 80 240 1
+2.24 touch 40 240 1
+2.28 touch 40 240 0
+3.00 touch 280 240 1
+3.04 touch 240 240 1
+3.08 touch 200 240 1
+3.12 touch 160 240 1
+3.16 touch 120 240 1
+3.20 touch 80 240 1
+3.24 touch 40 240 0

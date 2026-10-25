@@ -96,6 +96,109 @@ impl I2cDevice for Gt911 {
     fn read(&mut self) -> u8 { let v = self.reg(self.addr); self.addr = self.addr.wrapping_add(1); self.reads += 1; v }
 }
 
+/// AXS15231B capacitive touch, the touch half of the panel IC that also drives the QSPI glass.
+///
+/// It is not a register file: the host writes an 11-byte command
+/// `B5 AB A5 5A 00 00 00 08 00 00 00` (the payload length lives in byte 7) and then reads eight
+/// bytes of report. The first report byte is a gesture code, the second the number of points,
+/// and each 6-byte record carries the event in the top two bits of its high x byte (0x40 =
+/// released, 0x80 = pressed) — the MicroPython driver decodes `(x_hi >> 6) & 3`.
+///
+/// Nothing touched is not an empty report but a fixed idle pattern (`85 85 85 ...`), whose point
+/// count byte is larger than the one point the controller supports; a release is a real report
+/// with a single point whose event says "up", so a driver that keeps its last state until the
+/// controller says otherwise sees the finger lift.
+pub struct Axs15231Touch {
+    touch: std::sync::Arc<std::sync::Mutex<TouchState>>,
+    counters: std::sync::Arc<AxsCounters>,
+    /// The eight bytes the next read drains.
+    report: [u8; 8],
+    /// Bytes of the command the host is writing; the report is rebuilt once it is complete.
+    command: [u8; 11],
+    written: usize,
+    /// Read cursor inside `report`.
+    cursor: usize,
+    /// A press report was handed out since the last release report.
+    pressed_seen: bool,
+}
+
+/// Counters shared with the board, so an end-of-run report can show that the guest polled the
+/// controller instead of only having touch injected into it.
+#[derive(Default, Debug)]
+pub struct AxsCounters { pub reads: std::sync::atomic::AtomicU64, pub reports: std::sync::atomic::AtomicU64 }
+
+impl Axs15231Touch {
+    /// The idle pattern measured on the module: any byte count above one point makes the driver
+    /// discard it, and 0x85 is what the controller actually returns when nothing is touched.
+    const IDLE: u8 = 0x85;
+    /// The command the driver writes before every read.
+    pub const COMMAND: [u8; 11] = [0xb5, 0xab, 0xa5, 0x5a, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00];
+
+    pub fn new(touch: std::sync::Arc<std::sync::Mutex<TouchState>>) -> Self {
+        Self::with_counters(touch, Default::default())
+    }
+
+    pub fn with_counters(touch: std::sync::Arc<std::sync::Mutex<TouchState>>, counters: std::sync::Arc<AxsCounters>) -> Self {
+        Axs15231Touch { touch, counters, report: [Self::IDLE; 8], command: [0; 11], written: 0, cursor: 0, pressed_seen: false }
+    }
+
+    /// Build one report from the current touch state: press, release, or idle.
+    fn build(&mut self) {
+        use std::sync::atomic::Ordering::Relaxed;
+        let mut state = self.touch.lock().expect("AXS15231 touch state mutex poisoned");
+        state.observe();
+        let state = *state;
+        self.counters.reports.fetch_add(1, Relaxed);
+        if state.down {
+            self.pressed_seen = true;
+            self.report = Self::point(0x00, 0x80, state.x, state.y);
+        } else if self.pressed_seen {
+            self.pressed_seen = false;
+            self.report = Self::point(0xff, 0x40, state.x, state.y);
+        } else {
+            self.report = [Self::IDLE; 8];
+        }
+    }
+
+    /// One report: gesture, point count, then x/y with the event bits in the high nibbles.
+    fn point(gesture: u8, event: u8, x: u16, y: u16) -> [u8; 8] {
+        [gesture, 1, event | ((x >> 8) as u8 & 0x0f), x as u8, (y >> 8) as u8 & 0x0f, y as u8, 0, 0]
+    }
+
+    /// The point a report carries, for tests and tools that read the wire format instead of the
+    /// driver: `(x, y, pressed)`, or `None` for the idle pattern.
+    pub fn coordinates(report: &[u8; 8]) -> Option<(u16, u16, bool)> {
+        if report[1] == 0 || report[1] > 1 { return None; }
+        let pressed = (report[2] >> 6) & 0x03 != 1;
+        Some(((((report[2] & 0x0f) as u16) << 8) | report[3] as u16, (((report[4] & 0x0f) as u16) << 8) | report[5] as u16, pressed))
+    }
+}
+
+impl I2cDevice for Axs15231Touch {
+    /// A write starts the command; a repeated start switches to reading the report. The report is
+    /// rebuilt at the start of every read, so a poll always sees the current state.
+    fn start(&mut self, read: bool) -> bool {
+        if read {
+            self.build();
+            self.cursor = 0;
+        } else {
+            self.written = 0;
+        }
+        true
+    }
+    fn write(&mut self, byte: u8) -> bool {
+        if self.written < self.command.len() { self.command[self.written] = byte; self.written += 1; }
+        true
+    }
+    fn read(&mut self) -> u8 {
+        use std::sync::atomic::Ordering::Relaxed;
+        let value = self.report[self.cursor.min(self.report.len() - 1)];
+        self.cursor = (self.cursor + 1).min(self.report.len());
+        self.counters.reads.fetch_add(1, Relaxed);
+        value
+    }
+}
+
 /// Hynitron CST820 touch controller used on the Waveshare Touch AMOLED 1.8 V2.
 /// The register report matches the CST816S-compatible driver used by its board support package.
 pub struct Cst820 { ptr: u8, first: bool, touch: std::sync::Arc<std::sync::Mutex<TouchState>>, pub reads: u64 }
@@ -162,6 +265,53 @@ mod tests {
         assert!(device.write(1));
         assert!(device.start(true));
         assert_eq!(device.read(), 0xa5);
+    }
+
+    /// One poll as the MicroPython driver does it: command out, repeated start, eight bytes in.
+    fn axs_read(device: &mut Axs15231Touch) -> [u8; 8] {
+        assert!(device.start(false));
+        for byte in Axs15231Touch::COMMAND { assert!(device.write(byte)); }
+        assert!(device.start(true));
+        let mut report = [0u8; 8];
+        for byte in &mut report { *byte = device.read(); }
+        report
+    }
+
+    #[test]
+    fn axs15231_idle_pattern_is_not_a_point() {
+        let mut device = Axs15231Touch::new(Default::default());
+        assert_eq!(axs_read(&mut device), [0x85; 8]);
+        assert_eq!(Axs15231Touch::coordinates(&[0x85; 8]), None);
+    }
+
+    #[test]
+    fn axs15231_reports_a_pressed_point_then_one_release_and_then_idle() {
+        let touch = std::sync::Arc::new(std::sync::Mutex::new(TouchState::default()));
+        let mut device = Axs15231Touch::new(touch.clone());
+        touch.lock().unwrap().update(0x45, 0x1b4, true);
+        let press = axs_read(&mut device);
+        assert_eq!(press, [0x00, 0x01, 0x80, 0x45, 0x01, 0xb4, 0x00, 0x00]);
+        assert_eq!(Axs15231Touch::coordinates(&press), Some((0x45, 0x1b4, true)));
+
+        touch.lock().unwrap().update(0x45, 0x1b4, false);
+        let release = axs_read(&mut device);
+        assert_eq!(release, [0xff, 0x01, 0x40, 0x45, 0x01, 0xb4, 0x00, 0x00]);
+        assert_eq!(Axs15231Touch::coordinates(&release), Some((0x45, 0x1b4, false)));
+        assert_eq!(axs_read(&mut device), [0x85; 8], "the release is reported once");
+        assert_eq!(device.counters.reports.load(std::sync::atomic::Ordering::Relaxed), 3);
+    }
+
+    /// A tap shorter than the poll interval still yields press and release: the first poll sees
+    /// the press (the state keeps it until observed) and the next one the release.
+    #[test]
+    fn axs15231_short_tap_is_never_lost() {
+        let touch = std::sync::Arc::new(std::sync::Mutex::new(TouchState::default()));
+        let mut device = Axs15231Touch::new(touch.clone());
+        touch.lock().unwrap().update(100, 200, true);
+        touch.lock().unwrap().update(100, 200, false);
+        assert_eq!(Axs15231Touch::coordinates(&axs_read(&mut device)), Some((100, 200, true)));
+        assert_eq!(Axs15231Touch::coordinates(&axs_read(&mut device)), Some((100, 200, false)));
+        assert_eq!(axs_read(&mut device), [0x85; 8]);
     }
 
     #[test]

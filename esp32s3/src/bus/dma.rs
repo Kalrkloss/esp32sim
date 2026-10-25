@@ -197,7 +197,9 @@ impl SocBus {
             self.periph.gpio.changes.clear();
         }
         let pins = if host == 2 { self.spi2_pins.take() } else { self.spi3_pins.take() };
-        let rx = if let Some(pins) = pins {
+        let rx = if self.board.uses_spi_phases() {
+            self.board.spi_transfer_phases(host, transfer.phases, &transfer.tx, transfer.rx_len)
+        } else if let Some(pins) = pins {
             self.board.spi_transfer_pins(host, pins, &transfer.tx, transfer.rx_len)
         } else {
             self.board.spi_transfer(host, &transfer.tx, transfer.rx_len)

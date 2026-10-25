@@ -8,16 +8,19 @@
 //! - `WaveshareLcd4b` — ESP32-S3-Touch-LCD-4B
 //! - `WaveshareAmoled18V2` — ESP32-S3-Touch-AMOLED-1.8 V2
 //! - `StopWatch` — M5Stack StopWatch
+//! - `Jc3248w535` — Guition JC3248W535: AXS15231B QSPI panel with its capacitive touch
 //! - `NoBoard` — a bare module: nothing on the pins (any ESP32-S3 firmware, console only)
 pub use esp_soc::board::{Board, BoardEdge, BoardModel, NoBoard, VirtualCycle};
 
 pub mod atech14;
+pub mod jc3248w535;
 pub mod stopwatch;
 pub mod waveshare_amoled18;
 pub mod waveshare_cam;
 pub mod waveshare_lcd4b;
 
 pub use atech14::*;
+pub use jc3248w535::*;
 pub use stopwatch::*;
 pub use waveshare_amoled18::*;
 pub use waveshare_cam::*;
@@ -32,6 +35,7 @@ pub fn make_board(name: &str) -> Option<Board> {
         "waveshare-cam" | "waveshare" => Some(Box::new(WaveshareCam::new())),
         "waveshare-lcd4b" | "lcd4b" => Some(Box::new(WaveshareLcd4b::new())),
         "waveshare-amoled18-v2" | "amoled18-v2" => Some(Box::new(WaveshareAmoled18V2::new())),
+        "jc3248w535" | "jc3248" => Some(Box::new(Jc3248w535::new())),
         _ => None,
     }
 }

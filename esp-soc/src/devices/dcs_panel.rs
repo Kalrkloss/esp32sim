@@ -44,6 +44,36 @@ impl DcsPanel {
         self.gram = gram; self.resets = resets; self.dc = dc; self.ramctrl = ramctrl;
     }
 
+    /// Feed one command byte, as a D/C line held low would.
+    pub fn command(&mut self, b: u8) {
+        self.dc = false;
+        self.byte(b);
+        self.dc = true;
+    }
+
+    /// Feed parameter or pixel bytes, as a D/C line held high would.
+    pub fn data(&mut self, bytes: &[u8]) {
+        self.dc = true;
+        for &b in bytes { self.byte(b); }
+    }
+
+    /// What the glass shows: RAM as written, inverted while the controller is in inversion mode.
+    pub fn visible_pixels(&self) -> Vec<u16> {
+        if self.inverted { self.gram.iter().map(|pixel| !pixel).collect() } else { self.gram.clone() }
+    }
+
+    /// Begin a memory write that continues where the previous one stopped (RAMWRC, 0x3C): the
+    /// address counter is kept and no frame is counted — only RAMWR restarts at the window origin.
+    pub fn continue_memory_write(&mut self) {
+        self.dc = true;
+        self.cmd = 0x2c;
+        self.argn = 0;
+        self.pixel_hi = None;
+    }
+
+    /// The address window memory writes go into: `(x0, y0, x1, y1)` in the controller's frame.
+    pub fn window(&self) -> (u16, u16, u16, u16) { (self.x0, self.y0, self.x1, self.y1) }
+
     /// One byte from the SPI master, a command or data depending on `dc`.
     pub fn byte(&mut self, b: u8) {
         if !self.dc {

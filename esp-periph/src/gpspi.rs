@@ -18,10 +18,29 @@ macro_rules! fill_spi_w {
     }};
 }
 
+/// Where the phases of a transaction end, in bytes of the transferred stream. A controller
+/// flattens command, address and data into one byte stream; a device whose wire protocol is not
+/// flat (a QSPI panel frames its DCS command in an 8-bit opcode plus a 24-bit address phase)
+/// cannot recover the boundary from the bytes alone, because a data byte can equal the opcode.
+/// `command + address` is the header length; everything after it is data.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct SpiPhases {
+    pub command: usize,
+    pub address: usize,
+}
+
+impl SpiPhases {
+    /// Header bytes before the data phase.
+    pub fn header(&self) -> usize { self.command + self.address }
+}
+
 /// One complete transfer waiting for the board attached to a GP-SPI host.
 pub struct GpSpiTransfer {
     pub tx: Vec<u8>,
     pub rx_len: usize,
+    /// Byte lengths of the command and address phases inside `tx`. A transfer without a command
+    /// phase (the continuation chunks of a large DMA write) reports zeroes.
+    pub phases: SpiPhases,
     data_len: usize,
     rx_word_base: usize,
 }
@@ -65,13 +84,16 @@ impl GpSpi {
         let data_bits = (self.regs.read(0x1c) & 0x3ffff) + 1;
         self.dma_tx_pending = None;
         let mut tx = Vec::new();
+        let mut phases = SpiPhases::default();
         if user & (1 << 31) != 0 {                                        // command phase, LSB byte first
             let n = (((user2 >> 28) & 0xf) + 1).div_ceil(8); let c = user2 & 0xffff;
             for i in 0..n { tx.push((c >> (8 * i)) as u8); }
+            phases.command = n as usize;
         }
         if user & (1 << 30) != 0 {                                        // address phase, MSB first from the top of ADDR
             let bits = (user1 >> 27) + 1; let n = bits.div_ceil(8); let a = self.regs.read(0x04);
             for i in 0..n { tx.push((a >> (24 - 8 * i)) as u8); }
+            phases.address = n as usize;
         }
         let mut data_len = 0;
         if user & (1 << 27) != 0 {                                        // MOSI data phase from W0.. (or W8.. with HIGHPART)
@@ -87,7 +109,7 @@ impl GpSpi {
         }
         let rx_len = if user & (1 << 28) != 0 { data_bits.div_ceil(8) as usize } else { 0 };
         let rx_word_base = if user & (1 << 24) != 0 { 8 } else { 0 };
-        self.pending = Some(GpSpiTransfer { tx, rx_len, data_len, rx_word_base });
+        self.pending = Some(GpSpiTransfer { tx, rx_len, phases, data_len, rx_word_base });
     }
 
     pub fn has_pending_transfer(&self) -> bool { self.pending.is_some() }
@@ -226,6 +248,7 @@ mod tests {
         spi.write(0x00, 1 << 24);
         let transfer = spi.take_transfer().expect("USR must issue one board transaction");
         assert_eq!(transfer.tx, [0x02, 0x04, 0x00, 0x00, 0x11, 0x22, 0x33]);
+        assert_eq!(transfer.phases, SpiPhases { command: 1, address: 3 }, "one command byte, three address bytes");
         assert_eq!(transfer.rx_len, 3);
         assert_eq!(spi.transfers, 0);
 
@@ -247,6 +270,7 @@ mod tests {
         spi.complete_dma_tx(&[0x12, 0x34]);
         let transfer = spi.take_transfer().expect("DMA completion makes the transfer visible");
         assert_eq!(transfer.tx, [0x12, 0x34]);
+        assert_eq!(transfer.phases, SpiPhases::default(), "a data-only transfer has no header to delimit");
         spi.finish_transfer(transfer, &[]);
         assert_eq!(spi.transfers, 1);
     }

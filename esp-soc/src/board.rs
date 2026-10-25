@@ -22,6 +22,14 @@ pub struct SpiPins {
     pub cs: u64,
 }
 
+/// Where the phases of a GP-SPI transaction end, in bytes of the transferred stream.
+///
+/// A controller flattens command, address and data into one byte stream; a device whose wire
+/// protocol is not flat (a QSPI panel frames the DCS command in an 8-bit opcode plus a 24-bit
+/// address phase) cannot recover the boundary from the bytes alone, because a pixel byte can
+/// equal the opcode. `command + address` is the header length; everything after it is data.
+pub use esp_periph::gpspi::SpiPhases;
+
 /// What a board does with the SoC's pin-level activity.
 pub trait BoardModel {
     fn name(&self) -> &'static str;
@@ -50,6 +58,15 @@ pub trait BoardModel {
     /// Pin-aware boards select their devices using these routes and return MISO bytes.
     /// The default preserves the controller-based callback.
     fn spi_transfer_pins(&mut self, host: u8, _pins: SpiPins, tx: &[u8], rx_len: usize) -> Vec<u8> {
+        self.spi_transfer(host, tx, rx_len)
+    }
+    /// Opt in to `spi_transfer_phases`: the bus then reports where each transaction's command and
+    /// address phases end. Only devices that decode framing (QSPI panels) need it; boards that
+    /// consume a flat byte stream keep `spi_transfer`.
+    fn uses_spi_phases(&self) -> bool { false }
+    /// A complete GP-SPI transaction with its phase boundaries. The default drops the framing and
+    /// forwards the bytes, so a board that opts in but has no use for the split still works.
+    fn spi_transfer_phases(&mut self, host: u8, _phases: SpiPhases, tx: &[u8], rx_len: usize) -> Vec<u8> {
         self.spi_transfer(host, tx, rx_len)
     }
     /// Opt in to UART route decoding and receive polling. Cached by `attach_board_devices`.

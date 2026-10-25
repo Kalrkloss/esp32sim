@@ -1,0 +1,13 @@
+# Tap the "taps" button on page 2 twice: swipe left to page 2, then two taps at (160, 310).
+3.00 touch 280 240 1
+3.04 touch 240 240 1
+3.08 touch 200 240 1
+3.12 touch 160 240 1
+3.16 touch 120 240 1
+3.20 touch 80 240 1
+3.24 touch 40 240 1
+3.28 touch 40 240 0
+4.00 touch 160 310 1
+4.12 touch 160 310 0
+4.60 touch 160 310 1
+4.72 touch 160 310 0
