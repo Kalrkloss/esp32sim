@@ -8,6 +8,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Node 24 LTS, not the runner image's Node 22: on 22, V8 holds the modules the WASM JIT
+      # releases, and tools/wasm-jit-test.mjs grows to 4.7 GB in 210 s (on an M-series Mac; on the
+      # runner 9 minutes, and out of memory once the module grows). On 24 the same run takes 0.2 GB
+      # and 14 s.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
