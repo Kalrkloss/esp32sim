@@ -150,19 +150,20 @@ fn f_arithmetic_rounds_flags_and_canonicalises() {
     assert_eq!((b.x, b.f, b.fcsr, b.mstatus, b.pc), (cpu.x, cpu.f, cpu.fcsr, cpu.mstatus, cpu.pc));
 }
 
-/// On the P4 rev >= 3 core EXT_ILL flags every FP instruction taken with FS = Off: FLW, the FP
-/// CSRs, C.FSW and C.FLWSP as well as the computational ones, which is all IDF's rev >= 3
-/// `vectors.S` looks at ("The FPU_EXT_ILL bug was fixed on revision 3.0 and higher", ESP-IDF
-/// v5.5.4 components/riscv/vectors.S:279-280). An IDF v5.5.4 sdmmc example built for rev >= 3
-/// panics in `sdmmc_card_init` at its first C.FLW without it.
+/// On the P4 rev >= 3 core EXT_ILL flags every FP instruction taken with FS = Off: FLW, FSW, the FP
+/// CSRs, C.FLW, C.FSW, C.FLWSP and C.FSWSP as well as the computational ones (FMADD among them),
+/// which is all IDF's rev >= 3 `vectors.S` looks at ("The FPU_EXT_ILL bug was fixed on revision
+/// 3.0 and higher", ESP-IDF v5.5.4 components/riscv/vectors.S:279-280). An IDF v5.5.4 sdmmc
+/// example built for rev >= 3 panics in `sdmmc_card_init` at its first C.FLW without it.
 #[test]
 fn rev3_ext_ill_flags_fp_loads_stores_and_csrs() {
-    let prog = asm("00c5f553 e00505d3 00052507 003025f3 7f001673 e15c 6022");
+    let prog = asm("00c5f553 e00505d3 00052507 003025f3 7f001673 e15c 6022 00a52027 6108 e02a 68c58543");
     for (core, ld_st) in [(Cpu::new_esp32p4_rev3(), 1), (Cpu::new_esp32p4(), 0)] {
         let (mut cpu, mut ram) = machine_on(core, &prog, "fadd.s fa0,fa1,fa2");
         cpu.mtvec = BASE + 0x400;
         cpu.x[10] = BASE + 0x800; cpu.x[2] = BASE + 0x900;
-        for (off, raw, ext) in [(0, 0x00c5_f553u32, 1), (4, 0xe005_05d3, 1), (8, 0x0005_2507, ld_st), (12, 0x0030_25f3, ld_st), (20, 0xe15c, ld_st), (22, 0x6022, ld_st)] {
+        for (off, raw, ext) in [(0, 0x00c5_f553u32, 1), (4, 0xe005_05d3, 1), (8, 0x0005_2507, ld_st), (12, 0x0030_25f3, ld_st), (20, 0xe15c, ld_st), (22, 0x6022, ld_st),
+            (24, 0x00a5_2027, ld_st), (28, 0x6108, ld_st), (30, 0xe02a, ld_st), (32, 0x68c5_8543, 1)] {
             cpu.ext_ill = 0;
             cpu.pc = BASE + off;
             assert_eq!(step(&mut cpu, &mut ram), Err(Trap::Exception(2)), "{raw:08x}");

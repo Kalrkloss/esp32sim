@@ -166,10 +166,13 @@ the bootloader's and the app's own doing: on rev ≥ 3 the bootloader loads at t
 the app above the L2 cache at its bottom (its first RAM segment at 0x4FF20000), and L2MEM is RAM
 throughout here.
 
-So far it is the rev < 3 model with those changes. For the blocks the model implements, no
-register moves between IDF v5.5.4's `soc/esp32p4/register/hw_ver1` and `hw_ver3`; the changes are
-added bits and registers, a few removed bits and the eFuse system words, none in a field the model
-gives a meaning to ([the comparison](evidence/p4-rev3-registers/README.md)). Of the blocks it does
+So far it is the rev < 3 model with those changes. Within the headers of the blocks the model
+implements, no register moves between IDF v5.5.4's `soc/esp32p4/register/hw_ver1` and `hw_ver3`;
+the changes are added bits and registers, a few removed bits and the eFuse system words, none in
+a field the model gives a meaning to ([the comparison](evidence/p4-rev3-registers/README.md)).
+One register moves between headers, which that comparison cannot see: `WDEV_RND_REG`, the random
+number, is LP_SYSTEM's RNG_DATA on rev < 3 and LP_TRNG's (0x50126004, `trng_reg.h`, a header only
+`hw_ver3` has) on rev ≥ 3; the model has both. Of the blocks it does
 not implement, many differ (DMA2D, PPA, MIPI-CSI's bridge, ISP and PMU among them), and `hw_ver3`
 adds 23 headers. hello_world does not reach the differences, and neither do ESP-Hosted with the C6
 (golden `hosted-p4-rev3`) and the sdmmc example (golden `sdcard-p4-rev3`); USB has not been run on
@@ -1074,9 +1077,12 @@ firmware dialog offers the board `esp32p4`.
   ("Revisions").
 - **Core stall**: PMU's CPU_SW_STALL (stall code 0x86, IDF v5.5.4
   `hal/esp32p4/include/hal/cpu_utility_ll.h`) does not stop the other core, and HP_SYSTEM's
-  CORESTALLED_ST reads 0. `esp_restart` stalls core 1 before the reset, so core 1 runs on here and
-  its `Core1 Saved PC` is 0x12 bytes later than on silicon, on both revisions ("Compared with
-  silicon"). Anything else that relies on stalling the other core does not get it either.
+  CORESTALLED_ST reads 0. Nor does LP_CLKRST's HPCORE1_SW_RESET reset core 1: the model clears the
+  bit and ignores it. `esp_restart_noos` does both to core 1 before the chip reset, resets it and
+  then stalls it (IDF v5.5.4 `esp_system/port/soc/esp32p4/system_internal.c:174-175`), so core 1
+  runs on here and its `Core1 Saved PC` is 0x12 bytes later than on silicon, on both revisions
+  ("Compared with silicon"); which of the two would fix that is not tried. Anything else that
+  relies on stalling the other core does not get it either.
 - **AXI-GDMA, the LP core, MIPI-DSI/CSI, DMA2D/PPA**, and Xesppie's save and restore,
   which FreeRTOS runs only for a task that uses PIE. mbedTLS's SHA and AES in DMA mode run through
   the AXI GDMA on the P4 (IDF v5.5.3 `mbedtls/port/crypto_shared_gdma`, `SOC_AXI_GDMA_SUPPORTED`),
