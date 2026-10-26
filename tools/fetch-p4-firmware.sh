@@ -12,7 +12,7 @@
 set -e
 cd "$(dirname "$0")/.."
 DIR=${1:-web/wasm/fw/public}
-BASE=${P4_FIRMWARE_BASE_URL:-https://raw.githubusercontent.com/mikroverk/esp32sim-firmware/569d986a434dcdae68f1a88c0533913e429e9eaa/p4}
+BASE=${P4_FIRMWARE_BASE_URL:-https://raw.githubusercontent.com/mikroverk/esp32sim-firmware/d918cb24fe2798a2479fec4ecabaf43ea1a5ed42/p4}
 # file, SHA-256, URL
 IMAGES="p4-hello-smp-bootloader.bin fc8698c1520e0d6469861e917d84568c94d17721faa93937896ae427e8f91717 $BASE/p4-hello-smp-bootloader.bin
 p4-hello-smp_world.bin 9476bccf819114fe30ad55dde4d0917e7f5213df34ec6f159b81c4a84e053f8b $BASE/p4-hello-smp_world.bin
@@ -31,7 +31,7 @@ p4-usbmsc-ptable.bin f6992f2eded46b7b73dccaf32c0702dd50c683bf834222916c5cddf7b85
 p4-usbmsc.bin f47d38b4eae7c954e0c874a2ff6cfbba3a96a93c0765927672634517e4bb4150 $BASE/p4-usbmsc.bin
 p4-scintilla-lcd35-bootloader.bin 6ec32ade43d31404cdfc24548459ebc61fbd74c7f8c77690c243268541e34198 $BASE/p4-scintilla-lcd35-bootloader.bin
 p4-scintilla-lcd35-ptable.bin 6f0657eb6b8007c0dbfed6f64cf7a0d59f8ee1752af898e2f66dd218846b1835 $BASE/p4-scintilla-lcd35-ptable.bin
-p4-scintilla-lcd35.bin d6585431081afb01797c6f829ba33cecc2855b2648dfd401eeca568ad3af5f9e $BASE/p4-scintilla-lcd35.bin
+p4-scintilla-lcd35.bin af2bfdf68f7fd13f6c9046dcc2a6933389e0a8c1218c2eecd470d3495d523547 $BASE/p4-scintilla-lcd35.bin
 c6-hosted-bootloader.bin 42ae8347814c4e2ac477caede2797d798261ef253c114dffc344068783f9d643 $BASE/c6-hosted-bootloader.bin
 c6-hosted-ptable.bin dbbebb5ee220599f4b12fb5c43c01c38b59b2720b5df0d14f7d1b857f6524c92 $BASE/c6-hosted-ptable.bin
 c6-hosted-otadata.bin 7d2c7ac4888bfd75cd5f56e8d61f69595121183afc81556c876732fd3782c62f $BASE/c6-hosted-otadata.bin
