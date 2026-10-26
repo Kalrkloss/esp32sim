@@ -161,10 +161,13 @@ the bootloader's and the app's own doing: on rev ≥ 3 the bootloader loads at t
 the app above the L2 cache at its bottom (its first RAM segment at 0x4FF20000), and L2MEM is RAM
 throughout here.
 
-So far it is the rev < 3 model with those changes: 51 of the register headers the two share
-differ between IDF v5.5.4's `soc/esp32p4/register/hw_ver1` and `hw_ver3` in addresses or fields,
-among them GPIO, SYSTIMER, CACHE, HP_SYS_CLKRST, both interrupt matrices, SDMMC, the SPI memory
-controllers, eFuse, PMU, USB-Serial/JTAG and LP_SYSTEM, and `hw_ver3` adds 23. hello_world does
+So far it is the rev < 3 model with those changes. Compared with their comments removed, 53 of
+the 97 register blocks the two share differ between IDF v5.5.4's `soc/esp32p4/register/hw_ver1`
+and `hw_ver3` in addresses or fields, among them GPIO, SYSTIMER, CACHE, HP_SYS_CLKRST, both
+interrupt matrices, the SPI memory controllers, eFuse, PMU and LP_SYSTEM; USB-Serial/JTAG's
+renames its fields and narrows EP1's `rdwr_byte` to 8 bits. `hw_ver3` adds 23 headers. SDMMC's
+differ only in one macro's name (`SDHOST_VERSIONID_REG`); the added `sdmmc_eco5_struct.h` is
+included nowhere in IDF v5.5.4. hello_world does
 not reach the differences, and neither does ESP-Hosted with the C6 (golden `hosted-p4-rev3`); the
 SD card and USB have not been run on rev ≥ 3. The
 model runs at 360 MHz on both revisions, where IDF sets rev ≥ 3 to 400 MHz: the systimer and the
