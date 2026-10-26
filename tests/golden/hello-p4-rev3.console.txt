@@ -80,7 +80,7 @@ load:0x4ffac2c0,len:0xe88
 load:0x4ffaefc0,len:0x3560
 entry 0x4ffac2ca
 I (6) boot: ESP-IDF v5.5.4 2nd stage bootloader
-I (7) boot: compile time Oct 25 2026 01:44:04
+I (6) boot: compile time Oct 25 2026 01:44:04
 W (7) boot: Unicore bootloader
 I (7) boot: chip revision: v3.1
 I (7) boot: efuse block revision: v0.3

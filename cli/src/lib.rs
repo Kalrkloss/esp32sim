@@ -575,12 +575,19 @@ fn setup_c6(o: &Opts) -> esp32c6::Machine {
     m
 }
 
-/// The images are a rev >= 3 build: the bootloader's header says so, or the app's, or that of the
-/// bootloader in the flash image (`esp32p4::built_for_rev3`). The silicon revision follows them.
+/// The images are a rev >= 3 build: the bootloader's header says so (`--bootloader`, or the image
+/// `--flash-at` places at 0x2000), or else the app's, or that of another image `--flash-at`
+/// places, or that of the bootloader in the flash image (`esp32p4::built_for_rev3`). The silicon
+/// revision follows them.
 fn p4_rev3(o: &Opts) -> bool {
-    let head = |p: &String, at: usize| std::fs::read(p).ok().and_then(|d| d.get(at..).map(esp32p4::built_for_rev3));
-    o.bootloader.as_ref().and_then(|p| head(p, 0)).or_else(|| o.app.as_ref().and_then(|p| head(p, 0)))
-        .or_else(|| o.flash_image.as_ref().and_then(|p| head(p, 0x2000))).unwrap_or(false)
+    let head = |p: &str, at: usize| std::fs::read(p).ok().and_then(|d| d.get(at..).map(esp32p4::built_for_rev3));
+    let placed = |boot: bool| o.flash_at.iter().filter_map(|s| s.split_once('='))
+        .filter(move |(off, _)| (usize::from_str_radix(off.trim_start_matches("0x"), 16) == Ok(0x2000)) == boot).map(|(_, p)| p);
+    o.bootloader.as_deref().and_then(|p| head(p, 0))
+        .or_else(|| placed(true).find_map(|p| head(p, 0)))
+        .or_else(|| o.app.as_deref().and_then(|p| head(p, 0)))
+        .or_else(|| placed(false).find_map(|p| head(p, 0)))
+        .or_else(|| o.flash_image.as_deref().and_then(|p| head(p, 0x2000))).unwrap_or(false)
 }
 
 /// The ESP32-P4, a bare module: 16 MB of flash unless told otherwise, PSRAM with `--psram-mb`.
