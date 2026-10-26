@@ -340,7 +340,9 @@ mod tests {
     /// A chip reset rebuilds the peripherals; the board's touch controller and codec stay on I2C1,
     /// its touch INT stays high, and the audio captured before the reset stays in the sink.
     #[test]
-    fn a_reset_keeps_the_boards_devices_and_the_audio() {
+    /// The board's I2C devices are attached again, new, as on the S3: the codec's register file
+    /// starts over, where the board's ES8311 keeps it (IDF initialises it again either way).
+    fn a_reset_reattaches_the_boards_devices_and_keeps_the_audio() {
         let mut bus = crate::bus::SocBus::new(16 << 20, [0; 6], (0, 3));
         bus.board = crate::board::make_board("waveshare-p4-lcd35").unwrap();
         bus.attach_board_devices();

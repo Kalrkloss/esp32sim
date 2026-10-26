@@ -102,7 +102,7 @@
   $('fw_board').onchange = () => { const m = MEMORY[$('fw_board').value]; if (m) { $('fw_flash').value = m[0]; $('fw_psram').value = m[1]; } };
   // The mask ROM the site hosts for the chip a board name implies (the files tools/fetch-demo-assets.sh
   // puts in wasm/fw/): used when the visitor picks no ROM ELF of their own.
-  const romFor = (board) => board === 'esp32c3' ? 'esp32c3_rev3_rom.elf' : board === 'esp32p4' ? 'esp32p4_rev0_rom.elf' : board === 'esp32p4-rev3' ? 'esp32p4_rev300_rom.elf' : /c6/.test(board) ? 'esp32c6_rev0_rom.elf'
+  const romFor = (board) => board === 'esp32c3' ? 'esp32c3_rev3_rom.elf' : board === 'esp32p4' ? 'esp32p4_rev0_rom.elf' : board === 'esp32p4-rev3' || board === 'waveshare-p4-lcd35' ? 'esp32p4_rev300_rom.elf' : /c6/.test(board) ? 'esp32c6_rev0_rom.elf'
     : /^(esp32|esp32dev.*|ttgo-tdisplay|tdisplay)$/.test(board) ? 'esp32_rev300_rom.elf' : 'esp32s3_rev0_rom.elf';
   const readFile = (f) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsArrayBuffer(f); });
 

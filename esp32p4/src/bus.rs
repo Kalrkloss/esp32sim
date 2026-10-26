@@ -280,7 +280,8 @@ impl SocBus {
         if frames == 0 || bpf == 0 { return; }
         let Some(ch) = self.periph.ahb_dma.gdma.out_channel_for(4) else { return };
         let mut need = frames as usize * bpf;
-        let mut samples: Vec<i16> = Vec::new();
+        // the bytes of every descriptor taken, so a frame split between two stays whole
+        let mut stream: Vec<u8> = Vec::with_capacity(need);
         let mut mem = DmaView { l2mem: &mut self.l2mem, psram: &mut self.psram, mmu: &self.mmu_psram };
         let mut walk = esp_periph::gdma::DescriptorWalk::new(esp_periph::gdma::GDMA_DESCRIPTOR_STEP_BUDGET);
         loop {
@@ -305,17 +306,20 @@ impl SocBus {
                 continue;
             }
             let take = remaining.min(need);
-            let mut bytes = vec![0u8; take];
-            if esp_periph::sdmmc::SdmmcMemory::read(&mut mem, buf.wrapping_add(c.buf_pos), &mut bytes).is_err() {
+            let start = stream.len();
+            stream.resize(start + take, 0);
+            if esp_periph::sdmmc::SdmmcMemory::read(&mut mem, buf.wrapping_add(c.buf_pos), &mut stream[start..]).is_err() {
+                stream.truncate(start);
                 let c = &mut self.periph.ahb_dma.gdma.out[ch]; c.running = false; c.int_raw |= 1 << 2; break;
-            }
-            for f in bytes.chunks_exact(bpf) {
-                samples.push(if sample_bytes == 1 { (f[0] as i8 as i16) << 8 } else { i16::from_le_bytes([f[sample_bytes - 2], f[sample_bytes - 1]]) });
             }
             self.periph.ahb_dma.gdma.out[ch].buf_pos += take as u32;
             need -= take;
         }
         self.irq_dirty = true;
+        // a frame cut short by the chain's end, an error or the step budget is dropped
+        let samples: Vec<i16> = stream.chunks_exact(bpf)
+            .map(|f| if sample_bytes == 1 { (f[0] as i8 as i16) << 8 } else { i16::from_le_bytes([f[sample_bytes - 2], f[sample_bytes - 1]]) })
+            .collect();
         if !samples.is_empty() { let i = &mut self.periph.i2s1; i.frames_out += samples.len() as u64; i.pcm.extend_from_slice(&samples); }
     }
 
@@ -554,6 +558,24 @@ mod tests {
         b.i2s1_tx(crate::periph::CPU_HZ);
         assert!(b.periph.i2s1.pcm.is_empty());
         assert_eq!(b.periph.ahb_dma.gdma.out[0].int_raw & 1 << 3, 0, "no OUT_TOTAL_EOF");
+    }
+
+    /// A frame split between two descriptors (16-bit stereo, 6 bytes and then 2) is one frame,
+    /// not a frame and a dropped tail.
+    #[test]
+    fn i2s1_a_frame_split_between_descriptors_stays_whole() {
+        let mut b = SocBus::new(0x1000, [0; 6], (3, 1));
+        b.periph.i2s1.write(0x24, 1 << 2);                            // TX_START
+        (b.periph.i2s1.tx_conf1, b.periph.i2s1.bytes_per_frame) = (15 << 13, 4);   // 16-bit samples, two slots
+        let (d1, d2) = (0x4ff4_0000, 0x4ff4_0010);
+        for (o, v) in [(0, 1u32 << 31 | 6 << 12 | 6), (4, d1 + 0x100), (8, d2)] { b.write32(d1 + o, v).unwrap(); }
+        for (o, v) in [(0, 1u32 << 31 | 1 << 30 | 2 << 12 | 2), (4, d1 + 0x200), (8, 0)] { b.write32(d2 + o, v).unwrap(); }
+        for (a, v) in [(d1 + 0x100, 0x2222_1111), (d1 + 0x104, 0x3333), (d1 + 0x200, 0x4444)] { b.write32(a, v).unwrap(); }
+        let ch = &mut b.periph.ahb_dma.gdma.out[0];
+        (ch.peri_sel, ch.running, ch.desc) = (4, true, d1);
+        b.i2s1_tx(crate::periph::CPU_HZ);
+        assert_eq!(b.periph.i2s1.pcm, [0x1111, 0x3333], "the first slot of each frame");
+        assert!(b.periph.ahb_dma.gdma.out[0].int_raw & 1 << 3 != 0, "OUT_TOTAL_EOF");
     }
 
     #[test]
