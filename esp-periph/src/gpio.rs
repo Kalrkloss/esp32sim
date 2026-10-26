@@ -27,11 +27,11 @@ pub struct Gpio {
 }
 impl Gpio {
     pub fn new() -> Self { Self::with_pins(49) }
-    pub fn with_pins(pins: u8) -> Self { Gpio { out: 0, enable: 0, input: (1u64 << pins) - 1, status: 0, pin: [0; GPIO_MAX_PINS], func_in_sel: [0x3c; 256], func_out_sel: [0x100; GPIO_MAX_PINS], ram: RegRam::new(), pins, changes: Vec::new(), strap: 0x0f, input_changes: Vec::new(), pull_up: 0, pull_down: 0, external_mask: 0, external_levels: 0, int_ena_pins: 0, matrix_input_pins: 0, input_select: 0x80 } }
-    /// Report every pin whose driven level changed: `out & enable` before against after. Both
-    /// words matter — a driver that toggles the output *enable* to produce a level (IDF 5.5's
-    /// esp_lcd releases the D/C line after each colour transfer and re-enables it before the
-    /// next) changes what a board sees just as much as one that toggles `out`.
+    /// A GPIO with `pins` pins, at most `GPIO_MAX_PINS` (the P4's 57).
+    pub fn with_pins(pins: u8) -> Self {
+        assert!(pins as usize <= GPIO_MAX_PINS, "{pins} GPIO pins, at most {GPIO_MAX_PINS}");
+        Gpio { out: 0, enable: 0, input: (1u64 << pins) - 1, status: 0, pin: [0; GPIO_MAX_PINS], func_in_sel: [0x3c; 256], func_out_sel: [0x100; GPIO_MAX_PINS], ram: RegRam::new(), pins, changes: Vec::new(), strap: 0x0f, input_changes: Vec::new(), pull_up: 0, pull_down: 0, external_mask: 0, external_levels: 0, int_ena_pins: 0, matrix_input_pins: 0, input_select: 0x80 } }
+    /// The bits of this GPIO's pins.
     fn mask(&self) -> u64 { (1u64 << self.pins) - 1 }
     /// A PIN register by pin number (INT_TYPE 9:7, INT_ENA 17:13), for pins past the S3 map.
     pub fn set_pin_config(&mut self, pin: usize, v: u32) {
@@ -40,6 +40,10 @@ impl Gpio {
         let enabled = v & (1 << 13) != 0 && matches!((v >> 7) & 7, 1..=5);
         self.int_ena_pins = (self.int_ena_pins & !(1 << pin)) | (u64::from(enabled) << pin);
     }
+    /// Report every pin whose driven level changed: `out & enable` before against after. Both
+    /// words matter — a driver that toggles the output *enable* to produce a level (IDF 5.5's
+    /// esp_lcd releases the D/C line after each colour transfer and re-enables it before the
+    /// next) changes what a board sees just as much as one that toggles `out`.
     fn note_out(&mut self, old_out: u64, old_enable: u64) {
         let vis = self.out & self.enable; let oldvis = old_out & old_enable;
         let mut diff = (vis ^ oldvis) & self.mask();

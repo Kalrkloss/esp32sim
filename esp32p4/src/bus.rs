@@ -271,7 +271,8 @@ impl SocBus {
     /// I2S1's transmit DMA through the AHB-GDMA (trigger 4), paced by the frame rate: the frames
     /// due since the last call are taken from the OUT chain, a descriptor at a time, each one
     /// written back to the CPU when AUTO_WRBACK is set, with OUT_DONE, OUT_EOF on a SUC_EOF one and
-    /// OUT_TOTAL_EOF at the end of the chain, as the S3's pump does (esp32s3/src/bus/dma.rs). The
+    /// OUT_TOTAL_EOF when that one ends the chain, as the S3's pump does (esp32s3/src/bus/dma.rs).
+    /// Descriptors are read through the shared `DescriptorWalk`, with its step budget. The
     /// first slot of each frame goes to the audio sink. IDF's I2S driver keeps a ring of
     /// descriptors, so the stream runs as long as it refills them.
     fn i2s1_tx(&mut self, cycles: u64) {
@@ -281,22 +282,25 @@ impl SocBus {
         let mut need = frames as usize * bpf;
         let mut samples: Vec<i16> = Vec::new();
         let mut mem = DmaView { l2mem: &mut self.l2mem, psram: &mut self.psram, mmu: &self.mmu_psram };
-        let word = |m: &mut DmaView, a: u32| -> Option<u32> { let mut b = [0u8; 4]; esp_periph::sdmmc::SdmmcMemory::read(m, a, &mut b).ok().map(|_| u32::from_le_bytes(b)) };
-        for _ in 0..esp_periph::gdma::GDMA_DESCRIPTOR_STEP_BUDGET {
+        let mut walk = esp_periph::gdma::DescriptorWalk::new(esp_periph::gdma::GDMA_DESCRIPTOR_STEP_BUDGET);
+        loop {
             if need == 0 { break; }
             let c = self.periph.ahb_dma.gdma.out[ch];
             if !c.running || c.desc == 0 { break; }
-            let (Some(dw0), Some(buf), Some(next)) = (word(&mut mem, c.desc), word(&mut mem, c.desc + 4), word(&mut mem, c.desc + 8)) else {
-                let c = &mut self.periph.ahb_dma.gdma.out[ch]; c.running = false; c.int_raw |= 1 << 2; break;   // OUT_DSCR_ERR
+            let read = walk.read_with(c.desc, |a| { let mut b = [0u8; 4]; esp_periph::sdmmc::SdmmcMemory::read(&mut mem, a, &mut b).map(|_| u32::from_le_bytes(b)) });
+            let (dw0, d) = match read {
+                Ok(read) => read,
+                Err(esp_periph::gdma::DmaDescriptorFault::StepBudgetExceeded { .. }) => break,   // the rest at the next call
+                Err(_) => { let c = &mut self.periph.ahb_dma.gdma.out[ch]; c.running = false; c.int_raw |= 1 << 2; break; }   // OUT_DSCR_ERR
             };
-            let length = (dw0 >> 12) & 0xfff;
-            let remaining = length.saturating_sub(c.buf_pos) as usize;
+            let (buf, next) = (d.buf, d.next);
+            let remaining = d.length.saturating_sub(c.buf_pos) as usize;
             if remaining == 0 {
                 if c.conf0 & (1 << 2) != 0 { let _ = esp_periph::sdmmc::SdmmcMemory::write(&mut mem, c.desc, &(dw0 & !(1 << 31)).to_le_bytes()); }   // AUTO_WRBACK: owner -> CPU
                 let c = &mut self.periph.ahb_dma.gdma.out[ch];
                 c.int_raw |= 1 << 0;                                                    // OUT_DONE
                 if dw0 & (1 << 30) != 0 { c.int_raw |= 1 << 1; c.eof_desc = c.desc; }   // OUT_EOF
-                if next == 0 { c.running = false; c.desc = 0; c.int_raw |= 1 << 3; break; }   // OUT_TOTAL_EOF
+                if next == 0 { c.running = false; c.desc = 0; if d.eof { c.int_raw |= 1 << 3; } break; }   // OUT_TOTAL_EOF
                 c.desc = next; c.buf_pos = 0;
                 continue;
             }
@@ -529,6 +533,28 @@ impl Bus for SocBus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// I2S1's transmit chain read from a guest-chosen descriptor address: one at the top of the
+    /// address space reads unmapped words, an OUT_DSCR_ERR, not an overflow (a panic in a debug
+    /// build); a chain of descriptors that loops ends at the walk's step budget, with no frames.
+    #[test]
+    fn i2s1_descriptors_at_any_address_end_in_an_error_not_a_panic() {
+        let mut b = SocBus::new(0x1000, [0; 6], (3, 1));
+        b.periph.i2s1.write(0x24, 1 << 2);                            // TX_START
+        let ch = &mut b.periph.ahb_dma.gdma.out[0];
+        (ch.peri_sel, ch.running, ch.desc) = (4, true, 0xffff_fffc);
+        b.i2s1_tx(crate::periph::CPU_HZ);
+        let ch = b.periph.ahb_dma.gdma.out[0];
+        assert!(!ch.running && ch.int_raw & 1 << 2 != 0, "OUT_DSCR_ERR: {:#x}", ch.int_raw);
+        // An owned descriptor of length 0 pointing at itself, in L2MEM.
+        let d = 0x4ff4_0000;
+        for (o, v) in [(0, 1u32 << 31), (4, d), (8, d)] { b.write32(d + o, v).unwrap(); }
+        let ch = &mut b.periph.ahb_dma.gdma.out[0];
+        (ch.running, ch.desc, ch.int_raw) = (true, d, 0);
+        b.i2s1_tx(crate::periph::CPU_HZ);
+        assert!(b.periph.i2s1.pcm.is_empty());
+        assert_eq!(b.periph.ahb_dma.gdma.out[0].int_raw & 1 << 3, 0, "no OUT_TOTAL_EOF");
+    }
 
     #[test]
     fn flash_window_and_its_uncached_alias_go_through_the_mmu() {

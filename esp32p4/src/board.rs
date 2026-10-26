@@ -3,7 +3,7 @@
 //! `waveshare/esp32_p4_wifi6_touch_lcd_3_5` 2.0.2 (include/bsp/esp32_p4_wifi6_touch_lcd_3_5.h,
 //! esp32_p4_wifi6_touch_lcd_3_5.c): an ST7796 320 x 480 on GPSPI2 (MOSI 20, CLK 21, CS 23, D/C 26,
 //! RST 27) with its backlight on LEDC from GPIO 28; FT5x06-family touch on I2C (SCL 8, SDA 7,
-//! RST 29, INT 50); an ES8311 codec on I2S0 (DOUT 9, LRCK 10, DIN 11, SCLK 12, MCLK 13) and the
+//! RST 29, INT 50); an ES8311 codec on I2S1 (CONFIG_BSP_I2S_NUM 1; DOUT 9, LRCK 10, DIN 11, SCLK 12, MCLK 13) and the
 //! speaker amplifier's enable on GPIO 53; an SD slot on slot 0; an ESP32-C6 on SDIO (ESP-Hosted).
 //! Modelled: the panel, the touch controller, the codec's registers (its audio is I2S1's).
 //! Not yet: the backlight level, the codec's volume.
