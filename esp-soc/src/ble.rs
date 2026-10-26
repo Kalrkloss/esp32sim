@@ -57,7 +57,8 @@ pub enum LinkAction {
     Connect,
     Advertisement(Vec<u8>, bool),
     Data(u16, Vec<u8>),
-    /// A device around the station (`peer::Nearby`) in the guest's scan: an LE Advertising Report.
+    /// A device around the station (`peer::Nearby`) in the guest's scan: an LE Advertising Report,
+    /// scannable and not connectable.
     Report { addr: [u8; 6], addr_type: u8, data: Vec<u8>, scan_response: Vec<u8>, rssi: i8, active: bool },
 }
 
@@ -461,10 +462,11 @@ impl HciController for Controller {
                 }
                 LinkAction::Data(cid, pdu) if self.connected => self.l2cap(cid, &pdu),
                 LinkAction::Report { addr, addr_type, data, scan_response, rssi, active } => {
-                    // LE Advertising Report (Bluetooth Core 5.4, Vol 4 Part E 7.7.65.2): ADV_IND, and
-                    // for an active scan SCAN_RSP, an empty one too, as a scannable advertiser
-                    // answers every scan request.
-                    for (kind, payload) in [(0u8, &data), (4u8, &scan_response)] {
+                    // LE Advertising Report (Bluetooth Core 5.4, Vol 4 Part E 7.7.65.2): ADV_SCAN_IND
+                    // (0x02, scannable, not connectable: Vol 6 Part B 2.3.1.4), and for an active scan
+                    // SCAN_RSP (0x04), an empty one too, as a scannable advertiser answers every scan
+                    // request.
+                    for (kind, payload) in [(2u8, &data), (4u8, &scan_response)] {
                         if kind == 4 && !active { continue; }
                         let mut e = vec![2, 1, kind, addr_type];
                         e.extend_from_slice(&addr);
