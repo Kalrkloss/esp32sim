@@ -15,6 +15,7 @@ Pocket Tank (from part 6 also the C6 WiFi station). One file per part:
 | 6 | `p4/06-coproc` | [06-coproc.md](06-coproc.md) | [EX245](../../experiments.md#ex245) |
 | rev ≥ 3 | `p4/rev3` | [07-rev3.md](07-rev3.md) | [EX247](../../experiments.md#ex247) |
 | rev ≥ 3, step 1 | `p4/rev3-step1` (against `p4/rev3`) | [08-rev3-step1.md](08-rev3-step1.md) | [EX247](../../experiments.md#ex247) |
+| rev ≥ 3, step 2 | `p4/lcd35-board` (against `p4/rev3-step1`) | [09-lcd35-board.md](09-lcd35-board.md) | [EX247](../../experiments.md#ex247) |
 
 ## Method
 
