@@ -44,7 +44,7 @@ I (35) efuse_init: Min chip rev:     v3.1
 I (35) efuse_init: Max chip rev:     v3.99 
 I (35) efuse_init: Chip rev:         v3.1
 I (35) heap_init: Initializing. RAM available for dynamic allocation:
-I (36) heap_init: At 4FF322B0 len 00088D10 (547 KiB): RETENT_RAM
+I (35) heap_init: At 4FF322B0 len 00088D10 (547 KiB): RETENT_RAM
 I (36) heap_init: At 4FFBAFC0 len 00004BF0 (18 KiB): RAM
 I (36) heap_init: At 50108080 len 00007F80 (31 KiB): RTCRAM
 I (36) heap_init: At 30100178 len 00001E88 (7 KiB): TCM

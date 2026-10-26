@@ -37,3 +37,17 @@ fn a_bootloader_and_app_for_different_revisions_stop_the_run_with_the_file_named
         assert!(!err.contains("[emu] stop:"), "the run started:\n{err}");
     }
 }
+
+/// A rev >= 3 bootloader placed with `--flash-at 0x2000=` picks the rev >= 3 model as `--bootloader`
+/// does, which then refuses the rev < 3 app.
+#[test]
+fn a_rev3_bootloader_placed_with_flash_at_picks_rev3() {
+    let app = "web/wasm/fw/public/p4-hello_world.bin";
+    let bl = rev3_copy("p4-hello-bootloader.bin");
+    let at = format!("0x2000={}", bl.display());
+    let args = ["--boot", "app", "--flash-mb", "2", "--flash-at", &at, "--ptable", "web/wasm/fw/public/p4-hello-ptable.bin", "--app", app, "--max-seconds", "1"];
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_esp32sim-p4")).args(args).current_dir(root()).output().unwrap();
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(2), "{err}");
+    assert!(err.contains(&format!("[emu] {app} was built for ESP32-P4 rev < v3.0")) && err.contains("this model is rev ≥ 3"), "{err}");
+}

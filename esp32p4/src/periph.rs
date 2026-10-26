@@ -724,8 +724,9 @@ pub struct Peripherals {
     /// LEDC (0x500D3000); its clock is HP_SYS_CLKRST PERI_CLK_CTRL22's (`ledc_clock`)
     pub ledc: Ledc,
     pub assist_debug: AssistDebug,
-    /// WDEV_RND_REG = LP_SYSTEM_REG_RNG_DATA (0x501101A4) on rev < 3
-    /// (IDF v5.5.3 register/hw_ver1/soc/wdev_reg.h:16, lp_system_reg.h:1251)
+    /// WDEV_RND_REG: LP_SYSTEM_REG_RNG_DATA (0x501101A4) on rev < 3, LP_TRNG's RNG_DATA
+    /// (0x50126004) on rev >= 3 (IDF v5.5.4 register/hw_ver1/soc/wdev_reg.h:16,
+    /// lp_system_reg.h:1251; hw_ver3/soc/wdev_reg.h:16, trng_reg.h:52). Both read this one generator.
     pub rng: Rng,
     /// register RAM behind unmodelled blocks, first-touch logging, pc attribution
     pub misc: Misc,
@@ -775,6 +776,9 @@ device_set! { Peripherals; clock: (clock) CPU_HZ, [(ClockDomain::Xtal, 9), (Cloc
     0x500e5 "HP_SYS" (hp_sys) => [src::FROM_CPU0, src::FROM_CPU0 + 1, src::FROM_CPU0 + 2, src::FROM_CPU0 + 3];
     0x500e6 "HP_SYS_CLKRST" (hp_clkrst) => [];
     0x50110 "LP_RNG" (rng) @ 0x1a4..=0x1a7 => [];
+    // LP_TRNG, rev >= 3's random source. hw_ver1 has no block here and its IDF never reads it, so
+    // it is mounted on both revisions; CFG, RSTN and DATE stay register RAM.
+    0x50126 "LP_TRNG" (rng) @ 0x4..=0x7 => [];
     0x50110 "LP_SYS" (lp) => [];
     0x50111 "LP_CLKRST" alias (lp) delta 0x1000 => [];
     0x50112 "LP_TIMER" alias (lp) delta 0x2000 => [];
@@ -790,7 +794,7 @@ impl DeviceSet for Peripherals {
     fn pre_access(&mut self, block: u32, off: u32, write: bool) {
         // INTR_STATUS_0..3 read the source state.
         if block == 0x500d6 && !write && (0x200..=0x20c).contains(&(off & 0x7ff)) { self.intmtx.status = self.source_status(); }
-        if block == 0x50110 && off == 0x1a4 && !write { self.rng.now = self.clock.cycles() as u32; }
+        if (block == 0x50110 && off == 0x1a4 || block == 0x50126 && off == 0x4) && !write { self.rng.now = self.clock.cycles() as u32; }
         // I2C1's clock: HP_SYS_CLKRST PERI_CLK_CTRL10 I2C1_CLK_SRC_SEL bit 26 (1 = RC_FAST),
         // PERI_CLK_CTRL11 I2C1_CLK_DIV_NUM 7:0, NUMERATOR 15:8, DENOMINATOR 23:16
         // (register/hw_ver3/soc/hp_sys_clkrst_reg.h:1443-1470; hal/i2c_ll.h:186-226 writes div_a to
@@ -848,7 +852,7 @@ impl Peripherals {
             0x500e4 => "AUDIO_ADDC", 0x500e5 => "HP_SYS", 0x500e6 => "HP_SYS_CLKRST",
             0x50110 => "LP_SYS", 0x50111 => "LP_CLKRST", 0x50112 => "LP_TIMER", 0x50113 => "LP_ANA_PERI", 0x50114 => "LP_HUK",
             0x50115 => "PMU", 0x50116 => "LP_WDT", 0x50118 => "LP_MAILBOX", 0x50119 => "RTC", 0x50120 => "LP_PERI",
-            0x50121 => "LP_UART", 0x50122 => "LP_I2C", 0x50123 => "LP_SPI", 0x50124 => "I2C_ANA_MST", 0x50125 => "LP_I2S",
+            0x50121 => "LP_UART", 0x50122 => "LP_I2C", 0x50123 => "LP_SPI", 0x50124 => "I2C_ANA_MST", 0x50125 => "LP_I2S", 0x50126 => "LP_TRNG",
             0x50127 => "LP_ADC", 0x50128 => "LP_TOUCH", 0x5012a => "LP_GPIO", 0x5012b => "LP_IOMUX", 0x5012c => "LP_INTR",
             0x5012d => "EFUSE", 0x5012e => "LP_PERI_PMS", 0x5012f => "LP_TSENSOR",
             _ => "?",
@@ -1063,6 +1067,18 @@ mod tests {
         p.write32(0x500e_5010, 0);
         p.refresh_lines();
         assert_eq!(p.clic.core[0].candidate(), None);
+    }
+
+    #[test]
+    fn both_revisions_random_sources_read_the_generator() {
+        // WDEV_RND_REG: LP_SYSTEM RNG_DATA on rev < 3, LP_TRNG RNG_DATA on rev >= 3.
+        let mut p = Peripherals::new([0; 6], (3, 1));
+        for addr in [0x5011_01a4, 0x5012_6004] {
+            let (a, b) = (p.read32(addr), p.read32(addr));
+            assert!(a != 0 && b != 0 && a != b, "{addr:#x}: {a:#x} {b:#x}");
+        }
+        p.write32(0x5012_6000, 1);                                    // CFG stays register RAM
+        assert_eq!(p.read32(0x5012_6000), 1);
     }
 
     #[test]

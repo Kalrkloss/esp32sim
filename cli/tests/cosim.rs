@@ -439,9 +439,10 @@ fn fault_reg_read_crc_restarts_the_host() {
     assert_eq!((cs.summary.p4_resets, c.power_ups), (1, 2), "the C6 reset again by GPIO 54, once");
     // The restarted P4 makes GPIO 54 an output a few instructions before it writes the level
     // ("A restarted P4 glitches EN"); whether a slice end catches that depends on where the slices
-    // fall (the ROM's console after the restart moves it). Each one caught is two EN changes the
-    // C6 rides out, without a power-up.
-    assert!(c.en_glitches <= 1 && cs.summary.en_changes == 4 + 2 * c.en_glitches, "{} glitches, {} EN changes", c.en_glitches, cs.summary.en_changes);
+    // fall (the ROM's console after the restart moves it), here not. Each one caught would be two
+    // more EN changes, which the C6 rides out; `a_short_en_pulse_does_not_reset_the_c6` covers
+    // that path.
+    assert_eq!((c.en_glitches, cs.summary.en_changes), (0, 4), "no glitch caught at these slices");
 }
 
 /// A write's CRC status reports an error (the card drops the block), or never comes (the card
