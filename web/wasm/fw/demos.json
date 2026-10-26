@@ -70,6 +70,11 @@
   "note": "two chips in this tab, as on the Waveshare ESP32-P4-WIFI6: the P4 (rev ≥ 3, two RISC-V cores) runs IDF's wifi_station with ESP-Hosted, the C6 the ESP-Hosted slave, both from their mask ROMs and in lock-step over SDIO. The C6 joins the virtual access point and the P4 gets its address through it. A real board with a v3.2 P4 and its own C6 goes through the same steps to its address"
  },
  {
+  "fw": "tdisplay-schematik",
+  "title": "Schematik T-Display · classic ESP32 (Arduino)",
+  "note": "a restyled Schematik Arduino sketch on the classic ESP32: a lowercase wordmark, four fun lines and verified emulator specs on the ST7789. GPIO35 advances; GPIO0 powers off into deep sleep and wakes back to the wordmark. No physical-board verification"
+ },
+ {
   "fw": "tdisplay-prices",
   "title": "LilyGO TTGO T-Display · spot prices (MicroPython)",
   "note": "the classic ESP32: stock MicroPython v1.29.0 (ESP32_GENERIC) from micropython.org, booted by the mask ROM, running a pure-Python spot-price app on its ST7789 135×240 over VSPI from a LittleFS filesystem — day prices as a bar chart with the current hour. Demo data from its own filesystem: the browser has no sockets, so there is no Wi-Fi and no fetch; the two buttons are below the panel"
