@@ -91,7 +91,7 @@
       "disassembly_sha256": "249d74a5f9b9eedea7feaf85f54d460fcfcb196c33577a56933a7b01347a9b91"
     }
   ],
-  "cpu": "PENDING",
+  "cpu": "no timing run: the method has no callers",
   "build_jobs": {
     "base": 4,
     "head": 4

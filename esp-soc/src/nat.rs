@@ -171,6 +171,10 @@ struct Udp {
 }
 
 /// Current TCP occupancy, independent of cumulative connection statistics.
+///
+/// Only `active` counts against the 64-flow table limit: a new SYN on a full table evicts a
+/// TimeWait entry. A small `active` still does not mean a new connect will be admitted: the limit
+/// of 8 host connects in progress is process-wide, shared by every `Nat`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TcpFlowCounts {
     /// Connecting and connected flows, including half-close and unacknowledged FIN.
