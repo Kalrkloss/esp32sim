@@ -39,6 +39,8 @@ demos. Pages serves these files directly; no additional host or release is
 needed. The ROM is fetched by `tools/fetch-demo-assets.sh --no-linux`.
 The manifest uses no function stubs and does not ship the debug ELF.
 `SHA256SUMS` pins the application source and shipped images.
+The recipe maps the PlatformIO package directory to `/platformio` in
+`__FILE__` strings, so the images carry no local paths.
 
 `public/schematik-tdisplay-NOTICE.txt` inventories the linked components and
 licences. The adjacent source archive contains the unmodified Arduino core,
@@ -70,8 +72,8 @@ The browser smoke test is `node tools/wasm-test.mjs tdisplay-schematik`.
 Its `min_frames` requirement rejects a boot that never draws the display.
 
 For exact text/order/layout assertions on every screen, install Pillow and run
-`python3 examples/schematik-tdisplay/verify_frames.py "$OUT"` after the native
-build and PlatformIO build. It replays all nine screens, wrap, power-off,
-EXT0 wake and another power-off after releasing the wake press. Actual PNGs,
+`OUT=$(mktemp -d); python3 examples/schematik-tdisplay/verify_frames.py "$OUT"`
+after the native build and PlatformIO build. It replays all nine screens, wrap,
+power-off, EXT0 wake and another power-off after releasing the wake press. Actual PNGs,
 button scripts and console logs are retained under `$OUT`; no hardware or
 paid generation is needed.

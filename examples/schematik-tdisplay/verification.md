@@ -1,5 +1,7 @@
 # Verification receipt
 
+Refreshed on main `ce31ceac`, the branch's base.
+
 The existing MicroPython T-Display landing card is unchanged and precedes
 Schematik T-Display. This demo changes sketch firmware, static web content,
 packaging and verification only; no Rust/emulator code changes.
@@ -41,8 +43,9 @@ the wake press re-arms power-off. It does not advance the next-button cycle.
   configuration (`boards/lilygo-t-display.json` in the pinned pioarduino
   platform sets `build.f_cpu` to `240000000L`).
   This is a modeled CPU frequency, not a claim of host real-time throughput.
-- 4 MB flash: `esp32/src/board/tdisplay.rs:1`, `docs/esp32.md:78-83`,
-  and this demo's `web/wasm/fw/tdisplay-schematik.json` (`flash_mb: 4`).
+- 4 MB flash: `esp32/src/board/tdisplay.rs:1`, the `docs/esp32.md` section
+  "The board: `--board ttgo-tdisplay`", and this demo's
+  `web/wasm/fw/tdisplay-schematik.json` (`flash_mb: 4`).
   `esp32/src/bus.rs:75-85` allocates flash from the chosen size.
 - 18 ADC channels: `esp32/src/adc.rs:8-10` maps eight ADC1 and ten ADC2
   channels and validates their pins. `docs/esp32.md:57-62` describes classic
@@ -72,6 +75,10 @@ WASM build script copies from `target/`.
 Pinned inputs: PlatformIO Core 6.1.19; pioarduino 55.03.38-1;
 Arduino-ESP32 3.3.8 / ESP-IDF 5.5.4; Xtensa GCC 14.2.0_20260121;
 Arduino_GFX 1.6.9. `SHA256SUMS` pins the sketch and all five shipped artifacts.
+`platformio.ini` sets `-fmacro-prefix-map=${platformio.packages_dir}=/platformio`
+(PlatformIO applies `build_flags` to the framework sources too), so the
+Arduino core's `__FILE__` strings read `/platformio/...` instead of the local
+package directory.
 
 ```sh
 nice -n 10 pio run -d examples/schematik-tdisplay
@@ -80,6 +87,7 @@ nice -n 10 python3 examples/schematik-tdisplay/package.py
 nice -n 10 tools/fetch-demo-assets.sh --no-linux
 nice -n 10 cargo +1.99.0 build --release --bin esp32sim
 # Requires Pillow and the pinned PlatformIO dependencies above:
+OUT=$(mktemp -d)
 python3 examples/schematik-tdisplay/verify_frames.py "$OUT"
 ```
 
@@ -90,7 +98,11 @@ placement, clipping and failed wrap. It also asserts a blank sleeping frame,
 unchanged PCs/instruction totals at 2 and 2.5 seconds, EXT0 DEEPSLEEP_RESET,
 pixel-identical initial/wake frames, and power-off after wake release.
 PNGs are actual emulator captures, not generated mockups. The landing thumbnail
-is the captured initial frame converted losslessly to WebP. The source archive
+is the captured initial frame converted losslessly to WebP. The bootloader,
+partition table and application images contain no local paths:
+`strings -n 6 <image> | grep -c /Users/` is 0 for each, the 13 Arduino core
+`__FILE__` strings in the application start with `/platformio/`, and the
+bootloader only has the IDF's own `/IDF/...` paths. The source archive
 has zero owner IDs/timestamps, no local paths, and includes the modified sketch
 and pinned build recipe alongside unchanged dependency sources.
 
@@ -105,9 +117,14 @@ and pinned build recipe alongside unchanged dependency sources.
   string and the ELF/image hashes that depend on it, so the shipped app is kept.
 - Native frame assertions pass for all nine screens plus wrap. Sleeping CPUs
   remain at PCs `0x40084795` / `0x40086b91`, with instruction totals
-  6,969,641 / 93,508,722 unchanged at 2 and 2.5 seconds. EXT0 wake gives
+  6,965,801 / 93,508,590 unchanged at 2 and 2.5 seconds. EXT0 wake gives
   `DEEPSLEEP_RESET` and the first frame's exact RGB bytes; another GPIO0
   press after wake/release sleeps again.
+- Against the previous app image (built without the prefix map), all 14
+  captured panel PNGs (nine screens, wrap, two sleeping frames, wake and the
+  second power-off) are byte-identical, and the sleeping PCs are the same.
+  The instruction totals differ (previously 6,969,641 / 93,508,722) because
+  the shorter `__FILE__` strings move rodata and code addresses.
 - No Rust or Cargo file differs from main, and no Rust test reads the added
   files, so Clippy and the workspace tests are main's.
 - `RUSTUP_TOOLCHAIN=1.99.0 tools/wasm-build.sh` passes. The section check
