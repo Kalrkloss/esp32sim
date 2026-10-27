@@ -2,6 +2,16 @@
 
 Ordered by value; each item links to its plan where one exists.
 
+The work ahead is grouped in [GitHub milestones](https://github.com/mikroverk/esp32sim/milestones),
+each with a tracking issue that lists its items and what "done" means:
+
+- [Real time in the browser](https://github.com/mikroverk/esp32sim/milestone/1) — #302
+- [Wi-Fi complete](https://github.com/mikroverk/esp32sim/milestone/2) — #303
+- [BLE and Web Bluetooth](https://github.com/mikroverk/esp32sim/milestone/3) — #304
+- [Multiple boards and ESP-NOW](https://github.com/mikroverk/esp32sim/milestone/4) — #305
+- [ESP-NOW swarm demo](https://github.com/mikroverk/esp32sim/milestone/5) — #306
+- [New chips](https://github.com/mikroverk/esp32sim/milestone/6) — #214, #215
+
 1. **WiFi (full, unmodified)** — done: open and WPA2-PSK both associate through the closed blob,
    and outbound TCP/UDP reaches the real network through a user-mode NAT, TLS included
    ([wifi-plan.md](wifi-plan.md), [networking-plan.md](networking-plan.md)). Remaining: inbound
