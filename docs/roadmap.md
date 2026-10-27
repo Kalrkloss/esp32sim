@@ -11,6 +11,8 @@ each with a tracking issue that lists its items and what "done" means:
 - [Multiple boards and ESP-NOW](https://github.com/mikroverk/esp32sim/milestone/4) — #305
 - [ESP-NOW swarm demo](https://github.com/mikroverk/esp32sim/milestone/5) — #306
 - [New chips](https://github.com/mikroverk/esp32sim/milestone/6) — #214, #215
+- [Boards and integrations](https://github.com/mikroverk/esp32sim/milestone/7)
+- [Maintenance: fixes, compatibility, docs](https://github.com/mikroverk/esp32sim/milestone/8)
 
 1. **WiFi (full, unmodified)** — done: open and WPA2-PSK both associate through the closed blob,
    and outbound TCP/UDP reaches the real network through a user-mode NAT, TLS included
