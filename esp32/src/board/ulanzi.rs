@@ -1,12 +1,15 @@
-//! The Ulanzi TC001 pixel clock: an ESP32-WROOM-32 module (4 MB flash, no PSRAM) behind a 32×8
-//! WS2812 matrix, three buttons, a light sensor, a battery divider and a buzzer.
+//! The Ulanzi TC001 pixel clock: a classic ESP32 with 4 MB flash (the layout the AWTRIX web
+//! flasher writes) behind a 32×8 WS2812 matrix, three buttons, a light sensor, a battery divider
+//! and a buzzer.
 //!
-//! Wiring, from the AWTRIX 3 firmware written for it (`src/DisplayManager.cpp`,
-//! `src/PeripheryManager.cpp`, ULANZI environment): matrix data GPIO 32; buttons left GPIO 26,
+//! Wiring, from the AWTRIX 3 firmware written for it (Blueforcer/awtrix3 at `a69571703a88`,
+//! `src/DisplayManager.cpp`, `src/PeripheryManager.cpp`, ULANZI environment; the pin block moves
+//! between versions): matrix data GPIO 32; buttons left GPIO 26,
 //! select GPIO 27, right GPIO 14 (EasyButton with the internal pull-up, pressed = low); light
 //! sensor GPIO 35 and battery divider GPIO 34 (ADC1); buzzer GPIO 15; I2C SDA 21 / SCL 22 (a
 //! temperature/humidity sensor and an RTC, not modelled). The ADC inputs and the buzzer are not
-//! modelled either.
+//! modelled either, nor AWTRIX's `RESET_PIN` GPIO 13 (held low for 5 s it erases the settings);
+//! it reads high.
 //!
 //! The 256 LEDs are one chain, wired in rows from the top-left corner, every second row running
 //! right to left: AWTRIX's default matrix layout 0, `NEO_MATRIX_TOP + NEO_MATRIX_LEFT +

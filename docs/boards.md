@@ -245,11 +245,14 @@ Selected with `--chip esp32 --board ttgo-tdisplay` (alias `tdisplay`); [esp32.md
 | Light sensor, battery divider | GPIO 35, GPIO 34 (ADC1) | not modelled |
 | Buzzer | GPIO 15 | not modelled |
 | I2C | SDA 21 / SCL 22 | temperature/humidity sensor and RTC not modelled |
+| AWTRIX `RESET_PIN` | GPIO 13 (held low for 5 s, AWTRIX erases its settings) | not modelled, reads high |
 
 Selected with `--chip esp32 --board ulanzi-tc001` (alias `tc001`). Pins from the AWTRIX 3 firmware
-(`src/DisplayManager.cpp`, `src/PeripheryManager.cpp`). A 256-LED frame is 6144 RMT symbols sent
+(Blueforcer/awtrix3 at `a69571703a88`, `src/DisplayManager.cpp`, `src/PeripheryManager.cpp`; the
+pin block moves between versions). A 256-LED frame is 6144 RMT symbols sent
 through the refilled 64-word block; the classic RMT hands transmissions up to 4096 pixels to the
 board. Stock AWTRIX 3 runs on it: [examples/ulanzi-tc001](../examples/ulanzi-tc001/README.md).
+CLI only for now: the web page (`web/emu.js`) does not offer the board yet.
 
 ## `ai-thinker-cam` — AI-Thinker ESP32-CAM (classic ESP32)
 

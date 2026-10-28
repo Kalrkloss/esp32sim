@@ -13,5 +13,6 @@ Expected: on the first boot LittleFS finds no filesystem and formats it, the app
 "AP MODE" (`tc001.png`, 3× scale) and the board report counts the frames, about 80 a second. The
 colours are the values the firmware sends, before any brightness or diffuser.
 
-The images are not part of this repository; AWTRIX 3 is Blueforcer's, under its own licence.
+The images are not part of this repository and the script only downloads them. AWTRIX 3 is
+Blueforcer's, under CC BY-NC-SA 4.0 (`LICENSE.md` at the pinned commit): non-commercial use only.
 `external_awtrix_tc001` in `cli/tests/goldens.rs` runs the same check with `AWTRIX_FLASH` set to the image.
