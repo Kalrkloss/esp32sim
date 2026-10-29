@@ -3,7 +3,7 @@
 Ordered by value; each item links to its plan where one exists.
 
 The work ahead is grouped in [GitHub milestones](https://github.com/mikroverk/esp32sim/milestones),
-each with a tracking issue that lists its items and what "done" means:
+with tracking issues where available that list items and what "done" means:
 
 - [Real time in the browser](https://github.com/mikroverk/esp32sim/milestone/1) — #302
 - [Wi-Fi complete](https://github.com/mikroverk/esp32sim/milestone/2) — #303
