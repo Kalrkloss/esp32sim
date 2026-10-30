@@ -240,7 +240,7 @@ pub fn parse(args: &[String], default_chip: &str) -> Opts {
         i += 1;
     }
     if !o.hostfwd.is_empty() && o.wifi.is_none() { usage_error("--hostfwd requires --wifi"); }
-    if !o.hostfwd.is_empty() && o.net != "nat" && o.net != "user" { usage_error("--hostfwd requires --net nat"); }
+    if !o.hostfwd.is_empty() && !matches!(o.net.split(',').next(), Some("nat" | "user")) { usage_error("--hostfwd requires --net nat"); }
     for spec in &o.hostfwd {
         if let Err(e) = esp_soc::nat::HostFwdSpec::parse(spec) { usage_error(&format!("--hostfwd: {e}")); }
     }

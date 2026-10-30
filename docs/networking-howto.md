@@ -36,7 +36,10 @@ run to be reproducible and offline.
 with a server in the guest: a browser on the Mac opens `http://127.0.0.1:8080/` and the station
 sees a SYN from 10.0.2.2 to 10.0.2.15:80. Empty host address binds loopback; empty guest address is
 the station. The listener is bound when the run starts; SYNs go out once the station's MAC is known
-(association). Requires `--wifi` and `--net nat`.
+(association). A connection is not held until the guest's server listens: if the SYN arrives before
+the firmware calls `listen()`, the guest answers with RST and the host client sees a reset (QEMU's
+`hostfwd` behaves the same), so connect once the firmware is listening, or retry. Such a refusal
+counts as failed in the `[emu] nat:` report line. Requires `--wifi` and `--net nat`.
 
 The same `--wifi` and `--net` work on the **ESP32-C6** (`esp32sim-c6`): the access point and the
 network are the same code, the MAC model is the C6's own ([wifi-c6-plan.md](wifi-c6-plan.md)). What
