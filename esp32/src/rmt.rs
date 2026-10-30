@@ -11,6 +11,10 @@ const CONTINUOUS: u32 = 1 << 6;
 const APB_SOURCE: u32 = 1 << 17;
 const IDLE_LEVEL: u32 = 1 << 18;
 const IDLE_ENABLE: u32 = 1 << 19;
+/// Longest transmission handed to the board: 4096 WS2812 pixels, the S3's RMT DMA limit
+/// (`esp32s3/src/bus/dma.rs`). Wrap mode refills the 64-word block, so a 256-LED matrix sends
+/// 6144 symbols in one transmission. A longer stream still counts as a transmission but does not reach the board.
+const MAX_FRAME_BITS: usize = 24 * 4096;
 
 #[derive(Default)]
 struct Channel {
@@ -105,7 +109,7 @@ impl ClassicRmt {
         self.tx_count += 1;
         self.done.retain(|(channel, _)| *channel != n);
         let bits = std::mem::take(&mut self.ch[n].bits);
-        if bits.len() <= 4096 { self.done.push((n, bits)); }
+        if bits.len() <= MAX_FRAME_BITS { self.done.push((n, bits)); }
         self.idle(n);
         if self.conf1(n) & CONTINUOUS != 0 {
             self.ch[n].rd = 0;
@@ -155,7 +159,7 @@ impl ClassicRmt {
                 }
                 self.ch[n].symbol = self.mem[(n * WORDS + self.ch[n].rd) % self.mem.len()];
                 let sym = self.ch[n].symbol;
-                if sym & 0x7fff != 0 && self.ch[n].bits.len() <= 4096 { self.ch[n].bits.push(esp_periph::rmt::symbol_bit(sym)); }
+                if sym & 0x7fff != 0 && self.ch[n].bits.len() <= MAX_FRAME_BITS { self.ch[n].bits.push(esp_periph::rmt::symbol_bit(sym)); }
             }
             let half = (self.ch[n].symbol >> (16 * self.ch[n].phase)) as u16;
             self.ch[n].phase += 1;
@@ -299,12 +303,28 @@ mod tests {
         r.write(0xf0, 3);
         for i in 0..64 { r.write(ram(i), item(1, 1)); }
         start(&mut r, 0);
-        r.tick(20_000);
-        assert_eq!(r.ch[0].bits.len(), 4097);
+        r.tick(2 * super::MAX_FRAME_BITS as u64 + 20_000);
+        assert_eq!(r.ch[0].bits.len(), super::MAX_FRAME_BITS + 1);
         for i in 0..64 { r.write(ram(i), 0); }
         r.tick(128);
         assert!(r.done.is_empty());
         assert_eq!(r.read(0xa0) & 1, 1);
+    }
+
+    /// A 32×8 WS2812 matrix is 6144 symbols, sent through the 64-word block in wrap mode.
+    #[test]
+    fn a_wrapped_256_pixel_frame_is_published_whole() {
+        let mut r = model();
+        configure(&mut r, 0, 1, 1, true);
+        r.write(0xf0, 3);
+        for i in 0..64 { r.write(ram(i), item(1, 1)); }
+        start(&mut r, 0);
+        r.tick(2 * 6144 - 1);
+        for i in 0..64 { r.write(ram(i), 0); }
+        r.tick(128);
+        assert_eq!(r.done.len(), 1);
+        assert_eq!(r.done[0].1.len(), 6144);
+        assert_eq!(r.tx_count, 1);
     }
 
     #[test]

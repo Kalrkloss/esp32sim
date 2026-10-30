@@ -40,6 +40,8 @@ secondary-core control, eFuse, SPI flash, three UARTs, GPIO/IO_MUX, RTC control,
 and timer groups including LACT. `none` and `esp32dev` select the bare module.
 The default board option also selects the bare module for this chip.
 `ttgo-tdisplay` (alias `tdisplay`) is the LilyGO TTGO T-Display, see below.
+`ulanzi-tc001` (alias `tc001`) is the Ulanzi TC001 pixel clock, a 32×8 WS2812 matrix on RMT
+([boards.md](boards.md#ulanzi-tc001--ulanzi-tc001-pixel-clock-classic-esp32)).
 WASM accepts the `esp32` chip identifier. Boot applications through ROM.
 
 T0/T1 and LACT use 64-bit counters and the shared timer stepping logic.
