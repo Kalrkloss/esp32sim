@@ -2,6 +2,18 @@
 
 Ordered by value; each item links to its plan where one exists.
 
+The work ahead is grouped in [GitHub milestones](https://github.com/mikroverk/esp32sim/milestones),
+with tracking issues where available that list items and what "done" means:
+
+- [Real time in the browser](https://github.com/mikroverk/esp32sim/milestone/1) — #302
+- [Wi-Fi complete](https://github.com/mikroverk/esp32sim/milestone/2) — #303
+- [BLE and Web Bluetooth](https://github.com/mikroverk/esp32sim/milestone/3) — #304
+- [Multiple boards and ESP-NOW](https://github.com/mikroverk/esp32sim/milestone/4) — #305
+- [ESP-NOW swarm demo](https://github.com/mikroverk/esp32sim/milestone/5) — #306
+- [New chips](https://github.com/mikroverk/esp32sim/milestone/6) — #214, #215
+- [Boards and integrations](https://github.com/mikroverk/esp32sim/milestone/7)
+- [Maintenance: fixes, compatibility, docs](https://github.com/mikroverk/esp32sim/milestone/8)
+
 1. **WiFi (full, unmodified)** — done: open and WPA2-PSK both associate through the closed blob,
    and outbound TCP/UDP reaches the real network through a user-mode NAT, TLS included
    ([wifi-plan.md](wifi-plan.md), [networking-plan.md](networking-plan.md)). Remaining: UDP inbound,
@@ -40,8 +52,9 @@ Ordered by value; each item links to its plan where one exists.
 11. **ESP8266 (Xtensa LX106)** — todo ([#214](https://github.com/mikroverk/esp32sim/issues/214)):
    the call0 subset of the LX7 decoder, the ESP8266 ROM and memory map, UART/GPIO/FRC timers/HSPI,
    then its own Wi-Fi MAC model, since the SDK drives different hardware than the ESP32.
-12. **ESP32-P4 (RISC-V, dual HP core)** — todo ([#215](https://github.com/mikroverk/esp32sim/issues/215)):
-   F and Xesppie on top of the RV32 core, CLIC, L2MEM/PSRAM, then MIPI-DSI + DMA2D/PPA for the
-   display boards it ships on. Wi-Fi comes from a C6 over ESP-Hosted, so the C6 can be the co-processor.
+12. **ESP32-P4 (RISC-V, dual HP core)** — in progress ([#215](https://github.com/mikroverk/esp32sim/issues/215)):
+   F, CLIC, L2MEM/PSRAM, SDMMC, USB-OTG and Wi-Fi from an
+   emulated C6 over ESP-Hosted (`--coproc`) are there; Xesppie, MIPI-DSI and DMA2D/PPA for the
+   display boards it ships on are not.
 
 Not planned: blob-level WiFi/BLE emulation, cache-timing accuracy, Wokwi/cloud integration.
